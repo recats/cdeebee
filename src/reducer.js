@@ -1,5 +1,5 @@
 // @flow
-import { slice, assocPath, omit, clone } from 'ramda';
+import { slice, assocPath, omit, clone, mergeDeepRight } from 'ramda';
 import { types } from './constants';
 
 import { cancelationRequest, editEntity, getSubEntity } from './helpers';
@@ -11,7 +11,7 @@ export const storage = (state: Object = INITIAL_STORAGE, action: Object) => {
 
   switch (type) {
     case types.CDEEBEEE_UPDATE:
-      return { ...state, ...payload.response };
+      return mergeDeepRight(state, payload.response);
 
     case types.CDEEBEE_ENTITY_CHANGE_FIELD: {
       const entityList = state[payload.entityList];
