@@ -3,7 +3,6 @@
 [![npm](https://img.shields.io/npm/v/@recats/cdeebee.svg)](https://www.npmjs.com/package/@recats/cdeebee)
 ![Recats Digital](https://img.shields.io/badge/recats-digital-1abc9c.svg?style=flat)
 
-## Install
 ```sh
 npm i @recats/cdeebee
 # or
@@ -33,7 +32,7 @@ For instance for the sample above the whole cdeebee inside Redux will look like 
 {
   forumList: { 1: { title: ‘Milky Way Galaxy’ } },
   threadList: { 10001: { title: ‘Solar system’, forumID: 1 } },
-  postList: {  2: { title: ‘Earth’, threadId: 10001 } }
+  postList: {  2: { title: ‘Earth’, threadID: 10001 } }
 }
 
 ```
