@@ -1,5 +1,8 @@
 // @flow
-import { slice, assocPath, omit, clone, mergeDeepRight } from 'ramda';
+import {
+  slice, assocPath, omit, clone, mergeDeepRight,
+} from 'ramda';
+import set from 'lodash/set';
 import { types } from './constants';
 
 import { cancelationRequest, editEntity, getSubEntity } from './helpers';
@@ -17,7 +20,7 @@ export const storage = (state: Object = INITIAL_STORAGE, action: Object) => {
       const entityList = state[payload.entityList];
       const entity = editEntity(entityList[payload.entityID]);
       const subEntity = clone(getSubEntity(entity));
-      payload.list.forEach(({ key, value }) => { subEntity[key] = value; });
+      payload.list.forEach(({ key, value }) => set(subEntity, key, value));
       return assocPath([payload.entityList, payload.entityID, '__entity'], subEntity, state);
     }
     case types.CDEEBEE_INSERT_ENTITY:
