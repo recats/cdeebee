@@ -2,7 +2,7 @@
 import { types } from './constants';
 
 export type IKeyVaue = {
-  key: string,
+  key: string | Array<string>,
   value: any
 }
 
@@ -43,7 +43,7 @@ export function setKeyValueList(
 export function setKeyValue(
   entityList: $Keys<typeof types>,
   entityID: number,
-  key: string,
+  key: string | Array<string>,
   value: string,
   options?: ISetKeyValueProps,
 ): Function {
