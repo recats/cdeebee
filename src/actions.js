@@ -73,3 +73,26 @@ export function commitEntity(
     }
   };
 }
+
+export function resetEntity(
+  entityList: $Keys<typeof types>,
+  entityID: number,
+  options?: ICommitProps,
+): Function {
+  return (dispatch: Function, getState: Function) => {
+    if (options && options.preCommit) {
+      options.preCommit({
+        entityList, entityID, dispatch, getState,
+      });
+    }
+    dispatch({
+      type: types.CDEEBEE_RESET_ENTITY,
+      payload: { entityList, entityID },
+    });
+    if (options && options.postCommit) {
+      options.postCommit({
+        entityList, entityID, dispatch, getState,
+      });
+    }
+  };
+}

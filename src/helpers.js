@@ -5,6 +5,8 @@ import { EntityState } from './constants';
 /* eslint-disable no-underscore-dangle */
 /* eslint-disable no-param-reassign */
 
+const omitKeys = entity => omit(['__entity', '__state'], entity);
+
 /**
  * @method cancelationRequest
  * @param  {Array<Object>} activeRequest
@@ -72,7 +74,7 @@ export const commitEntity = (entity: Object) => {
     console.warn('commit works only in editing and new states');
     return entity;
   }
-  return omit(['__entity', '__state'], entity);
+  return omitKeys(entity);
 };
 
 /**
@@ -86,7 +88,7 @@ export const resetEntity = (entity: Object) => {
     console.warn('reset works only in editing and new states');
     return entity;
   }
-  return omit(['__entity'], entity);
+  return omitKeys(entity);
 };
 
 
