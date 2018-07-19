@@ -5,7 +5,9 @@ import {
 import set from 'lodash/set';
 import { types } from './constants';
 
-import { cancelationRequest, editEntity, getSubEntity } from './helpers';
+import {
+  cancelationRequest, editEntity, getSubEntity, resetEntity,
+} from './helpers';
 
 export const INITIAL_STORAGE = {};
 
@@ -23,9 +25,16 @@ export const storage = (state: Object = INITIAL_STORAGE, action: Object) => {
       payload.list.forEach(({ key, value }) => set(subEntity, key, value));
       return assocPath([payload.entityList, payload.entityID, '__entity'], subEntity, state);
     }
-    case types.CDEEBEE_INSERT_ENTITY:
     case types.CDEEBEE_SET_ENTITY:
       return assocPath([payload.entityList, payload.entityID], payload.entity, state);
+    case types.CDEEBEE_RESET_ENTITY: {
+      const entityList = state[payload.entityList];
+      return assocPath(
+        [payload.entityList, payload.entityID],
+        resetEntity(entityList[payload.entityID]),
+        state,
+      );
+    }
     case types.CDEEBEEE_DROP:
       return INITIAL_STORAGE;
     case types.CDEEBEEE_DROP_ELEMENT:

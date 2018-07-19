@@ -72,14 +72,21 @@ type Options = {
 }
 
 # setKeyValue
+import { cdeebeeActions } form '@recats/cdeebee';
+
 this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, entity: Array<string> | string, value: any, options?: Options)
 
 # commitEntity
 this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, entity: Array<string> | string, value: any)
+
+# resetEntity
+this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, options?: Options)
 ```
 
 ## Helpers
 ```js
+import { heleprs } form '@recats/cdeebee';
+
 # cancelationRequest
 helpers.cancelationRequest(activeRequest: Array<Object>) => Object;
 
