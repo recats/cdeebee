@@ -56,10 +56,10 @@ Finally there is a set of tools to work with API:
 ## Install
 ```js
 # reducer/index.js
-import { storage, requestManager } from '@recats/cdeebee';
+import { cdeebee, requestManager } from '@recats/cdeebee';
 
 export default combineReducers({
-  cdeebeee: storage,
+  cdeebeee,
   requestManager, ## optional (checkNetworkActivity, cancelationRequest)
 })
 
@@ -80,7 +80,7 @@ export function ****(fn: () => void) {
       files?: string,
       method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
       requestCancel?: boolean,
-      normalize?: (response: Object) => Object | Array<Object>,
+      normalize?: ({ response, cdeebee, mergeStrategy }) => Object,
       preUpdate?: (payload: Object) => void,
       postUpdate?: (payload: Object) => void,
       preError?: (payload: Object) => void,

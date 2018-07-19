@@ -19,7 +19,7 @@ type IProps = {
   method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
   requestCancel?: boolean,
   mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy>,
-  normalize?: (response: Object) => Object | Array<Object>,
+  normalize?: (e: Object) => Object | Array<Object>,
   preUpdate?: (payload: Object) => void,
   postUpdate?: (payload: Object) => void,
   preError?: (payload: Object) => void,
@@ -80,7 +80,7 @@ export default ({
         dispatch({
           type: types.CDEEBEEE_UPDATE,
           payload: {
-            response: normalize(response),
+            response: normalize({ response, cdeebee: getState().cdeebee, mergeStrategy }),
             cleanResponse: response,
             api,
             mergeStrategy,
