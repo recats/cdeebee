@@ -1,9 +1,9 @@
 // @flow
 import {
-  slice, assocPath, omit, clone, mergeDeepRight,
+  slice, assocPath, omit, clone,
 } from 'ramda';
 import set from 'lodash/set';
-import { types, cdeebeeMergeStrategy } from './constants';
+import { types } from './constants';
 
 import {
   cancelationRequest, editEntity, getSubEntity, resetEntity,
@@ -11,16 +11,12 @@ import {
 
 export const INITIAL_STORAGE = {};
 
-export const storage = (state: Object = INITIAL_STORAGE, action: Object) => {
+export const cdeebee = (state: Object = INITIAL_STORAGE, action: Object) => {
   const { type, payload } = action;
 
   switch (type) {
-    case types.CDEEBEEE_UPDATE: {
-      if (payload.mergeStrategy === cdeebeeMergeStrategy.merge) {
-        return mergeDeepRight(state, payload.response);
-      }
-      return payload.response;
-    }
+    case types.CDEEBEEE_UPDATE:
+      return { ...state, ...payload.response };
     case types.CDEEBEE_ENTITY_CHANGE_FIELD: {
       const entityList = state[payload.entityList];
       const entity = editEntity(entityList[payload.entityID]);
