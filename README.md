@@ -53,6 +53,42 @@ Finally there is a set of tools to work with API:
 - data normalisation and updating in cdeebee
 - necessary set of callbacks (preSuccess, postSuccess, preError)
 
+## Install
+```js
+# reducer/index.js
+import { storage, requestManager } from '@recats/cdeebee';
+
+export default combineReducers({
+  cdeebeee: storage,
+  requestManager, ## optional (checkNetworkActivity, cancelationRequest)
+})
+
+
+# Usage
+# actions/*.js
+import { cdeebeeRequest } from '@recats/cdeebee';
+
+export function ****(fn: () => void) {
+  return (dispatch: Function, getState: Function) => {
+    const postUpdate = () => fn();
+    cdeebeeRequest({
+      api: apiUrl.requestCdeebeee,
+
+      data?: { cdeebee: 'cool' },
+      headers?: Object,
+      files?: string,
+      method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
+      requestCancel?: boolean,
+      normalize?: (response: Object) => Object | Array<Object>,
+      preUpdate?: (payload: Object) => void,
+      postUpdate?: (payload: Object) => void,
+      preError?: (payload: Object) => void,
+      postError?: (payload: Object) => void,
+    })(dispatch, getState);
+  };
+}
+```
+
 ## Methods
 ```js
 helpers,
@@ -67,8 +103,8 @@ cdeebeeActions,
 ## Actions
 ```js
 type Options = {
-  preChange: (entityList, entityID, list, dispatch, getState) => void,
-  postChange: (entityList, entityID, list, dispatch, getState) => void,
+  preChange: (entityList: string, entityID: string | number, list?: string, dispatch: Function, getState: Function) => void,
+  postChange: (entityList: string, entityID: string | number, list?: string, dispatch: Function, getState: Function) => void,
 }
 
 # setKeyValue
