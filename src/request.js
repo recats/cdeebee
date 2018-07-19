@@ -7,7 +7,7 @@ import nanoid from 'nanoid';
 
 import { defaultNormalize } from './helpers';
 
-import { types } from './constants';
+import { types, cdeebeeMergeStrategy } from './constants';
 
 let responsePosition = {};
 
@@ -18,6 +18,7 @@ type IProps = {
   files?: string,
   method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
   requestCancel?: boolean,
+  mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy>,
   normalize?: (response: Object) => Object | Array<Object>,
   preUpdate?: (payload: Object) => void,
   postUpdate?: (payload: Object) => void,
@@ -36,6 +37,7 @@ export default ({
   requestCancel = true,
   method = 'POST',
   normalize = defaultNormalize,
+  mergeStrategy = cdeebeeMergeStrategy.merge,
   headers = { 'content-type': 'application/json' },
 }: IProps) => async (dispatch: Function, getState: Function) => {
   try {
@@ -77,7 +79,12 @@ export default ({
         if (preUpdate) preUpdate(resp.data);
         dispatch({
           type: types.CDEEBEEE_UPDATE,
-          payload: { response: normalize(response), cleanResponse: response, api },
+          payload: {
+            response: normalize(response),
+            cleanResponse: response,
+            api,
+            mergeStrategy,
+          },
         });
         if (postUpdate) postUpdate(resp.data);
       } else {

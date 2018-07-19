@@ -19,3 +19,8 @@ export const EntityState = {
   EDITING: 'EDITING',
   NORMAL: 'NORMAL',
 };
+
+export const cdeebeeMergeStrategy = {
+  merge: 'merge',
+  replace: 'replace',
+};
