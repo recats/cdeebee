@@ -2,7 +2,7 @@
 import { storage, requestManager } from './reducer';
 import cdeebeeRequest from './request';
 import * as helpers from './helpers';
-import { types as cdeebeeTypes } from './constants';
+import { types as cdeebeeTypes, cdeebeeMergeStrategy } from './constants';
 import * as cdeebeeActions from './actions';
 
 export {
@@ -11,5 +11,6 @@ export {
   requestManager,
   cdeebeeRequest,
   cdeebeeTypes,
+  cdeebeeMergeStrategy,
   cdeebeeActions,
 };

@@ -66,7 +66,7 @@ export default combineReducers({
 
 # Usage
 # actions/*.js
-import { cdeebeeRequest } from '@recats/cdeebee';
+import { cdeebeeRequest, cdeebeeMergeStrategy } from '@recats/cdeebee';
 
 export function ****(fn: () => void) {
   return (dispatch: Function, getState: Function) => {
@@ -75,6 +75,7 @@ export function ****(fn: () => void) {
       api: apiUrl.requestCdeebeee,
 
       data?: { cdeebee: 'cool' },
+      mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy> # default cdeebeeMergeStrategy.merge,
       headers?: Object,
       files?: string,
       method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
