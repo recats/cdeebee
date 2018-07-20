@@ -133,7 +133,10 @@ export const defaultNormalize = (
       } else if (mergeStrategy === cdeebeeMergeStrategy.replace) {
         response[key] = newStorageData;
       }
+    } else if (response[key] === null || response[key] === undefined) {
+      response = omit([key], response);
     }
   }
+
   return response;
 };
