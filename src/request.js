@@ -41,11 +41,12 @@ export default ({
   headers = { 'content-type': 'application/json' },
 }: IProps) => async (dispatch: Function, getState: Function) => {
   try {
+    const nanoID = nanoid();
     let body = JSON.stringify({
       ...data,
       sessionToken: Cookies.get('sessionToken'),
+      requestID: nanoID,
     });
-    const nanoID = nanoid();
     const source = axios.CancelToken.source();
 
     dispatch({
