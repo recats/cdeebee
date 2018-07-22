@@ -19,7 +19,7 @@ type IProps = {
   method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
   requestCancel?: boolean,
   mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy>,
-  normalize?: (e: Object) => Object | Array<Object>,
+  normalize?: (e: Object) => Object | Array<Object> => Object,
   preUpdate?: (payload: Object) => void,
   postUpdate?: (payload: Object) => void,
   preError?: (payload: Object) => void,
@@ -41,7 +41,10 @@ export default ({
   headers = { 'content-type': 'application/json' },
 }: IProps) => async (dispatch: Function, getState: Function) => {
   try {
-    let body = JSON.stringify({ ...data, sessionToken: Cookies.get('sessionToken') });
+    let body = JSON.stringify({
+      ...data,
+      sessionToken: Cookies.get('sessionToken'),
+    });
     const nanoID = nanoid();
     const source = axios.CancelToken.source();
 
@@ -80,7 +83,11 @@ export default ({
         dispatch({
           type: types.CDEEBEEE_UPDATE,
           payload: {
-            response: normalize({ response, cdeebee: getState().cdeebee, mergeStrategy }),
+            response: normalize({
+              response,
+              cdeebee: getState().cdeebee,
+              mergeStrategy,
+            }),
             cleanResponse: response,
             api,
             mergeStrategy,
