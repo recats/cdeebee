@@ -1,9 +1,8 @@
 // @flow
-import { clone, omit, merge } from 'ramda';
+import { clone, omit, mergeDeepRight } from 'ramda';
 import { cdeebeeMergeStrategy, EntityState } from './constants';
 
-/* eslint-disable no-underscore-dangle */
-/* eslint-disable no-param-reassign */
+/* eslint-disable no-underscore-dangle, no-restricted-syntax, no-param-reassign */
 
 const omitKeys = entity => omit(['__entity', '__state'], entity);
 
@@ -122,14 +121,14 @@ export const defaultNormalize = (
   }: Object,
 ) => {
   const keys = Object.keys(response);
-  for (const key of keys) { // eslint-disable-line
+  for (const key of keys) {
     const newStorageData = {};
-    if (response[key] instanceof Object) { // eslint-disable-line
-      for (const element of response[key].data) { // eslint-disable-line
+    if (response[key] instanceof Object) {
+      for (const element of response[key].data) {
         newStorageData[element[response[key].primaryKey]] = element;
       }
       if (mergeStrategy === cdeebeeMergeStrategy.merge) {
-        response[key] = merge(cdeebee[key], newStorageData);
+        response[key] = mergeDeepRight(cdeebee[key], newStorageData);
       } else if (mergeStrategy === cdeebeeMergeStrategy.replace) {
         response[key] = newStorageData;
       }
