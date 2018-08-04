@@ -1,6 +1,6 @@
 # cdeebee
 
-[![npm](https://img.shields.io/npm/v/@recats/cdeebee.svg)](https://www.npmjs.com/package/@recats/cdeebee)
+[![npm](https://img.shields.io/npm/v/@recats/cdeebee.svg)](https://www.npmjs.com/package/@recats/cdeebee) [![Greenkeeper badge](https://badges.greenkeeper.io/recats/cdeebee.svg)](https://greenkeeper.io/)
 ![Recats Digital](https://img.shields.io/badge/recats-digital-1abc9c.svg?style=flat)
 
 ```sh
