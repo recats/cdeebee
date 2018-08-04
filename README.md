@@ -1,6 +1,8 @@
 # cdeebee
 
-[![npm](https://img.shields.io/npm/v/@recats/cdeebee.svg)](https://www.npmjs.com/package/@recats/cdeebee) [![Greenkeeper badge](https://badges.greenkeeper.io/recats/cdeebee.svg)](https://greenkeeper.io/)
+[![npm](https://img.shields.io/npm/v/@recats/cdeebee.svg)](https://www.npmjs.com/package/@recats/cdeebee)
+[![Greenkeeper badge](https://badges.greenkeeper.io/recats/cdeebee.svg)](https://greenkeeper.io/)
+[![Travis badge](https://travis-ci.org/recats/cdeebee.svg?branch=master)](https://travis-ci.com/recats/cdeebee)
 ![Recats Digital](https://img.shields.io/badge/recats-digital-1abc9c.svg?style=flat)
 
 ```sh
