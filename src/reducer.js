@@ -68,7 +68,7 @@ export const requestManager = (state: Object = INITIAL_REQUEST, action: Object) 
       return {
         ...state,
         errorHandler: {
-          ...state.activeRequest,
+          ...state.errorHandler,
           [payload.api]: payload.cleanResponse,
         },
       };
