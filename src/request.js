@@ -79,7 +79,7 @@ export default ({
 
       const response = responsePosition[processID];
       delete responsePosition[processID];
-      if (response.errorCode === 0) {
+      if (response.responseStatus === 0) {
         if (preUpdate) preUpdate(resp.data);
         dispatch({
           type: types.CDEEBEEE_UPDATE,

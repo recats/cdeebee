@@ -61,13 +61,16 @@ export const requestManager = (state: Object = INITIAL_REQUEST, action: Object) 
         ...state,
         requestByApiUrl: {
           ...state.requestByApiUrl,
-          [payload.api]: payload.response,
+          [payload.api]: payload.cleanResponse,
         },
       };
     case types.CDEEBEE_ERRORHANDLER_SET:
       return {
         ...state,
-        errorHandler: { ...state.activeRequest, [payload.api]: payload.response },
+        errorHandler: {
+          ...state.activeRequest,
+          [payload.api]: payload.cleanResponse,
+        },
       };
 
     case types.CHANGE_ROUTE:
