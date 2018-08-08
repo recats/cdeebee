@@ -16,6 +16,7 @@ type IProps = {
   data?: Object,
   headers?: Object,
   files?: string,
+  responseCode?: string,
   method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
   requestCancel?: boolean,
   mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy>,
@@ -39,6 +40,7 @@ export default ({
   normalize = defaultNormalize,
   mergeStrategy = cdeebeeMergeStrategy.merge,
   headers = { 'content-type': 'application/json' },
+  responseCode = 'responseStatus',
 }: IProps) => async (dispatch: Function, getState: Function) => {
   try {
     const nanoID = nanoid();
@@ -79,7 +81,7 @@ export default ({
 
       const response = responsePosition[processID];
       delete responsePosition[processID];
-      if (response.errorCode === 0) {
+      if (response[responseCode] === 0) {
         if (preUpdate) preUpdate(resp.data);
         dispatch({
           type: types.CDEEBEEE_UPDATE,

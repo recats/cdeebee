@@ -80,6 +80,7 @@ export function ****(fn: () => void) {
       mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy> # default cdeebeeMergeStrategy.merge,
       headers?: Object,
       files?: string,
+      responseCode?: string,
       method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
       requestCancel?: boolean,
       normalize?: ({ response, cdeebee, mergeStrategy }) => Object,
