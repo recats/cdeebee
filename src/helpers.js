@@ -109,13 +109,13 @@ export const editEntity = (entity: Object) => {
 
 /**
  * @method defaultNormalize
- * @param  {number | string} errorCode
+ * @param  {number | string} responseStatus
  * @param  {Object} response
  * @return {Object}
  */
 export const defaultNormalize = (
   {
-    response: { errorCode, ...response },
+    response: { responseStatus, ...response },
     cdeebee,
     mergeStrategy,
   }: Object,
