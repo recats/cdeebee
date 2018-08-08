@@ -99,7 +99,7 @@ export default ({
         if (preError) preError(resp.data);
         dispatch({
           type: types.CDEEBEE_ERRORHANDLER_SET,
-          payload: { api, response },
+          payload: { api, cleanResponse: response },
         });
         if (postError) postError(resp.data);
       }
