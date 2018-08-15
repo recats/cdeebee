@@ -74,7 +74,7 @@ const request = new CdeebeeRequest({
   data: { sessionToken: 'cdeebee master' },
 }).send;
 
-export function ****(fn: () => void) {
+export function ***(fn: () => void) {
   return (dispatch: Function, getState: Function) => {
     const postUpdate = () => fn();
     request({
@@ -115,15 +115,15 @@ type Options = {
   postChange: (entityList: string, entityID: string | number, list?: string, dispatch: Function, getState: Function) => void,
 }
 
-# setKeyValue
+// setKeyValue
 import { cdeebeeActions } form '@recats/cdeebee';
 
 this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, entity: Array<string> | string, value: any, options?: Options)
 
-# commitEntity
+// commitEntity
 this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, entity: Array<string> | string, value: any)
 
-# resetEntity
+// resetEntity
 this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, options?: Options)
 ```
 
@@ -131,22 +131,22 @@ this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, opt
 ```js
 import { heleprs } form '@recats/cdeebee';
 
-# cancelationRequest
+// cancelationRequest
 helpers.cancelationRequest(activeRequest: Array<Object>) => Object;
 
-# checkNetworkActivity
+// checkNetworkActivity
 helpers.checkNetworkActivity(activeRequest: Array<Object>, apiUrl: string | Array<string>) => boolean;
 
-# getSubEntity element in cdeebee list
+// getSubEntity element in cdeebee list
 helpers.getSubEntity(entity: Object) => object;
 
-# getEntityState element in cdeebee list
+// getEntityState element in cdeebee list
 helpers.getEntityState(entity: Object) => string;
 
-# commitEntity element in cdeebee list
+// commitEntity element in cdeebee list
 helpers.commitEntity(entity: Object) => void;
 
-# resetEntity element in cdeebee list
+// resetEntity element in cdeebee list
 helpers.resetEntity(entity: Object) => void;
 ```
 
