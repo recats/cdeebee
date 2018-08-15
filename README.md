@@ -53,7 +53,7 @@ In addition it’s highly recommended to adopt API to work with cdeebee. But oth
 Finally there is a set of tools to work with API:
 - makeRequest function with is making request to server and manage queue with active requests
 - data normalisation and updating in cdeebee
-- necessary set of callbacks (preSuccess, postSuccess, preError)
+- necessary set of callbacks (preUpdate, preSuccess, postSuccess, preError)
 
 ## Install
 ```js
@@ -71,10 +71,8 @@ export default combineReducers({
 import { CdeebeeRequest, cdeebeeMergeStrategy } from '@recats/cdeebee';
 
 const request = new CdeebeeRequest({
-  data: { sessionToke: 'cdeebee master' },
+  data: { sessionToken: 'cdeebee master' },
 }).send;
-
-// initial argument data class mergeDeepRight with request data
 
 export function ****(fn: () => void) {
   return (dispatch: Function, getState: Function) => {
@@ -151,3 +149,9 @@ helpers.commitEntity(entity: Object) => void;
 # resetEntity element in cdeebee list
 helpers.resetEntity(entity: Object) => void;
 ```
+
+## Data merging behavior
+During data merging cdeebee could behave in different ways according to the enum value which is passed during request
+
+- *merge* uses ramda mergeDeepRight strategy to merge existing object with the new one
+- *replace* overrides the object
