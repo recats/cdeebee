@@ -57,23 +57,29 @@ Finally there is a set of tools to work with API:
 
 ## Install
 ```js
-# reducer/index.js
+// reducer/index.js
 import { cdeebee, requestManager } from '@recats/cdeebee';
 
 export default combineReducers({
   cdeebeee,
-  requestManager, ## optional (checkNetworkActivity, cancelationRequest)
+  requestManager, // optional (checkNetworkActivity, cancelationRequest)
 })
 
 
-# Usage
-# actions/*.js
-import { cdeebeeRequest, cdeebeeMergeStrategy } from '@recats/cdeebee';
+// Usage
+// actions/*.js
+import { CdeebeeRequest, cdeebeeMergeStrategy } from '@recats/cdeebee';
+
+const request = new CdeebeeRequest({
+  data: { sessionToke: 'cdeebee master' },
+}).send;
+
+// initial argument data class mergeDeepRight with request data
 
 export function ****(fn: () => void) {
   return (dispatch: Function, getState: Function) => {
     const postUpdate = () => fn();
-    cdeebeeRequest({
+    request({
       api: apiUrl.requestCdeebeee,
 
       data?: { cdeebee: 'cool' },
@@ -98,7 +104,7 @@ export function ****(fn: () => void) {
 helpers,
 storage,
 requestManager,
-cdeebeeRequest,
+CdeebeeRequest, // class
 cdeebeeTypes,
 cdeebeeActions,
 ```
@@ -145,6 +151,3 @@ helpers.commitEntity(entity: Object) => void;
 # resetEntity element in cdeebee list
 helpers.resetEntity(entity: Object) => void;
 ```
-
-### SessionToken
-  SessionToken must be saved in sessionToken cookie
