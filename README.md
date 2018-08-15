@@ -53,27 +53,31 @@ In addition it’s highly recommended to adopt API to work with cdeebee. But oth
 Finally there is a set of tools to work with API:
 - makeRequest function with is making request to server and manage queue with active requests
 - data normalisation and updating in cdeebee
-- necessary set of callbacks (preSuccess, postSuccess, preError)
+- necessary set of callbacks (preUpdate, preSuccess, postSuccess, preError)
 
 ## Install
 ```js
-# reducer/index.js
+// reducer/index.js
 import { cdeebee, requestManager } from '@recats/cdeebee';
 
 export default combineReducers({
   cdeebeee,
-  requestManager, ## optional (checkNetworkActivity, cancelationRequest)
+  requestManager, // optional (checkNetworkActivity, cancelationRequest)
 })
 
 
-# Usage
-# actions/*.js
-import { cdeebeeRequest, cdeebeeMergeStrategy } from '@recats/cdeebee';
+// Usage
+// actions/*.js
+import { CdeebeeRequest, cdeebeeMergeStrategy } from '@recats/cdeebee';
 
-export function ****(fn: () => void) {
+const request = new CdeebeeRequest({
+  data: { sessionToken: 'cdeebee master' },
+}).send;
+
+export function ***(fn: () => void) {
   return (dispatch: Function, getState: Function) => {
     const postUpdate = () => fn();
-    cdeebeeRequest({
+    request({
       api: apiUrl.requestCdeebeee,
 
       data?: { cdeebee: 'cool' },
@@ -98,7 +102,7 @@ export function ****(fn: () => void) {
 helpers,
 storage,
 requestManager,
-cdeebeeRequest,
+CdeebeeRequest, // class
 cdeebeeTypes,
 cdeebeeActions,
 ```
@@ -111,15 +115,15 @@ type Options = {
   postChange: (entityList: string, entityID: string | number, list?: string, dispatch: Function, getState: Function) => void,
 }
 
-# setKeyValue
+// setKeyValue
 import { cdeebeeActions } form '@recats/cdeebee';
 
 this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, entity: Array<string> | string, value: any, options?: Options)
 
-# commitEntity
+// commitEntity
 this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, entity: Array<string> | string, value: any)
 
-# resetEntity
+// resetEntity
 this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, options?: Options)
 ```
 
@@ -127,24 +131,27 @@ this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, opt
 ```js
 import { heleprs } form '@recats/cdeebee';
 
-# cancelationRequest
+// cancelationRequest
 helpers.cancelationRequest(activeRequest: Array<Object>) => Object;
 
-# checkNetworkActivity
+// checkNetworkActivity
 helpers.checkNetworkActivity(activeRequest: Array<Object>, apiUrl: string | Array<string>) => boolean;
 
-# getSubEntity element in cdeebee list
+// getSubEntity element in cdeebee list
 helpers.getSubEntity(entity: Object) => object;
 
-# getEntityState element in cdeebee list
+// getEntityState element in cdeebee list
 helpers.getEntityState(entity: Object) => string;
 
-# commitEntity element in cdeebee list
+// commitEntity element in cdeebee list
 helpers.commitEntity(entity: Object) => void;
 
-# resetEntity element in cdeebee list
+// resetEntity element in cdeebee list
 helpers.resetEntity(entity: Object) => void;
 ```
 
-### SessionToken
-  SessionToken must be saved in sessionToken cookie
+## Data merging behavior
+During data merging cdeebee could behave in different ways according to the enum value which is passed during request
+
+- *merge* uses ramda mergeDeepRight strategy to merge existing object with the new one
+- *replace* overrides the object
