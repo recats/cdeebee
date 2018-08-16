@@ -81,38 +81,45 @@ export default class requestManager {
         url: api, method, headers, data: body,
       });
 
-      if (resp) responsePosition = Object.assign({ [nanoID]: resp.data }, responsePosition);
+      if (resp) {
+        responsePosition = Object.assign(
+          { [nanoID]: { response: resp.data, requestApi: api } },
+          responsePosition,
+        );
 
+        while (responsePosition[get(getState().requestManager.activeRequest, '[0].nanoID')]) {
+          const processID = getState().requestManager.activeRequest[0].nanoID;
 
-      while (responsePosition[get(getState().requestManager.activeRequest, '[0].nanoID')]) {
-        const processID = getState().requestManager.activeRequest[0].nanoID;
-        dispatch({ type: types.CDEEBEE_REQUESTMANAGER_SHIFT });
+          const { response, requestApi } = responsePosition[processID];
 
-        const response = responsePosition[processID];
-        delete responsePosition[processID];
-        if (response[responseCode] === 0) {
-          if (preUpdate) preUpdate(resp.data);
-          dispatch({
-            type: types.CDEEBEEE_UPDATE,
-            payload: {
-              response: normalize({
-                response,
-                cdeebee: getState().cdeebee,
+          delete responsePosition[processID];
+
+          dispatch({ type: types.CDEEBEE_REQUESTMANAGER_SHIFT });
+
+          if (response[responseCode] === 0) {
+            if (preUpdate) preUpdate(resp.data);
+            dispatch({
+              type: types.CDEEBEEE_UPDATE,
+              payload: {
+                response: normalize({
+                  response,
+                  cdeebee: getState().cdeebee,
+                  mergeStrategy,
+                }),
+                cleanResponse: response,
+                api: requestApi,
                 mergeStrategy,
-              }),
-              cleanResponse: response,
-              api,
-              mergeStrategy,
-            },
-          });
-          if (postUpdate) postUpdate(resp.data);
-        } else {
-          if (preError) preError(resp.data);
-          dispatch({
-            type: types.CDEEBEE_ERRORHANDLER_SET,
-            payload: { api, cleanResponse: response },
-          });
-          if (postError) postError(resp.data);
+              },
+            });
+            if (postUpdate) postUpdate(resp.data);
+          } else {
+            if (preError) preError(resp.data);
+            dispatch({
+              type: types.CDEEBEE_ERRORHANDLER_SET,
+              payload: { api: requestApi, cleanResponse: response },
+            });
+            if (postError) postError(resp.data);
+          }
         }
       }
     } catch (error) {
