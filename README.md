@@ -51,7 +51,7 @@ There are several standard functions to work with this structure:
 In addition it’s highly recommended to adopt API to work with cdeebee. But otherwise you could use normalizr before using cdeebee to change your data structure from tree-like JSON to normalised lists
 
 Finally there is a set of tools to work with API:
-- makeRequest function with is making request to server and manage queue with active requests
+- CdeebeeRequest function with is making request to server and manage queue with active requests
 - data normalisation and updating in cdeebee
 - necessary set of callbacks (preUpdate, preSuccess, postSuccess, preError)
 
@@ -70,30 +70,52 @@ export default combineReducers({
 // actions/*.js
 import { CdeebeeRequest, cdeebeeMergeStrategy } from '@recats/cdeebee';
 
-const request = new CdeebeeRequest({
-  data: { sessionToken: 'cdeebee master' },
-}).send;
+const request = new CdeebeeRequest(
+  {
+    // defaultRequest data
+    data: { sessionToken: 'cdeebee master' },
+  },
+  {
+    // default request options
+    fileKey: 'files',
+    bodyKey: 'body',
+    method: 'POST',
+    normalize: defaultNormalize,
+    mergeStrategy: cdeebeeMergeStrategy.merge,
+    responseKeyCode: 'responseStatus',
+    header: { 'content-type': 'application/json' },
+  }
+).send;
 
 export function ***(fn: () => void) {
-  return (dispatch: Function, getState: Function) => {
-    const postUpdate = () => fn();
+  return (dispatch: Function, getState: Function) => (
     request({
       api: apiUrl.requestCdeebeee,
 
       data?: { cdeebee: 'cool' },
+      files?: File,
+
       mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy> # default cdeebeeMergeStrategy.merge,
-      headers?: Object,
-      files?: string,
-      responseCode?: string,
+
       method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
+      headers?: Object,
+      responseCode?: string,
       requestCancel?: boolean,
       normalize?: ({ response, cdeebee, mergeStrategy }) => Object,
+
+      // files
+      bodyKey: 'body',
+      fileKey: 'file',
+
+      // key
+      responseKeyCode: 'errorCode',
+
       preUpdate?: (payload: Object) => void,
       postUpdate?: (payload: Object) => void,
       preError?: (payload: Object) => void,
       postError?: (payload: Object) => void,
-    })(dispatch, getState);
-  };
+    })(dispatch, getState)
+  );
 }
 ```
 
