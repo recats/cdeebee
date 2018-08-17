@@ -80,7 +80,9 @@ const request = new CdeebeeRequest(
     fileKey: 'files',
     bodyKey: 'body',
     defaultMethod: 'POST',
-    defaultResponseKeyCode: 'responseStatus'
+    defaultNormalize,
+    defaultMergeStrategy: cdeebeeMergeStrategy.merge,
+    defaultResponseKeyCode: 'responseStatus',
     defaultHeader: { 'content-type': 'application/json' },
   }
 ).send;
