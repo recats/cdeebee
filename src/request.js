@@ -29,10 +29,20 @@ type IProps = {
 
 
 export default class requestManager {
-  requestObject: Object
+  requestObject: Object;
 
-  constructor(requestObject: Object) {
+  options: Object;
+
+  constructor(requestObject: Object, options: Object) {
     this.requestObject = requestObject;
+    this.options = {
+      fileKey: 'files',
+      bodyKey: 'body',
+      defaultMethod: 'POST',
+      defaultResponseKeyCode: 'responseStatus',
+      defaultHeader: { 'content-type': 'application/json' },
+      ...options,
+    };
   }
 
   send = (rq: IProps) => async (dispatch: Function, getState: Function) => {
@@ -45,11 +55,11 @@ export default class requestManager {
       data,
       files,
       requestCancel = true,
-      method = 'POST',
+      method = this.options.defaultMethod,
       normalize = defaultNormalize,
       mergeStrategy = cdeebeeMergeStrategy.merge,
-      headers = { 'content-type': 'application/json' },
-      responseCode = 'responseStatus',
+      headers = this.options.defaultHeader,
+      responseKeyCode = this.options.defaultResponseKeyCode,
     } = mergeDeepRight(this.requestObject, rq);
 
     try {
@@ -70,10 +80,10 @@ export default class requestManager {
       if (files) {
         const formData = new FormData();
         for (let i = 0; i < files.length; i += 1) {
-          formData.append('file', files[i]);
+          formData.append(this.options.fileKey, files[i]);
         }
 
-        formData.append('body', encodeURIComponent(body));
+        formData.append(this.options.bodyKey, encodeURIComponent(body));
         body = formData;
       }
 
@@ -96,7 +106,7 @@ export default class requestManager {
 
           dispatch({ type: types.CDEEBEE_REQUESTMANAGER_SHIFT });
 
-          if (response[responseCode] === 0) {
+          if (response[responseKeyCode] === 0) {
             if (preUpdate) preUpdate(resp.data);
             dispatch({
               type: types.CDEEBEEE_UPDATE,

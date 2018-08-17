@@ -70,9 +70,20 @@ export default combineReducers({
 // actions/*.js
 import { CdeebeeRequest, cdeebeeMergeStrategy } from '@recats/cdeebee';
 
-const request = new CdeebeeRequest({
-  data: { sessionToken: 'cdeebee master' },
-}).send;
+const request = new CdeebeeRequest(
+  {
+    // defaultRequest data
+    data: { sessionToken: 'cdeebee master' },
+  },
+  {
+    // defaultRequest options
+    fileKey: 'files',
+    bodyKey: 'body',
+    defaultMethod: 'POST',
+    defaultResponseKeyCode: 'responseStatus'
+    defaultHeader: { 'content-type': 'application/json' },
+  }
+).send;
 
 export function ***(fn: () => void) {
   return (dispatch: Function, getState: Function) => {
