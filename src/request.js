@@ -38,11 +38,11 @@ export default class requestManager {
     this.options = {
       fileKey: 'files',
       bodyKey: 'body',
-      defaultMethod: 'POST',
-      defaultNormalize,
-      defaultMergeStrategy: cdeebeeMergeStrategy.merge,
-      defaultResponseKeyCode: 'responseStatus',
-      defaultHeader: { 'content-type': 'application/json' },
+      method: 'POST',
+      normalize: defaultNormalize,
+      mergeStrategy: cdeebeeMergeStrategy.merge,
+      responseKeyCode: 'responseStatus',
+      header: { 'content-type': 'application/json' },
       ...options,
     };
   }
@@ -57,6 +57,8 @@ export default class requestManager {
       data,
       files,
       requestCancel = true,
+      fileKey = this.options.defaultFileKey,
+      bodyKey = this.options.defaultBodyKey,
       method = this.options.defaultMethod,
       normalize = this.options.defaultNormalize,
       mergeStrategy = this.options.defaultMergeStrategy,
@@ -82,10 +84,10 @@ export default class requestManager {
       if (files) {
         const formData = new FormData();
         for (let i = 0; i < files.length; i += 1) {
-          formData.append(this.options.fileKey, files[i]);
+          formData.append(fileKey, files[i]);
         }
 
-        formData.append(this.options.bodyKey, encodeURIComponent(body));
+        formData.append(bodyKey, encodeURIComponent(body));
         body = formData;
       }
 
