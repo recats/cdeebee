@@ -87,7 +87,7 @@ export default class requestManager {
           formData.append(fileKey, files[i]);
         }
 
-        formData.append(bodyKey, encodeURIComponent(body));
+        formData.append(bodyKey, body);
         body = formData;
       }
 
