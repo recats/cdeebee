@@ -57,21 +57,20 @@ export default class requestManager {
       data,
       files,
       requestCancel = true,
-      fileKey = this.options.defaultFileKey,
-      bodyKey = this.options.defaultBodyKey,
-      method = this.options.defaultMethod,
-      normalize = this.options.defaultNormalize,
-      mergeStrategy = this.options.defaultMergeStrategy,
-      headers = this.options.defaultHeader,
-      responseKeyCode = this.options.defaultResponseKeyCode,
+      fileKey = this.options.fileKey,
+      bodyKey = this.options.bodyKey,
+      method = this.options.method,
+      normalize = this.options.normalize,
+      mergeStrategy = this.options.mergeStrategy,
+      headers = this.options.header,
+      responseKeyCode = this.options.responseKeyCode,
     } = mergeDeepRight(this.requestObject, rq);
 
     try {
       const nanoID = nanoid();
-      let body = JSON.stringify({
-        ...data,
-        requestID: nanoID,
-      });
+
+      let body = JSON.stringify({ ...data, requestID: nanoID });
+
       const source = axios.CancelToken.source();
 
       dispatch({
