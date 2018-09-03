@@ -151,7 +151,7 @@ this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, opt
 
 ## Helpers
 ```js
-import { heleprs } form '@recats/cdeebee';
+import { helpers } from '@recats/cdeebee';
 
 // cancelationRequest
 helpers.cancelationRequest(activeRequest: Array<Object>) => Object;
