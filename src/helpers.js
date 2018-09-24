@@ -12,7 +12,12 @@ const omitKeys = entity => omit(['__entity', '__state'], entity);
  * @return {array<Object>} active request array
  */
 export const cancelationRequest = (activeRequest: Array<Object>): Object => {
-  const act: Array<Object> = activeRequest.filter(q => q.requestCancel && q.source.cancel(q));
+  const act: Array<Object> = activeRequest.filter(q => (
+    q.requestCancel
+      && q.source
+      && q.source.cancel instanceof Function
+      && q.source.cancel(q)
+  ));
   return { activeRequest: act };
 };
 
