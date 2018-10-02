@@ -1,16 +1,17 @@
 {
   "name": "@recats/cdeebee",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "React Redux data-logic library",
   "main": "lib/index.js",
   "repository": "git@github.com:recats/cdeebee.git",
   "author": "recats",
   "license": "MIT",
   "scripts": {
-    "build": "nwb build-react-component",
-    "flow": "./node_modules/.bin/flow",
-    "lint:js": "./node_modules/.bin/eslint ./src --ext=js,jsx",
-    "test": "yarn lint:js && yarn flow"
+    "build": "rm -rf lib && yarn build-cjs && yarn build-umd && yarn build-esm",
+    "build-cjs": "./node_modules/.bin/rollup src/index.ts --config --file lib/index.js",
+    "build-umd": "./node_modules/.bin/rollup src/index.ts --config --format umd --file lib/index.umd.js",
+    "build-esm": "./node_modules/.bin/rollup src/index.ts --config --format esm --file lib/index.esm.js",
+    "lint": "./node_modules/.bin/tslint -p . ./src/*.ts"
   },
   "keywords": [
     "react",
@@ -21,30 +22,37 @@
   ],
   "husky": {
     "hooks": {
-      "pre-commit": "yarn test"
+      "pre-commit": "yarn lint"
     }
   },
   "devDependencies": {
+    "@babel/core": "^7.1.2",
+    "@babel/plugin-proposal-class-properties": "^7.1.0",
+    "@babel/plugin-proposal-object-rest-spread": "^7.0.0",
+    "@babel/plugin-transform-runtime": "^7.1.0",
+    "@babel/preset-env": "^7.1.0",
+    "@types/lodash": "^4.14.116",
+    "@types/ramda": "^0.25.38",
     "babel-eslint": "^10.0.1",
-    "eslint": "^5.6.0",
-    "eslint-config-airbnb": "^17.1.0",
-    "eslint-plugin-compat": "^2.5.1",
-    "eslint-plugin-flowtype": "^2.50.1",
-    "eslint-plugin-import": "^2.14.0",
-    "eslint-plugin-jsx-a11y": "^6.1.1",
-    "eslint-plugin-react": "^7.11.1",
-    "flow-bin": "^0.82.0",
-    "husky": "^1.0.0-rc.15",
-    "nwb": "^0.23.0"
-  },
-  "peerDependencies": {
-    "flow-typed": "^2.4.0"
+    "babel-plugin-lodash": "^3.3.4",
+    "babel-plugin-ramda": "^1.6.3",
+    "babel-plugin-rewire-exports": "^1.0.1",
+    "husky": "^1.1.0",
+    "redux": "^4.0.0",
+    "rollup": "^0.66.2",
+    "rollup-plugin-babel": "^4.0.3",
+    "rollup-plugin-commonjs": "^9.1.8",
+    "rollup-plugin-json": "^3.1.0",
+    "rollup-plugin-terser": "^3.0.0",
+    "rollup-plugin-typescript2": "^0.17.0",
+    "tslint": "^5.11.0",
+    "typescript": "^3.1.1"
   },
   "dependencies": {
     "axios": "^0.18.0",
     "js-cookie": "^2.2.0",
     "lodash": "^4.17.11",
-    "nanoid": "^1.2.3",
+    "nanoid": "^1.2.5",
     "ramda": "^0.25.0"
   }
 }

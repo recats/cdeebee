@@ -1,28 +1,21 @@
-// @flow
+import { Dispatch } from 'redux';
 import { types } from './constants';
+import { EntityID } from './types';
 
-export type IKeyVaue = {
-  key: string | Array<string>,
-  value: any
-}
-
-export type ISetKeyValueProps = {
-  preChange?: Function,
-  postChange?: Function,
-}
-
-export type ICommitProps = {
-  preCommit?: Function,
-  postCommit?: Function,
+interface IOptions {
+  postCommit?: (d: object) => void;
+  preChange?: (d: object) => void;
+  postChange?: (d: object) => void;
+  preCommit?: (d: object) => void;
 }
 
 export function setKeyValueList(
-  entityList: $Keys<typeof types>,
-  entityID: number,
-  list: Array<IKeyVaue>,
-  options?: ISetKeyValueProps,
-): Function {
-  return (dispatch: Function, getState: Function) => {
+  entityList: string,
+  entityID: EntityID,
+  list: Array<{ key: string, value: any }>,
+  options: IOptions,
+) {
+  return (dispatch: Dispatch, getState: () => object) => {
     if (options && options.preChange) {
       options.preChange({
         entityList, entityID, list, dispatch, getState,
@@ -41,22 +34,22 @@ export function setKeyValueList(
 }
 
 export function setKeyValue(
-  entityList: $Keys<typeof types>,
-  entityID: number,
-  key: string | Array<string>,
-  value: string,
-  options?: ISetKeyValueProps,
-): Function {
+  entityList: string,
+  entityID: EntityID,
+  key: string,
+  value: any,
+  options: IOptions,
+) {
   return setKeyValueList(entityList, entityID, [{ key, value }], options);
 }
 
 export function commitEntity(
-  entityList: $Keys<typeof types>,
-  entityID: number,
-  entity: Object,
-  options?: ICommitProps,
-): Function {
-  return (dispatch: Function, getState: Function) => {
+  entityList: string,
+  entityID: EntityID,
+  entity: object,
+  options: IOptions,
+) {
+  return (dispatch: Dispatch, getState: () => object) => {
     if (options && options.preCommit) {
       options.preCommit({
         entityList, entityID, entity, dispatch, getState,
@@ -75,11 +68,11 @@ export function commitEntity(
 }
 
 export function resetEntity(
-  entityList: $Keys<typeof types>,
-  entityID: number,
-  options?: ICommitProps,
-): Function {
-  return (dispatch: Function, getState: Function) => {
+  entityList: string,
+  entityID: string | number,
+  options: IOptions,
+) {
+  return (dispatch: Dispatch, getState: () => object) => {
     if (options && options.preCommit) {
       options.preCommit({
         entityList, entityID, dispatch, getState,

@@ -1,39 +1,32 @@
-// @flow
-// $FlowIgnore
+// @ts-ignore
 import axios from 'axios';
-import get from 'lodash/get';
+import { get } from 'lodash';
 import { mergeDeepRight } from 'ramda';
+import { Dispatch } from 'redux';
+// @ts-ignore
 import nanoid from 'nanoid';
 
 import { defaultNormalize } from './helpers';
 
 import { types, cdeebeeMergeStrategy } from './constants';
 
-let responsePosition = {};
+import { IOptions } from './types';
 
-type IProps = {
-  api: string,
-  data?: Object,
-  headers?: Object,
-  files?: string,
-  responseCode?: string,
-  method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
-  requestCancel?: boolean,
-  mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy>,
-  normalize?: (e: Object) => Object | Array<Object> => Object,
-  preUpdate?: (payload: Object) => void,
-  postUpdate?: (payload: Object) => void,
-  preError?: (payload: Object) => void,
-  postError?: (payload: Object) => void,
+interface IResponse {
+  [string: string]: {
+    response: object,
+    requestApi: string,
+  };
 }
 
+let responsePosition: IResponse = {};
 
+// tslint:disable-next-line
 export default class requestManager {
-  requestObject: Object;
+  private requestObject: object;
+  private options: IOptions;
 
-  options: Object;
-
-  constructor(requestObject: Object, options: Object) {
+  constructor(requestObject: object, options: IOptions) {
     this.requestObject = requestObject;
     this.options = {
       fileKey: 'files',
@@ -42,12 +35,12 @@ export default class requestManager {
       normalize: defaultNormalize,
       mergeStrategy: cdeebeeMergeStrategy.merge,
       responseKeyCode: 'responseStatus',
-      header: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json' },
       ...options,
     };
   }
 
-  send = (rq: IProps) => async (dispatch: Function, getState: Function) => {
+  public send = (rq: IOptions) => async (dispatch: Dispatch, getState: () => any) => {
     const {
       api,
       preUpdate,
@@ -62,14 +55,14 @@ export default class requestManager {
       method = this.options.method,
       normalize = this.options.normalize,
       mergeStrategy = this.options.mergeStrategy,
-      headers = this.options.header,
+      headers = this.options.headers,
       responseKeyCode = this.options.responseKeyCode,
     } = mergeDeepRight(this.requestObject, rq);
 
     try {
       const nanoID = nanoid();
 
-      let body = JSON.stringify({ ...data, requestID: nanoID });
+      let body: any = JSON.stringify({ ...data, requestID: nanoID });
 
       const source = axios.CancelToken.source();
 
@@ -83,10 +76,14 @@ export default class requestManager {
       if (files) {
         const formData = new FormData();
         for (let i = 0; i < files.length; i += 1) {
-          formData.append(fileKey, files[i]);
+          if (fileKey) {
+            formData.append(fileKey, files[i]);
+          }
         }
 
-        formData.append(bodyKey, body);
+        if (bodyKey) {
+          formData.append(bodyKey, body);
+        }
         body = formData;
       }
 
@@ -108,13 +105,15 @@ export default class requestManager {
           delete responsePosition[processID];
 
           dispatch({ type: types.CDEEBEE_REQUESTMANAGER_SHIFT });
-
-          if (response[responseKeyCode] === 0) {
-            if (preUpdate) preUpdate(resp.data);
+          // @ts-ignore
+          if (responseKeyCode && response[responseKeyCode] === 0) {
+            if (preUpdate) {
+              preUpdate(resp.data);
+            }
             dispatch({
               type: types.CDEEBEEE_UPDATE,
               payload: {
-                response: normalize({
+                response: normalize instanceof Function && normalize({
                   response,
                   cdeebee: getState().cdeebee,
                   mergeStrategy,
@@ -124,18 +123,25 @@ export default class requestManager {
                 mergeStrategy,
               },
             });
-            if (postUpdate) postUpdate(resp.data);
+            if (postUpdate) {
+              postUpdate(resp.data);
+            }
           } else {
-            if (preError) preError(resp.data);
+            if (preError) {
+              preError(resp.data);
+            }
             dispatch({
               type: types.CDEEBEE_ERRORHANDLER_SET,
               payload: { api: requestApi, cleanResponse: response },
             });
-            if (postError) postError(resp.data);
+            if (postError) {
+              postError(resp.data);
+            }
           }
         }
       }
     } catch (error) {
+      // tslint:disable-next-line
       console.warn('@@makeRequest', error);
     }
   }

@@ -98,7 +98,7 @@ export function ***(fn: () => void) {
       mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy> # default cdeebeeMergeStrategy.merge,
 
       method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
-      headers?: Object,
+      headers?: object,
       responseCode?: string,
       requestCancel?: boolean,
       normalize?: ({ response, cdeebee, mergeStrategy }) => Object,
@@ -110,10 +110,10 @@ export function ***(fn: () => void) {
       // key
       responseKeyCode: 'errorCode',
 
-      preUpdate?: (payload: Object) => void,
-      postUpdate?: (payload: Object) => void,
-      preError?: (payload: Object) => void,
-      postError?: (payload: Object) => void,
+      preUpdate?: (payload: object) => void,
+      postUpdate?: (payload: object) => void,
+      preError?: (payload: object) => void,
+      postError?: (payload: object) => void,
     })(dispatch, getState)
   );
 }
@@ -160,16 +160,16 @@ helpers.cancelationRequest(activeRequest: Array<Object>) => Object;
 helpers.checkNetworkActivity(activeRequest: Array<Object>, apiUrl: string | Array<string>) => boolean;
 
 // getSubEntity element in cdeebee list
-helpers.getSubEntity(entity: Object) => object;
+helpers.getSubEntity(entity: object) => object;
 
 // getEntityState element in cdeebee list
-helpers.getEntityState(entity: Object) => string;
+helpers.getEntityState(entity: object) => string;
 
 // commitEntity element in cdeebee list
-helpers.commitEntity(entity: Object) => void;
+helpers.commitEntity(entity: object) => void;
 
 // resetEntity element in cdeebee list
-helpers.resetEntity(entity: Object) => void;
+helpers.resetEntity(entity: object) => void;
 ```
 
 ## Data merging behavior

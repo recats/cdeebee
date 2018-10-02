@@ -2,9 +2,8 @@
   "parser": "babel-eslint",
   "extends": [
     "airbnb",
-    "plugin:flowtype/recommended"
   ],
-  "plugins": ["compat", "flowtype", "react"],
+  "plugins": ["compat", "react"],
   "rules": {
     "import/no-extraneous-dependencies": "off",
     "react/jsx-uses-react": "error",
