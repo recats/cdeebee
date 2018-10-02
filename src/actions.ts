@@ -1,10 +1,21 @@
+import { Dispatch } from 'redux';
 import { types } from './constants';
+import { EntityID } from './types';
 
+interface IOptions {
+  postCommit?: (d: object) => void;
+  preChange?: (d: object) => void;
+  postChange?: (d: object) => void;
+  preCommit?: (d: object) => void;
+}
 
 export function setKeyValueList(
-  entityList, entityID, list, options,
+  entityList: string,
+  entityID: EntityID,
+  list: Array<{ key: string, value: any }>,
+  options: IOptions,
 ) {
-  return (dispatch, getState) => {
+  return (dispatch: Dispatch, getState: () => object) => {
     if (options && options.preChange) {
       options.preChange({
         entityList, entityID, list, dispatch, getState,
@@ -23,22 +34,22 @@ export function setKeyValueList(
 }
 
 export function setKeyValue(
-  entityList,
-  entityID,
-  key,
-  value,
-  options,
+  entityList: string,
+  entityID: EntityID,
+  key: string,
+  value: any,
+  options: IOptions,
 ) {
   return setKeyValueList(entityList, entityID, [{ key, value }], options);
 }
 
 export function commitEntity(
-  entityList,
-  entityID,
-  entity,
-  options,
+  entityList: string,
+  entityID: EntityID,
+  entity: object,
+  options: IOptions,
 ) {
-  return (dispatch, getState) => {
+  return (dispatch: Dispatch, getState: () => object) => {
     if (options && options.preCommit) {
       options.preCommit({
         entityList, entityID, entity, dispatch, getState,
@@ -57,11 +68,11 @@ export function commitEntity(
 }
 
 export function resetEntity(
-  entityList,
-  entityID,
-  options,
+  entityList: string,
+  entityID: string | number,
+  options: IOptions,
 ) {
-  return (dispatch, getState) => {
+  return (dispatch: Dispatch, getState: () => object) => {
     if (options && options.preCommit) {
       options.preCommit({
         entityList, entityID, dispatch, getState,

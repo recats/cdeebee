@@ -1,16 +1,19 @@
 import {
   slice, assocPath, omit, clone,
 } from 'ramda';
-import set from 'lodash/set';
+
+import { set } from 'lodash';
 import { types } from './constants';
 
 import {
   cancelationRequest, editEntity, getSubEntity, resetEntity,
 } from './helpers';
 
-export const INITIAL_STORAGE = {};
+import { ICdeebee, IRequestAction, IRequestState } from './types';
 
-export const cdeebee = (state = INITIAL_STORAGE, action) => {
+export const INITIAL_STORAGE: any = {};
+
+export const cdeebee = (state: any = INITIAL_STORAGE, action: ICdeebee) => {
   const { type, payload } = action;
 
   switch (type) {
@@ -20,7 +23,7 @@ export const cdeebee = (state = INITIAL_STORAGE, action) => {
       const entityList = state[payload.entityList];
       const entity = editEntity(entityList[payload.entityID]);
       const subEntity = clone(getSubEntity(entity));
-      payload.list.forEach(({ key, value }) => set(subEntity, key, value));
+      payload.list.forEach(({ key, value }: any) => set(subEntity, key, value));
       return assocPath([payload.entityList, payload.entityID, '__entity'], subEntity, state);
     }
     case types.CDEEBEE_SET_ENTITY:
@@ -42,13 +45,13 @@ export const cdeebee = (state = INITIAL_STORAGE, action) => {
   }
 };
 
-const INITIAL_REQUEST = {
+const INITIAL_REQUEST: IRequestState = {
   activeRequest: [],
   requestByApiUrl: {},
   errorHandler: {},
 };
 
-export const requestManager = (state = INITIAL_REQUEST, action) => {
+export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: IRequestAction) => {
   const { type, payload } = action;
   switch (type) {
     case types.CDEEBEE_REQUESTMANAGER_SET:
@@ -73,6 +76,7 @@ export const requestManager = (state = INITIAL_REQUEST, action) => {
       };
 
     case types.CHANGE_ROUTE:
+      // @ts-ignore
       return cancelationRequest(state.activeRequest);
     default:
       return state;

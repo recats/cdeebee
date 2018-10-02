@@ -1,8 +1,9 @@
-import resolve from 'rollup-plugin-node-resolve';
+
 import commonjs from 'rollup-plugin-commonjs';
 import babel from 'rollup-plugin-babel';
 import { terser } from 'rollup-plugin-terser';
 import json from 'rollup-plugin-json';
+import typescript from 'rollup-plugin-typescript2';
 
 export default {
   output: {
@@ -10,14 +11,9 @@ export default {
     format: 'cjs',
   },
   plugins: [
+    typescript(),
     babel({
       runtimeHelpers: true,
-      exclude: 'node_modules/**',
-    }),
-    resolve({
-      jsnext: true,
-      main: true,
-      browser: true,
     }),
     commonjs({
       ignoreGlobal: true,
