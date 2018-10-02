@@ -1,4 +1,3 @@
-// @flow
 import {
   slice, assocPath, omit, clone,
 } from 'ramda';
@@ -11,7 +10,7 @@ import {
 
 export const INITIAL_STORAGE = {};
 
-export const cdeebee = (state: Object = INITIAL_STORAGE, action: Object) => {
+export const cdeebee = (state = INITIAL_STORAGE, action) => {
   const { type, payload } = action;
 
   switch (type) {
@@ -49,7 +48,7 @@ const INITIAL_REQUEST = {
   errorHandler: {},
 };
 
-export const requestManager = (state: Object = INITIAL_REQUEST, action: Object) => {
+export const requestManager = (state = INITIAL_REQUEST, action) => {
   const { type, payload } = action;
   switch (type) {
     case types.CDEEBEE_REQUESTMANAGER_SET:

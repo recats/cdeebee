@@ -1,5 +1,3 @@
-// @flow
-// $FlowIgnore
 import axios from 'axios';
 import get from 'lodash/get';
 import { mergeDeepRight } from 'ramda';
@@ -11,29 +9,25 @@ import { types, cdeebeeMergeStrategy } from './constants';
 
 let responsePosition = {};
 
-type IProps = {
-  api: string,
-  data?: Object,
-  headers?: Object,
-  files?: string,
-  responseCode?: string,
-  method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
-  requestCancel?: boolean,
-  mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy>,
-  normalize?: (e: Object) => Object | Array<Object> => Object,
-  preUpdate?: (payload: Object) => void,
-  postUpdate?: (payload: Object) => void,
-  preError?: (payload: Object) => void,
-  postError?: (payload: Object) => void,
-}
+// type IProps = {
+//   api: string,
+//   data?: Object,
+//   headers?: Object,
+//   files?: string,
+//   responseCode?: string,
+//   method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
+//   requestCancel?: boolean,
+//   mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy>,
+//   normalize?: (e: Object) => Object | Array<Object> => Object,
+//   preUpdate?: (payload: Object) => void,
+//   postUpdate?: (payload: Object) => void,
+//   preError?: (payload: Object) => void,
+//   postError?: (payload: Object) => void,
+// }
 
 
 export default class requestManager {
-  requestObject: Object;
-
-  options: Object;
-
-  constructor(requestObject: Object, options: Object) {
+  constructor(requestObject, options) {
     this.requestObject = requestObject;
     this.options = {
       fileKey: 'files',
@@ -47,7 +41,7 @@ export default class requestManager {
     };
   }
 
-  send = (rq: IProps) => async (dispatch: Function, getState: Function) => {
+  send = rq => async (dispatch, getState) => {
     const {
       api,
       preUpdate,

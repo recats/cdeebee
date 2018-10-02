@@ -1,4 +1,3 @@
-// @flow
 import { clone, omit, mergeDeepRight } from 'ramda';
 import { cdeebeeMergeStrategy, EntityState } from './constants';
 
@@ -11,8 +10,8 @@ const omitKeys = entity => omit(['__entity', '__state'], entity);
  * @param  {Array<Object>} activeRequest
  * @return {array<Object>} active request array
  */
-export const cancelationRequest = (activeRequest: Array<Object>): Object => {
-  const act: Array<Object> = activeRequest.filter(q => (
+export const cancelationRequest = (activeRequest) => {
+  const act = activeRequest.filter(q => (
     q.requestCancel
       && q.source
       && q.source.cancel instanceof Function
@@ -27,7 +26,7 @@ export const cancelationRequest = (activeRequest: Array<Object>): Object => {
  * @param {string} api url
  * @return {string} boolean isLoading
  */
-export function checkNetworkActivity(activeRequest: Array<Object>, apiUrl: string | Array<string>) {
+export function checkNetworkActivity(activeRequest, apiUrl) {
   if (!apiUrl || activeRequest.length === 0) return false;
 
   const apiUrlList = apiUrl instanceof Array ? apiUrl : [apiUrl];
@@ -44,14 +43,14 @@ export function checkNetworkActivity(activeRequest: Array<Object>, apiUrl: strin
  * @param  {Object} entity cdeebee object
  * @return {Object} object (editable)
  */
-export const getSubEntity = (entity: Object) => entity.__entity || entity;
+export const getSubEntity = entity => entity.__entity || entity;
 
 /**
  * @method getEntityState
  * @param  {Object} entity cdeebee object
  * @return {Object} object state
  */
-export const getEntityState = (entity: Object): $Keys<typeof EntityState> => {
+export const getEntityState = (entity) => {
   if (!entity.__entity) return EntityState.NORMAL;
   return entity.__entity.__state;
 };
@@ -62,7 +61,7 @@ export const getEntityState = (entity: Object): $Keys<typeof EntityState> => {
  * @param  {Object} entity cdeebee object
  * @return {Object} with __state "EntityState.NEW"
  */
-export const insertEntity = (entity: Object) => {
+export const insertEntity = (entity) => {
   entity.__state = EntityState.NEW;
   return entity;
 };
@@ -72,7 +71,7 @@ export const insertEntity = (entity: Object) => {
  * @param  {Object} entity cdeebee object
  * @return {Object} with __state "EDITING"
  */
-export const commitEntity = (entity: Object) => {
+export const commitEntity = (entity) => {
   const state = getEntityState(entity);
   if (state === EntityState.NORMAL) {
     console.warn('commit works only in editing and new states');
@@ -86,7 +85,7 @@ export const commitEntity = (entity: Object) => {
  * @param  {Object} entity cdeebee object
  * @return {Object} with __state "EntityState.NORMAL"
  */
-export const resetEntity = (entity: Object) => {
+export const resetEntity = (entity) => {
   const state = getEntityState(entity);
   if (state === EntityState.NORMAL) {
     console.warn('reset works only in editing and new states');
@@ -101,7 +100,7 @@ export const resetEntity = (entity: Object) => {
  * @param  {Object} entity cdeebee object
  * @return {Object} with __state "EntityState.EDITING" and __entity deep object
  */
-export const editEntity = (entity: Object) => {
+export const editEntity = (entity) => {
   const state = getEntityState(entity);
   if (state === EntityState.EDITING) {
     return entity;
@@ -123,7 +122,7 @@ export const defaultNormalize = (
     response: { responseStatus, ...response },
     cdeebee,
     mergeStrategy,
-  }: Object,
+  },
 ) => {
   const keys = Object.keys(response);
   for (const key of keys) {
