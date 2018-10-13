@@ -68,9 +68,7 @@ export default class requestManager {
 
       dispatch({
         type: types.CDEEBEE_REQUESTMANAGER_SET,
-        payload: {
-          nanoID, api, source, requestCancel,
-        },
+        payload: { nanoID, api, source, data, requestCancel },
       });
 
       if (files) {
