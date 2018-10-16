@@ -2,9 +2,10 @@
 import axios from 'axios';
 import { get } from 'lodash';
 import { mergeDeepRight } from 'ramda';
+// @ts-ignore
 import { Dispatch } from 'redux';
 // @ts-ignore
-import nanoid from 'nanoid';
+import nanoid from 'nanoid/generate';
 
 import { defaultNormalize } from './helpers';
 
@@ -60,7 +61,7 @@ export default class requestManager {
     } = mergeDeepRight(this.requestObject, rq);
 
     try {
-      const nanoID = nanoid();
+      const nanoID = nanoid('0123456789abcdefghijklmnopqrstuvwxyz', 15);
 
       let body: any = JSON.stringify({ ...data, requestID: nanoID });
 
