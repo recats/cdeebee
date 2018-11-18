@@ -1324,9 +1324,13 @@ pseudomap@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/pseudomap/-/pseudomap-1.0.2.tgz#f052a28da70e618917ef0a8ac34c1ae5a68286b3"
 
-ramda@0.x, ramda@^0.25.0:
+ramda@0.x:
   version "0.25.0"
   resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.25.0.tgz#8fdf68231cffa90bc2f9460390a0cb74a29b29a9"
+
+ramda@^0.26.0:
+  version "0.26.0"
+  resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.26.0.tgz#3cbe059f5c18fbc0eb86f2396ab1f8320705424c"
 
 randomatic@^3.0.0:
   version "3.1.0"
