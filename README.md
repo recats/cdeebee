@@ -108,7 +108,7 @@ export function ***(fn: () => void) {
       fileKey: 'file',
 
       // key
-      responseKeyCode: 'errorCode',
+      responseKeyCode: 'responseStatus',
 
       preUpdate?: (payload: object) => void,
       postUpdate?: (payload: object) => void,
