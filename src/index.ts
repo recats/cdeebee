@@ -1,4 +1,3 @@
-// @flow
 import { cdeebee, requestManager } from './reducer';
 import CdeebeeRequest from './request';
 import * as helpers from './helpers';

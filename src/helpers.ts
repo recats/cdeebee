@@ -7,12 +7,9 @@ const omitKeys = (entity: object) => omit(['__entity', '__state'], entity);
 
 export const cancelationRequest = (activeRequest: IActiveRequest[]) => {
   const act = activeRequest.filter(q => (
-    q.requestCancel
-      && q.source
-      && q.source.cancel instanceof Function
-      && q.source.cancel(q)
+    !q.requestCancel && q.source && q.source.cancel instanceof Function
   ));
-  return { activeRequest: act };
+  return act;
 };
 
 export function checkNetworkActivity(activeRequest: IActiveRequest[], apiUrl: string | string[]) {

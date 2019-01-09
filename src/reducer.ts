@@ -77,7 +77,7 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
 
     case types.CHANGE_ROUTE:
       // @ts-ignore
-      return cancelationRequest(state.activeRequest);
+      return { ...state, activeRequest: cancelationRequest(state.activeRequest) };
     default:
       return state;
   }
