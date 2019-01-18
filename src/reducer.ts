@@ -1,5 +1,5 @@
 import {
-  slice, assocPath, omit, clone,
+  slice, assocPath, omit, clone, dissoc,
 } from 'ramda';
 
 import { set } from 'lodash';
@@ -65,6 +65,11 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
           ...state.requestByApiUrl,
           [payload.api]: payload.cleanResponse,
         },
+      };
+    case types.CDEEBEEE_DROP_REQUEST_BY_API_URL:
+      return {
+        ...state,
+        requestByApiUrl: dissoc(payload.api, state.requestByApiUrl),
       };
     case types.CDEEBEE_ERRORHANDLER_SET:
       return {
