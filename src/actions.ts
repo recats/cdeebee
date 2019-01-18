@@ -89,3 +89,7 @@ export function resetEntity(
     }
   };
 }
+
+export function dropRequestByApiUrl(api: string) {
+  return (dispatch: Dispatch) => dispatch({ type: types.CDEEBEEE_DROP_REQUEST_BY_API_URL, payload: { api } });
+}

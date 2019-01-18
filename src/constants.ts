@@ -10,6 +10,8 @@ export enum types {
   CDEEBEEE_DROP = '@@cdeebee/DROP',
   CDEEBEEE_DROP_ELEMENT = '@@cdeebee/DROP_ELEMENT',
 
+  CDEEBEEE_DROP_REQUEST_BY_API_URL = '@@cdeebee/DROP_REQUEST_BY_API_URL',
+
   CHANGE_ROUTE = '@@router/LOCATION_CHANGE',
 }
 
