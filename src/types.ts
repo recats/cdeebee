@@ -1,4 +1,4 @@
-import { types, cdeebeeMergeStrategy } from './constants';
+import { types, cdeebeeMergeStrategy, EntityState } from './constants';
 
 export interface CDEEBEEUpadte {
   readonly type: types.CDEEBEEE_UPDATE;
@@ -113,7 +113,7 @@ export interface IActiveRequest {
 
 export interface  IEntity {
   __entity: {
-    __state: string,
+    __state: EntityState;
   };
 }
 

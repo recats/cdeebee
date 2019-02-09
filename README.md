@@ -121,12 +121,14 @@ export function ***(fn: () => void) {
 
 ## Methods
 ```js
-helpers,
-storage,
-requestManager,
-CdeebeeRequest, // class
-cdeebeeTypes,
-cdeebeeActions,
+  cdeebee,
+  cdeebeeHelpers,
+  requestManager,
+  CdeebeeRequest, // class
+  cdeebeeTypes,
+  cdeebeeEntityState,
+  cdeebeeMergeStrategy,
+  cdeebeeActions,
 ```
 
 
@@ -151,25 +153,25 @@ this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, opt
 
 ## Helpers
 ```js
-import { helpers } from '@recats/cdeebee';
+import { cdeebeeHelpers } from '@recats/cdeebee';
 
 // cancelationRequest
-helpers.cancelationRequest(activeRequest: Array<Object>) => Object;
+cdeebeeHelpers.cancelationRequest(activeRequest: Array<Object>) => Object;
 
 // checkNetworkActivity
-helpers.checkNetworkActivity(activeRequest: Array<Object>, apiUrl: string | Array<string>) => boolean;
+cdeebeeHelpers.checkNetworkActivity(activeRequest: Array<Object>, apiUrl: string | Array<string>) => boolean;
 
 // getSubEntity element in cdeebee list
-helpers.getSubEntity(entity: object) => object;
+cdeebeeHelpers.getSubEntity(entity: object) => object;
 
 // getEntityState element in cdeebee list
-helpers.getEntityState(entity: object) => string;
+cdeebeeHelpers.getEntityState(entity: object) => string;
 
 // commitEntity element in cdeebee list
-helpers.commitEntity(entity: object) => void;
+cdeebeeHelpers.commitEntity(entity: object) => void;
 
 // resetEntity element in cdeebee list
-helpers.resetEntity(entity: object) => void;
+cdeebeeHelpers.resetEntity(entity: object) => void;
 ```
 
 ## Data merging behavior

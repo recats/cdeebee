@@ -1,18 +1,18 @@
 import { clone, omit, mergeDeepRight } from 'ramda';
 import { cdeebeeMergeStrategy, EntityState } from './constants';
-
+import { get } from 'lodash';
 import { IEntity, IDefaultNormolize, IActiveRequest } from './types';
 
 const omitKeys = (entity: object) => omit(['__entity', '__state'], entity);
 
-export const cancelationRequest = (activeRequest: IActiveRequest[]) => {
+export const cancelationRequest = (activeRequest: IActiveRequest[]): IActiveRequest[] => {
   const act = activeRequest.filter(q => (
     !q.requestCancel && q.source && q.source.cancel instanceof Function
   ));
   return act;
 };
 
-export function checkNetworkActivity(activeRequest: IActiveRequest[], apiUrl: string | string[]) {
+export function checkNetworkActivity(activeRequest: IActiveRequest[], apiUrl: string | string[]): boolean {
   if (!apiUrl || activeRequest.length === 0) {
     return false;
   }
@@ -31,10 +31,11 @@ export function checkNetworkActivity(activeRequest: IActiveRequest[], apiUrl: st
 export const getSubEntity = (entity: IEntity ) => entity.__entity || entity;
 
 export const getEntityState = (entity: IEntity) => {
-  if (!entity.__entity) {
+  const entityState = get(entity, '__entity.__state') || get(entity, '__state');
+  if (!entityState) {
     return EntityState.NORMAL;
   }
-  return entity.__entity.__state;
+  return entityState;
 };
 
 export const insertEntity = (entity: { __state: string }) => {
@@ -94,7 +95,7 @@ export const defaultNormalize: (d: IDefaultNormolize) => object = (
       } else if (mergeStrategy === cdeebeeMergeStrategy.replace) {
         response[key] = newStorageData;
       }
-    } else if (response[key] === null || response[key] === undefined) {
+    } else if (response[key] === null || response[key] === undefined || typeof response[key] === 'string') {
       response = omit([key], response);
     }
   }
