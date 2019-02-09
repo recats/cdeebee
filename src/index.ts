@@ -1,15 +1,20 @@
 import { cdeebee, requestManager } from './reducer';
 import CdeebeeRequest from './request';
-import * as helpers from './helpers';
-import { types as cdeebeeTypes, cdeebeeMergeStrategy } from './constants';
+import * as cdeebeeHelpers from './helpers';
+import {
+  types as cdeebeeTypes,
+  cdeebeeMergeStrategy,
+  EntityState as cdeebeeEntityState,
+} from './constants';
 import * as cdeebeeActions from './actions';
 
 export {
-  helpers,
   cdeebee,
+  cdeebeeHelpers,
   requestManager,
   CdeebeeRequest,
   cdeebeeTypes,
+  cdeebeeEntityState,
   cdeebeeMergeStrategy,
   cdeebeeActions,
 };

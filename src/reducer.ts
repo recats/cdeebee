@@ -9,7 +9,7 @@ import {
   cancelationRequest, editEntity, getSubEntity, resetEntity,
 } from './helpers';
 
-import { ICdeebee, IRequestAction, IRequestState } from './types';
+import { ICdeebee, IRequestAction, IRequestState, IActiveRequest } from './types';
 
 export const INITIAL_STORAGE: any = {};
 
@@ -81,8 +81,7 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
       };
 
     case types.CHANGE_ROUTE:
-      // @ts-ignore
-      return { ...INITIAL_REQUEST, activeRequest: cancelationRequest(state.activeRequest) };
+      return { ...INITIAL_REQUEST, activeRequest: cancelationRequest((state.activeRequest as IActiveRequest[])) };
     default:
       return state;
   }
