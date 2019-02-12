@@ -100,6 +100,7 @@ export interface IDefaultNormolize {
     [params: string]: any,
   };
   cdeebee: object;
+  primaryKey: string;
   mergeStrategy: cdeebeeMergeStrategy;
 }
 
@@ -124,6 +125,7 @@ export interface IOptions {
   files?: string;
   fileKey?: string;
   bodyKey?: string;
+  primaryKey?: string;
   responseKeyCode?: string;
   method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
   requestCancel?: boolean;

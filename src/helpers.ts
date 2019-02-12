@@ -78,16 +78,15 @@ export const editEntity = (entity: IEntity) => {
 export const defaultNormalize: (d: IDefaultNormolize) => object = (
   {
     response: { responseStatus, ...response },
-    cdeebee,
-    mergeStrategy,
+    cdeebee, mergeStrategy, primaryKey,
   },
 ) => {
   const keys = Object.keys(response);
   for (const key of keys) {
     const newStorageData: any = {};
-    if (response[key] instanceof Object) {
+    if (response[key] instanceof Object && response[key].hasOwnProperty(primaryKey)) {
       for (const element of response[key].data) {
-        newStorageData[element[response[key].primaryKey]] = element;
+        newStorageData[element[response[key][primaryKey]]] = element;
       }
       if (mergeStrategy === cdeebeeMergeStrategy.merge) {
         // @ts-ignore
