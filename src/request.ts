@@ -33,6 +33,7 @@ export default class requestManager {
       fileKey: 'files',
       bodyKey: 'body',
       method: 'POST',
+      primaryKey: 'primaryKey',
       normalize: defaultNormalize,
       mergeStrategy: cdeebeeMergeStrategy.merge,
       responseKeyCode: 'responseStatus',
@@ -52,6 +53,7 @@ export default class requestManager {
       files,
       requestCancel = true,
       fileKey = this.options.fileKey,
+      primaryKey = this.options.primaryKey,
       bodyKey = this.options.bodyKey,
       method = this.options.method,
       normalize = this.options.normalize,
@@ -113,9 +115,7 @@ export default class requestManager {
               type: types.CDEEBEEE_UPDATE,
               payload: {
                 response: normalize instanceof Function && normalize({
-                  response,
-                  cdeebee: getState().cdeebee,
-                  mergeStrategy,
+                  response, cdeebee: getState().cdeebee, mergeStrategy, primaryKey,
                 }),
                 cleanResponse: response,
                 api: requestApi,

@@ -80,6 +80,7 @@ const request = new CdeebeeRequest(
     fileKey: 'files',
     bodyKey: 'body',
     method: 'POST',
+    primaryKey: 'primaryKey',
     normalize: defaultNormalize,
     mergeStrategy: cdeebeeMergeStrategy.merge,
     responseKeyCode: 'responseStatus',
@@ -96,6 +97,7 @@ export function ***(fn: () => void) {
       files?: File,
 
       mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy> # default cdeebeeMergeStrategy.merge,
+      primaryKey?: string // default 'primaryKey',
 
       method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
       headers?: object,
@@ -134,21 +136,44 @@ export function ***(fn: () => void) {
 
 ## Actions
 ```js
-type Options = {
-  preChange: (entityList: string, entityID: string | number, list?: string, dispatch: Function, getState: Function) => void,
-  postChange: (entityList: string, entityID: string | number, list?: string, dispatch: Function, getState: Function) => void,
+interface IOptions {
+  postCommit: (entityList: string, entityID: string | number, list: string, dispatch: Function, getState: Function) => void;
+  preChange: (entityList: string, entityID: string | number, list: string, dispatch: Function, getState: Function) => void;
+  
+  postChange: (entityList: string, entityID: string | number, list: string, dispatch: Function, getState: Function) => void;
+  preCommit: (entityList: string, entityID: string | number, list: string, dispatch: Function, getState: Function) => void;
 }
 
 // setKeyValue
 import { cdeebeeActions } form '@recats/cdeebee';
 
-this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, entity: Array<string> | string, value: any, options?: Options)
+this.props.cdeebeeActions.setKeyValueList(
+  entityList: string,
+  entityID: EntityID,
+  list: Array<{ key: string, value: any }>,
+  options: IOptions,
+)
 
-// commitEntity
-this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, entity: Array<string> | string, value: any)
+this.props.cdeebeeActions.setKeyValue(
+  entityList: string,
+  entityID: EntityID,
+  key: string,
+  value: any,
+  options: IOptions,
+)
 
-// resetEntity
-this.props.cdeebeeActions.setKeyValue(listName: string, id: string | number, options?: Options)
+this.props.cdeebeeActions.commitEntity(
+  entityList: string,
+  entityID: EntityID,
+  entity: object,
+  options: IOptions,
+)
+
+this.props.cdeebeeActions.resetEntity(
+  entityList: string,
+  entityID: string | number,
+  options: IOptions,
+)
 ```
 
 ## Helpers
