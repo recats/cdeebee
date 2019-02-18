@@ -88,9 +88,7 @@ export default class requestManager {
         body = formData;
       }
 
-      const resp = await axios({
-        url: api, method, headers, data: body,
-      });
+      const resp = await axios({ url: api, method, headers, data: body });
 
       if (resp) {
         responsePosition = Object.assign(
@@ -140,6 +138,7 @@ export default class requestManager {
         }
       }
     } catch (error) {
+      dispatch({ type: types.CDEEBEE_INTERNAL_ERROR });
       // tslint:disable-next-line
       console.warn('@@makeRequest', error);
     }

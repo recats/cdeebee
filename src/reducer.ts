@@ -79,6 +79,8 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
           [payload.api]: payload.cleanResponse,
         },
       };
+    case types.CDEEBEE_INTERNAL_ERROR:
+      return { ...state, activeRequest: [], requestByApiUrl: {} };
 
     case types.CHANGE_ROUTE:
       return { ...INITIAL_REQUEST, activeRequest: cancelationRequest((state.activeRequest as IActiveRequest[])) };
