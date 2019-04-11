@@ -1,3 +1,5 @@
+export const EnumAlphabet = '0123456789abcdefghijklmnopqrstuvwxyz';
+
 export enum types {
   CDEEBEE_REQUESTMANAGER_SHIFT = '@@cdeebee/REQUESTMANAGER_SHIFT',
   CDEEBEE_REQUESTMANAGER_SET = '@@cdeebee/REQUESTMANAGER_SET',

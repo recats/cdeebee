@@ -9,7 +9,7 @@ import nanoid from 'nanoid/generate';
 
 import { defaultNormalize } from './helpers';
 
-import { types, cdeebeeMergeStrategy } from './constants';
+import { EnumAlphabet, types, cdeebeeMergeStrategy } from './constants';
 
 import { IOptions } from './types';
 
@@ -63,7 +63,7 @@ export default class requestManager {
     } = mergeDeepRight(this.requestObject, rq);
 
     try {
-      const nanoID = nanoid('0123456789abcdefghijklmnopqrstuvwxyz', 15);
+      const nanoID = nanoid(EnumAlphabet, 15);
 
       let body: any = JSON.stringify({ ...data, requestID: nanoID });
 
@@ -140,7 +140,9 @@ export default class requestManager {
     } catch (error) {
       dispatch({ type: types.CDEEBEE_INTERNAL_ERROR });
       // tslint:disable-next-line
-      console.warn('@@makeRequest', error);
+      console.warn('@@makeRequest-error', error);
+      // tslint:disable-next-line
+      console.warn('@@makeRequest-object', mergeDeepRight(this.requestObject, rq));
     }
   }
 }
