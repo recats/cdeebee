@@ -24,8 +24,11 @@ export enum cdeebeeTypes {
   CHANGE_ROUTE = '@@router/LOCATION_CHANGE',
 }
 
-
-export type EntityState = 'NEW' | 'EDITING' | 'NORMAL';
+export enum cdeebeeEntityState {
+  NEW = 'NEW',
+  EDITING = 'EDITING',
+  NORMAL = 'NORMAL',
+}
 
 export enum cdeebeeMergeStrategy {
   merge = 'merge',
@@ -36,7 +39,7 @@ export interface IOptions {
   api: string;
   data?: object;
   headers?: object;
-  files?: string;
+  files?: any;
   fileKey?: string;
   bodyKey?: string;
   primaryKey?: string;
@@ -52,13 +55,13 @@ export interface IOptions {
 }
 
 export interface __Entity {
-  __entity?: { __state: EntityState; };
+  __entity?: { __state: cdeebeeEntityState; };
 }
 
 export interface ICdeebeeHelpers {
-  getSubEntity<T>(entity: T & __Entity): T & { __state: EntityState } | T & __Entity;
-  commitEntity<T>(entity: T & __Entity): T & { __state: EntityState } | T & __Entity;
-  getEntityState<T>(entity: T & __Entity): EntityState;
+  getSubEntity<T>(entity: T & __Entity): T & { __state: cdeebeeEntityState } | T & __Entity;
+  commitEntity<T>(entity: T & __Entity): T & { __state: cdeebeeEntityState } | T & __Entity;
+  getEntityState<T>(entity: T & __Entity): cdeebeeEntityState;
   
   checkNetworkActivity(activeRequest: object[], api: string[] | string): boolean;
   cancelationRequest(activeRequest: object[]): object;
@@ -68,30 +71,11 @@ export interface ICdeebeeHelpers {
 
 export const cdeebeeHelpers: ICdeebeeHelpers;
 
-export interface IOptions {
-  api: string;
-  data?: object;
-  headers?: object;
-  files?: string;
-  fileKey?: string;
-  bodyKey?: string;
-  primaryKey?: string;
-  responseKeyCode?: string;
-  method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
-  requestCancel?: boolean;
-  mergeStrategy?: cdeebeeMergeStrategy;
-  normalize?: (t: any) => void;
-  preUpdate?: (payload: object) => void;
-  postUpdate?: (payload: object) => void;
-  preError?: (payload: object) => void;
-  postError?: (payload: object) => void;
-}
-
 export interface ICdeebeeActions {
   setKeyValueList(entityList: string, entityID: string | number, dataList: Array<{ key: string, value: any }>, options?: IOptions): void;
   setKeyValue(entityList: string, entityID: string | number, key: string, value: any, options?: IOptions): void;
-  commitEntity(entityList: string, entityID: string | number, entity: object, options: IOptions): void;
-  resetEntity(entityList: string, entityID: string | number, options: IOptions): void;
+  commitEntity(entityList: string, entityID: string | number, entity: object, options?: IOptions): void;
+  resetEntity(entityList: string, entityID: string | number, options?: IOptions): void;
 }
 
 export interface ActionCreator<A> { (...args: any[]): A; }
