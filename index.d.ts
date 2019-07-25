@@ -72,10 +72,13 @@ export interface ICdeebeeHelpers {
 export const cdeebeeHelpers: ICdeebeeHelpers;
 
 export interface ICdeebeeActions {
-  setKeyValueList(entityList: string, entityID: string | number, dataList: Array<{ key: string, value: any }>, options?: IOptions): void;
-  setKeyValue(entityList: string, entityID: string | number, key: string, value: any, options?: IOptions): void;
+  setKeyValueList(entityList: string, entityID: string | number | Array<string | number>, dataList: Array<{ key: string, value: any }>, options?: IOptions): void;
+  setKeyValue(entityList: string, entityID: string | number, key: string | number | Array<string | number>, value: any, options?: IOptions): void;
+
   commitEntity(entityList: string, entityID: string | number, entity: object, options?: IOptions): void;
   resetEntity(entityList: string, entityID: string | number, options?: IOptions): void;
+
+  dropRequestByApiUrl: (api: string) => void;
 }
 
 export interface ActionCreator<A> { (...args: any[]): A; }
