@@ -29,3 +29,7 @@ export enum cdeebeeMergeStrategy {
   merge = 'merge',
   replace = 'replace',
 }
+
+export enum cdeebeeRequestStrategy {
+  skipCdeeBeeUpdate = 'skipCdeeBeeUpdate',
+}

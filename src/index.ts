@@ -4,6 +4,7 @@ import * as cdeebeeHelpers from './helpers';
 import {
   types as cdeebeeTypes,
   cdeebeeMergeStrategy,
+  cdeebeeRequestStrategy,
   EntityState as cdeebeeEntityState,
 } from './constants';
 import * as cdeebeeActions from './actions';
@@ -16,5 +17,6 @@ export {
   cdeebeeTypes,
   cdeebeeEntityState,
   cdeebeeMergeStrategy,
+  cdeebeeRequestStrategy,
   cdeebeeActions,
 };

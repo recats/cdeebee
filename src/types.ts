@@ -1,4 +1,4 @@
-import { types, cdeebeeMergeStrategy, EntityState } from './constants';
+import { types, cdeebeeMergeStrategy, cdeebeeRequestStrategy, EntityState } from './constants';
 
 export interface CDEEBEEUpadte {
   readonly type: types.CDEEBEEE_UPDATE;
@@ -102,6 +102,7 @@ export interface IDefaultNormolize {
   cdeebee: object;
   primaryKey: string;
   mergeStrategy: cdeebeeMergeStrategy;
+  requestStrategy: cdeebeeRequestStrategy;
 }
 
 export interface IActiveRequest {
@@ -130,6 +131,7 @@ export interface IOptions {
   method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
   requestCancel?: boolean;
   mergeStrategy?: cdeebeeMergeStrategy;
+  requestStrategy?: cdeebeeRequestStrategy;
   normalize?: (t: any) => void;
   preUpdate?: (payload: object) => void;
   postUpdate?: (payload: object) => void;

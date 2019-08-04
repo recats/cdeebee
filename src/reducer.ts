@@ -6,7 +6,8 @@ import { set } from 'lodash';
 import { types } from './constants';
 
 import {
-  cancelationRequest, editEntity, getSubEntity, resetEntity,
+  batchingUpdate,
+  cancelationRequest, editEntity, resetEntity,
 } from './helpers';
 
 import { ICdeebee, IRequestAction, IRequestState, IActiveRequest } from './types';
@@ -20,11 +21,8 @@ export const cdeebee = (state: any = INITIAL_STORAGE, action: ICdeebee) => {
     case types.CDEEBEEE_UPDATE:
       return { ...state, ...payload.response };
     case types.CDEEBEE_ENTITY_CHANGE_FIELD: {
-      const entityList = state[payload.entityList];
-      const entity = editEntity(entityList[payload.entityID]);
-      const subEntity = clone(getSubEntity(entity));
-      payload.list.forEach(({ key, value }: any) => set(subEntity, key, value));
-      return assocPath([payload.entityList, payload.entityID, '__entity'], subEntity, state);
+      const objCreate = editEntity(state, payload.entityList, payload.entityID);
+      return batchingUpdate(objCreate, payload.valueList, [payload.entityList, payload.entityID, '__entity']);
     }
     case types.CDEEBEE_SET_ENTITY:
       return assocPath([payload.entityList, payload.entityID], payload.entity, state);

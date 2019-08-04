@@ -97,6 +97,7 @@ export function ***(fn: () => void) {
       files?: File,
 
       mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy> # default cdeebeeMergeStrategy.merge,
+      requestStrategy?: $Keys<typeof cdeebeeRequestStrategy> # default undefined,
       primaryKey?: string // default 'primaryKey',
 
       method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
@@ -129,7 +130,8 @@ export function ***(fn: () => void) {
   CdeebeeRequest, // class
   cdeebeeTypes,
   cdeebeeEntityState,
-  cdeebeeMergeStrategy,
+  cdeebeeRequestStrategy, // request strategy (skipCdeeBeeUpdate, etc...)
+  cdeebeeMergeStrategy, // merge storage strategy
   cdeebeeActions,
 ```
 
@@ -147,18 +149,10 @@ interface IOptions {
 // setKeyValue
 import { cdeebeeActions } form '@recats/cdeebee';
 
-this.props.cdeebeeActions.setKeyValueList(
-  entityList: string,
-  entityID: EntityID,
-  list: Array<{ key: string, value: any }>,
-  options: IOptions,
-)
-
 this.props.cdeebeeActions.setKeyValue(
   entityList: string,
   entityID: EntityID,
-  key: string,
-  value: any,
+  valueList: Array<{ key: Array<string | number>, value: any }>,
   options: IOptions,
 )
 

@@ -7,40 +7,31 @@ interface IOptions {
   preChange?: (d: object) => void;
   postChange?: (d: object) => void;
   preCommit?: (d: object) => void;
-}
-
-export function setKeyValueList(
-  entityList: string,
-  entityID: EntityID,
-  list: Array<{ key: string, value: any }>,
-  options: IOptions,
-) {
-  return (dispatch: Dispatch, getState: () => object) => {
-    if (options && options.preChange) {
-      options.preChange({
-        entityList, entityID, list, dispatch, getState,
-      });
-    }
-    dispatch({
-      type: types.CDEEBEE_ENTITY_CHANGE_FIELD,
-      payload: { entityList, entityID, list },
-    });
-    if (options && options.postChange) {
-      options.postChange({
-        entityList, entityID, list, dispatch, getState,
-      });
-    }
-  };
+  prePath?: Array<string | number>;
 }
 
 export function setKeyValue(
   entityList: string,
   entityID: EntityID,
-  key: string,
-  value: any,
+  valueList: Array<{ key: Array<string | number>, value: any }>,
   options: IOptions,
 ) {
-  return setKeyValueList(entityList, entityID, [{ key, value }], options);
+  return (dispatch: Dispatch, getState: () => object) => {
+    if (options && options.preChange) {
+      options.preChange({
+        entityList, entityID, valueList, dispatch, getState,
+      });
+    }
+    dispatch({
+      type: types.CDEEBEE_ENTITY_CHANGE_FIELD,
+      payload: { entityList, entityID, valueList },
+    });
+    if (options && options.postChange) {
+      options.postChange({
+        entityList, entityID, valueList, dispatch, getState,
+      });
+    }
+  };
 }
 
 export function commitEntity(

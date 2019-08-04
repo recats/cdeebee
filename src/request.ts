@@ -9,7 +9,7 @@ import nanoid from 'nanoid/generate';
 
 import { defaultNormalize } from './helpers';
 
-import { EnumAlphabet, types, cdeebeeMergeStrategy } from './constants';
+import { cdeebeeRequestStrategy, EnumAlphabet, types, cdeebeeMergeStrategy } from './constants';
 
 import { IOptions } from './types';
 
@@ -52,6 +52,7 @@ export default class requestManager {
       data,
       files,
       requestCancel = true,
+      requestStrategy,
       fileKey = this.options.fileKey,
       primaryKey = this.options.primaryKey,
       bodyKey = this.options.bodyKey,
@@ -109,17 +110,25 @@ export default class requestManager {
             if (preUpdate) {
               preUpdate(resp.data);
             }
-            dispatch({
-              type: types.CDEEBEEE_UPDATE,
-              payload: {
-                response: normalize instanceof Function && normalize({
-                  response, cdeebee: getState().cdeebee, mergeStrategy, primaryKey,
-                }),
-                cleanResponse: response,
-                api: requestApi,
-                mergeStrategy,
-              },
-            });
+
+            switch (requestStrategy) {
+              case cdeebeeRequestStrategy.skipCdeeBeeUpdate:
+                break;
+              default:
+                dispatch({
+                  type: types.CDEEBEEE_UPDATE,
+                  payload: {
+                    response: normalize instanceof Function && normalize({
+                      response, cdeebee: getState().cdeebee, mergeStrategy, primaryKey,
+                    }),
+                    cleanResponse: response,
+                    api: requestApi,
+                    mergeStrategy,
+                  },
+                });
+                break;
+            }
+
             if (postUpdate) {
               postUpdate(resp.data);
             }
@@ -127,10 +136,12 @@ export default class requestManager {
             if (preError) {
               preError(resp.data);
             }
+
             dispatch({
               type: types.CDEEBEE_ERRORHANDLER_SET,
               payload: { api: requestApi, cleanResponse: response },
             });
+
             if (postError) {
               postError(resp.data);
             }

@@ -35,6 +35,10 @@ export enum cdeebeeMergeStrategy {
   replace = 'replace',
 }
 
+export enum cdeebeeRequestStrategy {
+  skipCdeeBeeUpdate = 'skipCdeeBeeUpdate',
+}
+
 export interface IOptions {
   api: string;
   data?: object;
@@ -47,6 +51,7 @@ export interface IOptions {
   method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
   requestCancel?: boolean;
   mergeStrategy?: cdeebeeMergeStrategy;
+  requestStrategy?: cdeebeeRequestStrategy;
   normalize?: (t: any) => void;
   preUpdate?: (payload: object) => void;
   postUpdate?: (payload: object) => void;
@@ -58,22 +63,42 @@ export interface __Entity {
   __entity?: { __state: cdeebeeEntityState; };
 }
 
+export interface IValueList {
+  key: Array<string | number>;
+  value: any;
+}
+
 export interface ICdeebeeHelpers {
+  batchingUpdate: (state: object, valueList: IValueList, prePath: Array<string | number>) => object;
+
   getSubEntity<T>(entity: T & __Entity): T & { __state: cdeebeeEntityState } | T & __Entity;
   commitEntity<T>(entity: T & __Entity): T & { __state: cdeebeeEntityState } | T & __Entity;
   getEntityState<T>(entity: T & __Entity): cdeebeeEntityState;
-  
+
   checkNetworkActivity(activeRequest: object[], api: string[] | string): boolean;
   cancelationRequest(activeRequest: object[]): object;
-  
+
   resetEntity<T>(activeRequest: T & __Entity): T & __Entity;
 }
 
 export const cdeebeeHelpers: ICdeebeeHelpers;
 
+export interface ICdeebeeSetKeyValueOptions {
+  postCommit?: (d: object) => void;
+  preChange?: (d: object) => void;
+  postChange?: (d: object) => void;
+  preCommit?: (d: object) => void;
+}
+
+export interface ICdeebeeOnChange {
+  entityList: string;
+  entityID: string | number;
+  data: Array<{ key: string, value: any }>;
+  options?: ICdeebeeSetKeyValueOptions;
+}
+
 export interface ICdeebeeActions {
-  setKeyValueList(entityList: string, entityID: string | number | Array<string | number>, dataList: Array<{ key: string, value: any }>, options?: IOptions): void;
-  setKeyValue(entityList: string, entityID: string | number, key: string | number | Array<string | number>, value: any, options?: IOptions): void;
+  setKeyValue(entityList: string, entityID: string | number, valueList: IValueList[], options?: ICdeebeeSetKeyValueOptions): void;
 
   commitEntity(entityList: string, entityID: string | number, entity: object, options?: IOptions): void;
   resetEntity(entityList: string, entityID: string | number, options?: IOptions): void;
@@ -86,7 +111,7 @@ export const cdeebeeActions: ActionCreator<ICdeebeeActions>;
 
 export class CdeebeeRequest {
   public requestObject: any;
-  
+
   constructor(
     defaultRequest: object,
     options: {
@@ -100,7 +125,7 @@ export class CdeebeeRequest {
       header?: object,
     },
   );
-  
+
   public send(requestData: IOptions): (dispatch: any, getState: any) => void;
 }
 
@@ -200,4 +225,4 @@ export type ICdeebee =
   | CDEEBEEDropElement
   ;
 
-  export function cdeebee(state: IRequestState, action: ICdeebee): object;
+export function cdeebee(state: IRequestState, action: ICdeebee): object;

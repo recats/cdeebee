@@ -1,4 +1,4 @@
-import { clone, omit, mergeDeepRight } from 'ramda';
+import { assocPath, omit, mergeDeepRight } from 'ramda';
 import { cdeebeeMergeStrategy, EntityState } from './constants';
 import { get } from 'lodash';
 import { IEntity, IDefaultNormolize, IActiveRequest } from './types';
@@ -63,16 +63,37 @@ export const resetEntity = (entity: IEntity) => {
   return omitKeys(entity);
 };
 
-export const editEntity = (entity: IEntity) => {
-  const state = getEntityState(entity);
+export const editEntity = (store: IEntity, list: string, id: number | string) => {
+  const arrayList = get(store, list);
+  const state = getEntityState(arrayList[id]);
+
   if (state === EntityState.EDITING) {
-    return entity;
+    // tslint:disable-next-line:no-console
+    console.log('editing');
+    return store;
   }
-  const newEntity: IEntity = clone(entity);
-  // @ts-ignore
-  newEntity.__entity = clone(entity);
-  newEntity.__entity.__state = EntityState.EDITING;
-  return newEntity;
+
+    // tslint:disable-next-line:no-console
+  console.log('createNew');
+  const newReturnStore = assocPath([list, id, '__entity'], arrayList[id], store);
+  return assocPath([list, id, '__entity', '__state'], EntityState.EDITING, newReturnStore);
+};
+
+export const batchingUpdate = (
+  state: object,
+  valueList: Array<{ key: Array<string | number >, value: any }>,
+  prePath?: Array<string | number>,
+) => {
+  const prePathEnity = prePath ? prePath : [];
+
+  let returnState: object = state;
+
+  for (let i = 0; i < valueList.length; i++) {
+    const arr = valueList[i];
+    returnState = assocPath([...prePathEnity, ...arr.key], arr.value, returnState);
+  }
+
+  return returnState;
 };
 
 export const defaultNormalize: (d: IDefaultNormolize) => object = (
