@@ -9,7 +9,7 @@ import {
   cancelationRequest, editEntity, resetEntity,
 } from './helpers';
 
-import { ICdeebee, IRequestAction, IRequestState, IActiveRequest } from './definition';
+import { ICdeebee, IRequestAction, IRequestState, cdeebeActiveRequest } from './definition';
 
 export const INITIAL_STORAGE: any = {};
 
@@ -80,7 +80,7 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
       return { ...state, activeRequest: [], requestByApiUrl: {} };
 
     case cdeebeeTypes.CHANGE_ROUTE:
-      return { ...INITIAL_REQUEST, activeRequest: cancelationRequest((state.activeRequest as IActiveRequest[])) };
+      return { ...INITIAL_REQUEST, activeRequest: cancelationRequest((state.activeRequest as cdeebeActiveRequest[])) };
     default:
       return state;
   }

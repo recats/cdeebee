@@ -1,4 +1,4 @@
-import { ICdeebee, IRequestAction, IRequestState, IActiveRequest } from './definition';
+import { ICdeebee, IRequestAction, IRequestState, cdeebeActiveRequest } from './definition';
 export declare const INITIAL_STORAGE: any;
 export declare const cdeebee: (state: any, action: ICdeebee) => any;
 export declare const requestManager: (state: IRequestState | undefined, action: IRequestAction) => {
@@ -7,6 +7,6 @@ export declare const requestManager: (state: IRequestState | undefined, action: 
     errorHandler: object;
 } | {
     requestByApiUrl: unknown;
-    activeRequest: IActiveRequest[];
+    activeRequest: cdeebeActiveRequest[];
     errorHandler: object;
 };

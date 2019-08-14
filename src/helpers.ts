@@ -1,18 +1,18 @@
 /* tslint:disable max-line-length */
 import { assocPath, omit, mergeDeepRight } from 'ramda';
 import { get } from 'lodash';
-import { cdeebeeMergeStrategy, cdeebeeEntityState, cdeebeeValueList, IEntity, IDefaultNormolize, IActiveRequest } from './definition';
+import { cdeebeeMergeStrategy, cdeebeeEntityState, cdeebeeValueList, IEntity, IDefaultNormolize, cdeebeActiveRequest } from './definition';
 
 const omitKeys = <T>(entity: T): T & any => omit<T, any>(['__entity', '__state'], entity);
 
-export const cancelationRequest = (activeRequest: IActiveRequest[]): IActiveRequest[] => {
+export const cancelationRequest = (activeRequest: cdeebeActiveRequest[]): cdeebeActiveRequest[] => {
   const act = activeRequest.filter(q => (
     !q.requestCancel && q.source && q.source.cancel instanceof Function
   ));
   return act;
 };
 
-export const checkNetworkActivity = (activeRequest: IActiveRequest[], apiUrl: string | string[]): boolean => {
+export const checkNetworkActivity = (activeRequest: cdeebeActiveRequest[], apiUrl: string | string[]): boolean => {
   if (!apiUrl || activeRequest.length === 0) {
     return false;
   }

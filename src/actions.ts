@@ -5,7 +5,7 @@ import { cdeebeeTypes, cdeebeeValueList, EntityID } from './definition';
 export function setKeyValue(
   entityList: string,
   entityID: EntityID,
-  valueList: cdeebeeValueList,
+  valueList: cdeebeeValueList[],
 ) {
   return (dispatch: Dispatch) => {
     dispatch({
