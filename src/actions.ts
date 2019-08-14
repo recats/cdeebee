@@ -1,11 +1,11 @@
 // @ts-ignore
 import { Dispatch } from 'redux';
-import { cdeebeeTypes, IValueList, EntityID } from './definition';
+import { cdeebeeTypes, cdeebeeValueList, EntityID } from './definition';
 
 export function setKeyValue(
   entityList: string,
   entityID: EntityID,
-  valueList: IValueList,
+  valueList: cdeebeeValueList,
 ) {
   return (dispatch: Dispatch) => {
     dispatch({

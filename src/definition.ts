@@ -30,7 +30,7 @@ export enum cdeebeeMergeStrategy {
 
 export type IDefaultOption = {
   headers?: object;
-  files?: any;
+  files?: File[];
   fileKey?: string;
   bodyKey?: string;
   primaryKey?: string;
