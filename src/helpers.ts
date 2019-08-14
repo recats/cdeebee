@@ -1,5 +1,5 @@
 /* tslint:disable max-line-length */
-import {assocPath, omit, mergeDeepRight } from 'ramda';
+import { assocPath, omit, mergeDeepRight } from 'ramda';
 import { get } from 'lodash';
 import { cdeebeeMergeStrategy, cdeebeeEntityState, cdeebeeValueList, IEntity, IDefaultNormolize, IActiveRequest } from './definition';
 

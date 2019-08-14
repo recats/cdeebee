@@ -136,8 +136,16 @@ export type IRequestAction =
   | CDEEBEEChangeRoute
   ;
 
+export interface IActiveRequest {
+  api: string;
+  requestCancel: object;
+  source: {
+    cancel: (t: any) => void;
+  };
+}
+
 export interface IRequestState {
-  activeRequest: object[];
+  activeRequest: IActiveRequest[];
   requestByApiUrl: object;
   errorHandler: object;
 }

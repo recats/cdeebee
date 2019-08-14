@@ -23,7 +23,7 @@ export declare enum cdeebeeMergeStrategy {
 }
 export declare type IDefaultOption = {
     headers?: object;
-    files?: any;
+    files?: File[];
     fileKey?: string;
     bodyKey?: string;
     primaryKey?: string;
@@ -105,8 +105,15 @@ export interface CDEEBEEChangeRoute {
     readonly payload?: any;
 }
 export declare type IRequestAction = CDEEBEERequestManager | CDEEBEERequestShift | CDEEBEEUpdate | CDEEBEEErrorSet | CDEEBEEChangeRoute;
+export interface IActiveRequest {
+    api: string;
+    requestCancel: object;
+    source: {
+        cancel: (t: any) => void;
+    };
+}
 export interface IRequestState {
-    activeRequest: object[];
+    activeRequest: IActiveRequest[];
     requestByApiUrl: object;
     errorHandler: object;
 }
