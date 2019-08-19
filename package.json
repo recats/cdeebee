@@ -37,7 +37,7 @@
     "babel-eslint": "^10.0.2",
     "babel-plugin-lodash": "^3.3.4",
     "babel-plugin-ramda": "^2.0.0",
-    "babel-plugin-rewire-exports": "^1.2.0",
+    "babel-plugin-rewire-exports": "^2.0.0",
     "husky": "^3.0.1",
     "redux": "^4.0.4",
     "rollup": "^1.17.0",
