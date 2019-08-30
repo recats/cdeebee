@@ -10,6 +10,7 @@ export declare enum cdeebeeTypes {
     CDEEBEEE_DROP_ELEMENT = "@@cdeebee/DROP_ELEMENT",
     CDEEBEE_INTERNAL_ERROR = "@@cdeebee/INTERNAL_ERROR",
     CDEEBEEE_DROP_REQUEST_BY_API_URL = "@@cdeebee/DROP_REQUEST_BY_API_URL",
+    CDEEBEEE_DROP_ERROR_BY_API_URL = "@@cdeebee/DROP_ERROR_BY_API_URL",
     CHANGE_ROUTE = "@@router/LOCATION_CHANGE"
 }
 export declare enum cdeebeeEntityState {
@@ -60,6 +61,7 @@ export declare type cdeebeActiveRequest = {
 export declare type EntityID = string | number;
 export interface cdeebeeIActions {
     dropRequestByApiUrl: (api: string) => void;
+    dropErrorsByApiUrl: (api: string) => void;
     setKeyValue: (entityList: string, entityID: EntityID, valueList: cdeebeeValueList[]) => void;
     commitEntity: (entityList: string, entityID: EntityID, entity: object) => void;
     resetEntity: (entityList: string, entityID: EntityID) => void;

@@ -9,4 +9,8 @@ export declare const requestManager: (state: IRequestState | undefined, action: 
     requestByApiUrl: unknown;
     activeRequest: cdeebeActiveRequest[];
     errorHandler: object;
+} | {
+    errorHandler: unknown;
+    activeRequest: cdeebeActiveRequest[];
+    requestByApiUrl: object;
 };

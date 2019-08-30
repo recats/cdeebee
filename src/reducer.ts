@@ -68,6 +68,11 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
         ...state,
         requestByApiUrl: dissoc(payload.api, state.requestByApiUrl),
       };
+    case cdeebeeTypes.CDEEBEEE_DROP_ERROR_BY_API_URL:
+      return {
+        ...state,
+        errorHandler: dissoc(payload.api, state.errorHandler),
+      };
     case cdeebeeTypes.CDEEBEE_ERRORHANDLER_SET:
       return {
         ...state,

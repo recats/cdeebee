@@ -13,6 +13,7 @@ export enum cdeebeeTypes {
   CDEEBEE_INTERNAL_ERROR = '@@cdeebee/INTERNAL_ERROR',
 
   CDEEBEEE_DROP_REQUEST_BY_API_URL = '@@cdeebee/DROP_REQUEST_BY_API_URL',
+  CDEEBEEE_DROP_ERROR_BY_API_URL = '@@cdeebee/DROP_ERROR_BY_API_URL',
 
   CHANGE_ROUTE = '@@router/LOCATION_CHANGE',
 }
@@ -72,6 +73,7 @@ export type EntityID = string | number;
 // tslint:disable-next-line:class-name
 export interface cdeebeeIActions {
   dropRequestByApiUrl: (api: string) => void;
+  dropErrorsByApiUrl: (api: string) => void;
 
   setKeyValue: (
     entityList: string, entityID: EntityID, valueList: cdeebeeValueList[],

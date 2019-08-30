@@ -9,3 +9,9 @@ export declare function dropRequestByApiUrl(api: string): (dispatch: Dispatch<im
         api: string;
     };
 };
+export declare function dropErrorsByApiUrl(api: string): (dispatch: Dispatch<import("redux").AnyAction>) => {
+    type: cdeebeeTypes;
+    payload: {
+        api: string;
+    };
+};
