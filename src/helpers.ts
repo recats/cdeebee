@@ -1,18 +1,18 @@
-import { clone, omit, mergeDeepRight } from 'ramda';
-import { cdeebeeMergeStrategy, EntityState } from './constants';
+/* tslint:disable max-line-length */
+import { assocPath, omit, mergeDeepRight } from 'ramda';
 import { get } from 'lodash';
-import { IEntity, IDefaultNormolize, IActiveRequest } from './types';
+import { cdeebeeMergeStrategy, cdeebeeEntityState, cdeebeeValueList, IEntity, IDefaultNormolize, cdeebeActiveRequest } from './definition';
 
-const omitKeys = (entity: object) => omit(['__entity', '__state'], entity);
+const omitKeys = <T>(entity: T): T & any => omit<T, any>(['__entity', '__state'], entity);
 
-export const cancelationRequest = (activeRequest: IActiveRequest[]): IActiveRequest[] => {
+export const cancelationRequest = (activeRequest: cdeebeActiveRequest[]): cdeebeActiveRequest[] => {
   const act = activeRequest.filter(q => (
     !q.requestCancel && q.source && q.source.cancel instanceof Function
   ));
   return act;
 };
 
-export function checkNetworkActivity(activeRequest: IActiveRequest[], apiUrl: string | string[]): boolean {
+export const checkNetworkActivity = (activeRequest: cdeebeActiveRequest[], apiUrl: string | string[]): boolean => {
   if (!apiUrl || activeRequest.length === 0) {
     return false;
   }
@@ -26,53 +26,70 @@ export function checkNetworkActivity(activeRequest: IActiveRequest[], apiUrl: st
   }
 
   return false;
-}
+};
 
-export const getSubEntity = (entity: IEntity ) => entity.__entity || entity;
+export const getSubEntity = <T>(entity: T & IEntity): { __state: cdeebeeEntityState } | (T & IEntity) => entity.__entity || entity;
 
-export const getEntityState = (entity: IEntity) => {
+export const getEntityState = <T>(entity: T & IEntity): cdeebeeEntityState => {
   const entityState = get(entity, '__entity.__state') || get(entity, '__state');
   if (!entityState) {
-    return EntityState.NORMAL;
+    return cdeebeeEntityState.NORMAL;
   }
   return entityState;
 };
 
 export const insertEntity = (entity: { __state: string }) => {
-  entity.__state = EntityState.NEW;
+  entity.__state = cdeebeeEntityState.NEW;
   return entity;
 };
 
-export const commitEntity = (entity: IEntity) => {
+export const commitEntity = <T>(entity: T & IEntity): T => {
   const state = getEntityState(entity);
-  if (state === EntityState.NORMAL) {
+  if (state === cdeebeeEntityState.NORMAL) {
     // tslint:disable-next-line
     console.warn('commit works only in editing and new states');
     return entity;
   }
-  return omitKeys(entity);
+  return omitKeys<T>(entity);
 };
 
-export const resetEntity = (entity: IEntity) => {
+export const resetEntity = <T>(entity: T & IEntity): T => {
   const state = getEntityState(entity);
-  if (state === EntityState.NORMAL) {
+  if (state === cdeebeeEntityState.NORMAL) {
     // tslint:disable-next-line
     console.warn('reset works only in editing and new states');
     return entity;
   }
-  return omitKeys(entity);
+  return omitKeys<T>(entity);
 };
 
-export const editEntity = (entity: IEntity) => {
-  const state = getEntityState(entity);
-  if (state === EntityState.EDITING) {
-    return entity;
+export const editEntity = (store: IEntity, list: string, id: number | string) => {
+  const arrayList = get(store, list);
+  const state = getEntityState(arrayList[id]);
+
+  if (state === cdeebeeEntityState.EDITING) {
+    return store;
   }
-  const newEntity: IEntity = clone(entity);
-  // @ts-ignore
-  newEntity.__entity = clone(entity);
-  newEntity.__entity.__state = EntityState.EDITING;
-  return newEntity;
+
+  const newReturnStore = assocPath([list, id, '__entity'], arrayList[id], store);
+  return assocPath([list, id, '__entity', '__state'], cdeebeeEntityState.EDITING, newReturnStore);
+};
+
+export const batchingUpdate = (
+  state: object,
+  valueList: cdeebeeValueList[],
+  prePath?: Array<string | number>,
+) => {
+  const prePathEnity = prePath ? prePath : [];
+
+  let returnState: object = state;
+
+  for (let i = 0; i < valueList.length; i++) {
+    const arr = valueList[i];
+    returnState = assocPath([...prePathEnity, ...arr.key], arr.value, returnState);
+  }
+
+  return returnState;
 };
 
 export const defaultNormalize: (d: IDefaultNormolize) => object = (

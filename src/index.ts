@@ -2,13 +2,17 @@ import { cdeebee, requestManager } from './reducer';
 import CdeebeeRequest from './request';
 import * as cdeebeeHelpers from './helpers';
 import {
-  types as cdeebeeTypes,
+  cdeebeeTypes,
   cdeebeeMergeStrategy,
-  EntityState as cdeebeeEntityState,
-} from './constants';
+  cdeebeeEntityState,
+  cdeebeeValueList,
+  cdeebeActiveRequest,
+  cdeebeeIActions,
+} from './definition';
 import * as cdeebeeActions from './actions';
 
 export {
+  cdeebeeValueList,
   cdeebee,
   cdeebeeHelpers,
   requestManager,
@@ -17,4 +21,6 @@ export {
   cdeebeeEntityState,
   cdeebeeMergeStrategy,
   cdeebeeActions,
+  cdeebeActiveRequest,
+  cdeebeeIActions,
 };

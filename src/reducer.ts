@@ -1,15 +1,15 @@
 import {
-  slice, assocPath, omit, clone, dissoc,
+  slice, assocPath, omit, dissoc,
 } from 'ramda';
 
-import { set } from 'lodash';
-import { types } from './constants';
+import { cdeebeeTypes } from './index';
 
 import {
-  cancelationRequest, editEntity, getSubEntity, resetEntity,
+  batchingUpdate,
+  cancelationRequest, editEntity, resetEntity,
 } from './helpers';
 
-import { ICdeebee, IRequestAction, IRequestState, IActiveRequest } from './types';
+import { ICdeebee, IRequestAction, IRequestState, cdeebeActiveRequest } from './definition';
 
 export const INITIAL_STORAGE: any = {};
 
@@ -17,18 +17,15 @@ export const cdeebee = (state: any = INITIAL_STORAGE, action: ICdeebee) => {
   const { type, payload } = action;
 
   switch (type) {
-    case types.CDEEBEEE_UPDATE:
+    case cdeebeeTypes.CDEEBEEE_UPDATE:
       return { ...state, ...payload.response };
-    case types.CDEEBEE_ENTITY_CHANGE_FIELD: {
-      const entityList = state[payload.entityList];
-      const entity = editEntity(entityList[payload.entityID]);
-      const subEntity = clone(getSubEntity(entity));
-      payload.list.forEach(({ key, value }: any) => set(subEntity, key, value));
-      return assocPath([payload.entityList, payload.entityID, '__entity'], subEntity, state);
+    case cdeebeeTypes.CDEEBEE_ENTITY_CHANGE_FIELD: {
+      const objCreate = editEntity(state, payload.entityList, payload.entityID);
+      return batchingUpdate(objCreate, payload.valueList, [payload.entityList, payload.entityID, '__entity']);
     }
-    case types.CDEEBEE_SET_ENTITY:
+    case cdeebeeTypes.CDEEBEE_SET_ENTITY:
       return assocPath([payload.entityList, payload.entityID], payload.entity, state);
-    case types.CDEEBEE_RESET_ENTITY: {
+    case cdeebeeTypes.CDEEBEE_RESET_ENTITY: {
       const entityList = state[payload.entityList];
       return assocPath(
         [payload.entityList, payload.entityID],
@@ -36,9 +33,9 @@ export const cdeebee = (state: any = INITIAL_STORAGE, action: ICdeebee) => {
         state,
       );
     }
-    case types.CDEEBEEE_DROP:
+    case cdeebeeTypes.CDEEBEEE_DROP:
       return INITIAL_STORAGE;
-    case types.CDEEBEEE_DROP_ELEMENT:
+    case cdeebeeTypes.CDEEBEEE_DROP_ELEMENT:
       return omit([payload.entityList, payload.entityID], state);
     default:
       return state;
@@ -54,11 +51,11 @@ const INITIAL_REQUEST: IRequestState = {
 export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: IRequestAction) => {
   const { type, payload } = action;
   switch (type) {
-    case types.CDEEBEE_REQUESTMANAGER_SET:
+    case cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SET:
       return { ...state, activeRequest: [...state.activeRequest, payload] };
-    case types.CDEEBEE_REQUESTMANAGER_SHIFT:
+    case cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT:
       return { ...state, activeRequest: slice(1, Infinity, state.activeRequest) };
-    case types.CDEEBEEE_UPDATE:
+    case cdeebeeTypes.CDEEBEEE_UPDATE:
       return {
         ...state,
         requestByApiUrl: {
@@ -66,12 +63,17 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
           [payload.api]: payload.cleanResponse,
         },
       };
-    case types.CDEEBEEE_DROP_REQUEST_BY_API_URL:
+    case cdeebeeTypes.CDEEBEEE_DROP_REQUEST_BY_API_URL:
       return {
         ...state,
         requestByApiUrl: dissoc(payload.api, state.requestByApiUrl),
       };
-    case types.CDEEBEE_ERRORHANDLER_SET:
+    case cdeebeeTypes.CDEEBEEE_DROP_ERROR_BY_API_URL:
+      return {
+        ...state,
+        errorHandler: dissoc(payload.api, state.errorHandler),
+      };
+    case cdeebeeTypes.CDEEBEE_ERRORHANDLER_SET:
       return {
         ...state,
         errorHandler: {
@@ -79,11 +81,11 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
           [payload.api]: payload.cleanResponse,
         },
       };
-    case types.CDEEBEE_INTERNAL_ERROR:
+    case cdeebeeTypes.CDEEBEE_INTERNAL_ERROR:
       return { ...state, activeRequest: [], requestByApiUrl: {} };
 
-    case types.CHANGE_ROUTE:
-      return { ...INITIAL_REQUEST, activeRequest: cancelationRequest((state.activeRequest as IActiveRequest[])) };
+    case cdeebeeTypes.CHANGE_ROUTE:
+      return { ...INITIAL_REQUEST, activeRequest: cancelationRequest((state.activeRequest as cdeebeActiveRequest[])) };
     default:
       return state;
   }
