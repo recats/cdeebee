@@ -10,7 +10,7 @@ import nanoid from 'nanoid/generate';
 import { defaultNormalize } from './helpers';
 
 import { EnumAlphabet } from './constants';
-import { IDefaultOption, IRequestOptions, cdeebeeTypes, cdeebeeMergeStrategy } from './definition';
+import { cdeebeeMergeStrategy, cdeebeeTypes, IDefaultOption, IRequestOptions } from './definition';
 
 interface IResponse {
   [string: string]: {
@@ -51,6 +51,7 @@ export default class requestManager {
       data,
       files,
       requestCancel = true,
+      updateStore = true,
       fileKey = this.options.fileKey,
       primaryKey = this.options.primaryKey,
       bodyKey = this.options.bodyKey,
@@ -109,17 +110,19 @@ export default class requestManager {
               preUpdate(resp.data);
             }
 
-            dispatch({
-              type: cdeebeeTypes.CDEEBEEE_UPDATE,
-              payload: {
-                response: normalize instanceof Function && normalize({
-                  response, cdeebee: getState().cdeebee, mergeStrategy, primaryKey,
-                }),
-                cleanResponse: response,
-                api: requestApi,
-                mergeStrategy,
-              }
-            });
+            if (updateStore) {
+              dispatch({
+                type: cdeebeeTypes.CDEEBEEE_UPDATE,
+                payload: {
+                  response: normalize instanceof Function && normalize({
+                    response, cdeebee: getState().cdeebee, mergeStrategy, primaryKey,
+                  }),
+                  cleanResponse: response,
+                  api: requestApi,
+                  mergeStrategy,
+                }
+              });
+            }
 
             if (postUpdate) {
               postUpdate(resp.data);

@@ -103,7 +103,8 @@ export function ***(fn: () => void) {
       method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
       headers?: object,
       responseCode?: string,
-      requestCancel?: boolean,
+      requestCancel?: boolean,  // default true
+      updateStore?: boolean, // default true
       normalize?: ({ response, cdeebee, mergeStrategy }) => Object,
 
       // files

@@ -37,6 +37,7 @@ export type IDefaultOption = {
   primaryKey?: string;
   responseKeyCode?: string;
   requestCancel?: boolean;
+  updateStore?: boolean;
   mergeStrategy?: cdeebeeMergeStrategy;
   normalize?: (t: any) => void;
   preUpdate?: (payload: object) => void;
