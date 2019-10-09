@@ -103,7 +103,8 @@ export function ***(fn: () => void) {
       method?: 'POST' | 'GET' | 'PUT' | 'DELETE',
       headers?: object,
       responseCode?: string,
-      requestCancel?: boolean,
+      requestCancel?: boolean,  // default true
+      updateStore?: boolean, // default true
       normalize?: ({ response, cdeebee, mergeStrategy }) => Object,
 
       // files
@@ -124,49 +125,40 @@ export function ***(fn: () => void) {
 
 ## Methods
 ```js
-  cdeebee,
-  cdeebeeHelpers,
-  requestManager,
-  CdeebeeRequest, // class
-  cdeebeeTypes,
-  cdeebeeEntityState,
-  cdeebeeRequestStrategy, // request strategy (skipCdeeBeeUpdate, etc...)
-  cdeebeeMergeStrategy, // merge storage strategy
-  cdeebeeActions,
+  cdeebee
+  cdeebeeHelpers
+  requestManager
+  CdeebeeRequest // class
+  cdeebeeTypes
+  cdeebeeEntityState
+  cdeebeeMergeStrategy // merge storage strategy
+  cdeebeeValueList
+  cdeebeeActions
+  cdeebeActiveRequest
+  cdeebeeIActions
 ```
 
 
 ## Actions
 ```js
-interface IOptions {
-  postCommit: (entityList: string, entityID: string | number, list: string, dispatch: Function, getState: Function) => void;
-  preChange: (entityList: string, entityID: string | number, list: string, dispatch: Function, getState: Function) => void;
-  
-  postChange: (entityList: string, entityID: string | number, list: string, dispatch: Function, getState: Function) => void;
-  preCommit: (entityList: string, entityID: string | number, list: string, dispatch: Function, getState: Function) => void;
-}
-
 // setKeyValue
 import { cdeebeeActions } form '@recats/cdeebee';
 
 this.props.cdeebeeActions.setKeyValue(
   entityList: string,
   entityID: EntityID,
-  valueList: Array<{ key: Array<string | number>, value: any }>,
-  options: IOptions,
+  valueList: cdeebeeValueList,
 )
 
 this.props.cdeebeeActions.commitEntity(
   entityList: string,
   entityID: EntityID,
   entity: object,
-  options: IOptions,
 )
 
 this.props.cdeebeeActions.resetEntity(
   entityList: string,
-  entityID: string | number,
-  options: IOptions,
+  entityID: EntityID,
 )
 ```
 
@@ -175,10 +167,10 @@ this.props.cdeebeeActions.resetEntity(
 import { cdeebeeHelpers } from '@recats/cdeebee';
 
 // cancelationRequest
-cdeebeeHelpers.cancelationRequest(activeRequest: Array<Object>) => Object;
+cdeebeeHelpers.cancelationRequest(activeRequest: cdeebeActiveRequest) => Object;
 
 // checkNetworkActivity
-cdeebeeHelpers.checkNetworkActivity(activeRequest: Array<Object>, apiUrl: string | Array<string>) => boolean;
+cdeebeeHelpers.checkNetworkActivity(activeRequest: cdeebeActiveRequest, apiUrl: string | Array<string>) => boolean;
 
 // getSubEntity element in cdeebee list
 cdeebeeHelpers.getSubEntity(entity: object) => object;

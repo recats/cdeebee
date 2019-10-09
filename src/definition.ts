@@ -1,10 +1,3 @@
-// Type definitions for cdeebee v1.6
-// Project: https://github.com/recats/cdeebee
-// Definitions by: Strelkov Dmitry <https://github.com/stk-dmitry>
-// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
-// TypeScript Version: 3.4
-export as namespace cdeebee;
-
 export enum cdeebeeTypes {
   CDEEBEE_REQUESTMANAGER_SHIFT = '@@cdeebee/REQUESTMANAGER_SHIFT',
   CDEEBEE_REQUESTMANAGER_SET = '@@cdeebee/REQUESTMANAGER_SET',
@@ -20,6 +13,7 @@ export enum cdeebeeTypes {
   CDEEBEE_INTERNAL_ERROR = '@@cdeebee/INTERNAL_ERROR',
 
   CDEEBEEE_DROP_REQUEST_BY_API_URL = '@@cdeebee/DROP_REQUEST_BY_API_URL',
+  CDEEBEEE_DROP_ERROR_BY_API_URL = '@@cdeebee/DROP_ERROR_BY_API_URL',
 
   CHANGE_ROUTE = '@@router/LOCATION_CHANGE',
 }
@@ -35,83 +29,67 @@ export enum cdeebeeMergeStrategy {
   replace = 'replace',
 }
 
-export enum cdeebeeRequestStrategy {
-  skipCdeeBeeUpdate = 'skipCdeeBeeUpdate',
-}
-
-export interface IOptions {
-  api: string;
-  data?: object;
+export type IDefaultOption = {
   headers?: object;
-  files?: any;
+  files?: File[];
   fileKey?: string;
   bodyKey?: string;
   primaryKey?: string;
   responseKeyCode?: string;
-  method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
   requestCancel?: boolean;
+  updateStore?: boolean;
   mergeStrategy?: cdeebeeMergeStrategy;
-  requestStrategy?: cdeebeeRequestStrategy;
   normalize?: (t: any) => void;
   preUpdate?: (payload: object) => void;
   postUpdate?: (payload: object) => void;
   preError?: (payload: object) => void;
+  method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
   postError?: (payload: object) => void;
+};
+
+export interface IRequestOptions extends IDefaultOption {
+  api: string;
+  data?: object;
 }
 
-export interface __Entity {
+export interface IEntity {
   __entity?: { __state: cdeebeeEntityState; };
 }
 
-export interface IValueList {
+export type cdeebeeValueList = {
   key: Array<string | number>;
   value: any;
-}
+};
 
-export interface ICdeebeeHelpers {
-  batchingUpdate: (state: object, valueList: IValueList, prePath: Array<string | number>) => object;
+export type cdeebeActiveRequest = {
+  api: string;
+  requestCancel: object;
+  source: {
+    cancel: (t: any) => void;
+  };
+};
 
-  getSubEntity<T>(entity: T & __Entity): T & { __state: cdeebeeEntityState } | T & __Entity;
-  commitEntity<T>(entity: T & __Entity): T & { __state: cdeebeeEntityState } | T & __Entity;
-  getEntityState<T>(entity: T & __Entity): cdeebeeEntityState;
+export type EntityID = string | number;
 
-  checkNetworkActivity(activeRequest: object[], api: string[] | string): boolean;
-  cancelationRequest(activeRequest: object[]): object;
-
-  resetEntity<T>(activeRequest: T & __Entity): T & __Entity;
-}
-
-export const cdeebeeHelpers: ICdeebeeHelpers;
-
-export interface ICdeebeeSetKeyValueOptions {
-  postCommit?: (d: object) => void;
-  preChange?: (d: object) => void;
-  postChange?: (d: object) => void;
-  preCommit?: (d: object) => void;
-}
-
-export interface ICdeebeeOnChange {
-  entityList: string;
-  entityID: string | number;
-  data: Array<{ key: string, value: any }>;
-  options?: ICdeebeeSetKeyValueOptions;
-}
-
-export interface ICdeebeeActions {
-  setKeyValue(entityList: string, entityID: string | number, valueList: IValueList[], options?: ICdeebeeSetKeyValueOptions): void;
-
-  commitEntity(entityList: string, entityID: string | number, entity: object, options?: IOptions): void;
-  resetEntity(entityList: string, entityID: string | number, options?: IOptions): void;
-
+// tslint:disable-next-line:class-name
+export interface cdeebeeIActions {
   dropRequestByApiUrl: (api: string) => void;
+  dropErrorsByApiUrl: (api: string) => void;
+
+  setKeyValue: (
+    entityList: string, entityID: EntityID, valueList: cdeebeeValueList[],
+  ) => void;
+
+  commitEntity: (entityList: string, entityID: EntityID, entity: object) => void;
+  resetEntity: (entityList: string, entityID: EntityID) => void;
 }
 
-export interface ActionCreator<A> { (...args: any[]): A; }
-export const cdeebeeActions: ActionCreator<ICdeebeeActions>;
+export type ActionCreator<A> = (...args: any[]) => A;
 
 export class CdeebeeRequest {
   public requestObject: any;
 
+  // @ts-ignore
   constructor(
     defaultRequest: object,
     options: {
@@ -126,7 +104,6 @@ export class CdeebeeRequest {
     },
   );
 
-  public send(requestData: IOptions): (dispatch: any, getState: any) => void;
 }
 
 export interface CDEEBEERequestManager {
@@ -163,12 +140,10 @@ export type IRequestAction =
   ;
 
 export interface IRequestState {
-  activeRequest: object[],
-  requestByApiUrl: object,
-  errorHandler: object,
+  activeRequest: cdeebeActiveRequest[];
+  requestByApiUrl: object;
+  errorHandler: object;
 }
-export function requestManager(state: IRequestState, action: IRequestAction): object;
-
 
 export interface CDEEBEEUpadte {
   readonly type: cdeebeeTypes.CDEEBEEE_UPDATE;
@@ -225,4 +200,12 @@ export type ICdeebee =
   | CDEEBEEDropElement
   ;
 
-export function cdeebee(state: IRequestState, action: ICdeebee): object;
+export interface IDefaultNormolize {
+  response: {
+    responseStatus: string,
+    [params: string]: any,
+  };
+  cdeebee: object;
+  primaryKey: string;
+  mergeStrategy: cdeebeeMergeStrategy;
+}
