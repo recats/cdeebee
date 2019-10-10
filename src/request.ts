@@ -10,7 +10,7 @@ import nanoid from 'nanoid/generate';
 import { defaultNormalize } from './helpers';
 
 import { EnumAlphabet } from './constants';
-import { cdeebeeMergeStrategy, cdeebeeTypes, IDefaultOption, IRequestOptions } from './definition';
+import { cdeebeeTypes, IDefaultOption, IRequestOptions } from './definition';
 
 interface IResponse {
   [string: string]: {
@@ -148,6 +148,10 @@ export default class requestManager {
       console.warn('@@makeRequest-error', error);
       // tslint:disable-next-line
       console.warn('@@makeRequest-object', mergeDeepRight(this.requestObject, rq));
+
+      if (this.options.hasOwnProperty('globalErrorHandler') && this.options.globalErrorHandler instanceof Function) {
+        this.options.globalErrorHandler(error, mergeDeepRight(this.requestObject, rq))(dispatch, getState);
+      }
     }
   }
 }
