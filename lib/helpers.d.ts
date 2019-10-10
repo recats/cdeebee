@@ -1,4 +1,4 @@
-import { cdeebeeEntityState, cdeebeeValueList, IEntity, IDefaultNormolize, cdeebeActiveRequest } from './definition';
+import { cdeebeActiveRequest, cdeebeeEntityState, cdeebeeValueList, IDefaultNormolize, IEntity } from './definition';
 export declare const cancelationRequest: (activeRequest: cdeebeActiveRequest[]) => cdeebeActiveRequest[];
 export declare const checkNetworkActivity: (activeRequest: cdeebeActiveRequest[], apiUrl: string | string[]) => boolean;
 export declare const getSubEntity: <T>(entity: T & IEntity) => (T & IEntity) | {

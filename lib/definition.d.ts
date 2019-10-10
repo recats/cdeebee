@@ -31,7 +31,9 @@ export declare type IDefaultOption = {
     responseKeyCode?: string;
     requestCancel?: boolean;
     updateStore?: boolean;
-    mergeStrategy?: cdeebeeMergeStrategy;
+    mergeListStrategy?: {
+        [key: string]: cdeebeeMergeStrategy;
+    };
     normalize?: (t: any) => void;
     preUpdate?: (payload: object) => void;
     postUpdate?: (payload: object) => void;
@@ -76,7 +78,9 @@ export declare class CdeebeeRequest {
         method?: string;
         primaryKey?: string;
         normalize?: (data: object) => object;
-        mergeStrategy?: cdeebeeMergeStrategy;
+        mergeListStrategy?: {
+            [key: string]: cdeebeeMergeStrategy;
+        };
         responseKeyCode?: string;
         header?: object;
     });
@@ -164,5 +168,7 @@ export interface IDefaultNormolize {
     };
     cdeebee: object;
     primaryKey: string;
-    mergeStrategy: cdeebeeMergeStrategy;
+    mergeListStrategy: {
+        [key: string]: cdeebeeMergeStrategy;
+    };
 }
