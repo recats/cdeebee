@@ -34,7 +34,6 @@ export default class requestManager {
       method: 'POST',
       primaryKey: 'primaryKey',
       normalize: defaultNormalize,
-      mergeStrategy: cdeebeeMergeStrategy.merge,
       responseKeyCode: 'responseStatus',
       headers: { 'content-type': 'application/json' },
       ...options,
@@ -57,7 +56,7 @@ export default class requestManager {
       bodyKey = this.options.bodyKey,
       method = this.options.method,
       normalize = this.options.normalize,
-      mergeStrategy = this.options.mergeStrategy,
+      mergeListStrategy = this.options.mergeListStrategy,
       headers = this.options.headers,
       responseKeyCode = this.options.responseKeyCode,
     } = mergeDeepRight(this.requestObject, rq);
@@ -115,11 +114,11 @@ export default class requestManager {
                 type: cdeebeeTypes.CDEEBEEE_UPDATE,
                 payload: {
                   response: normalize instanceof Function && normalize({
-                    response, cdeebee: getState().cdeebee, mergeStrategy, primaryKey,
+                    response, cdeebee: getState().cdeebee, mergeListStrategy, primaryKey,
                   }),
                   cleanResponse: response,
                   api: requestApi,
-                  mergeStrategy,
+                  mergeListStrategy,
                 }
               });
             }

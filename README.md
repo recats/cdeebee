@@ -82,7 +82,6 @@ const request = new CdeebeeRequest(
     method: 'POST',
     primaryKey: 'primaryKey',
     normalize: defaultNormalize,
-    mergeStrategy: cdeebeeMergeStrategy.merge,
     responseKeyCode: 'responseStatus',
     header: { 'content-type': 'application/json' },
   }
@@ -96,7 +95,7 @@ export function ***(fn: () => void) {
       data?: { cdeebee: 'cool' },
       files?: File,
 
-      mergeStrategy?: $Keys<typeof cdeebeeMergeStrategy> # default cdeebeeMergeStrategy.merge,
+      cdeebeeMergeStrategy?: { [listName]: cdeebeeMergeStrategy // default cdeebeeMergeStrategy.merge },
       requestStrategy?: $Keys<typeof cdeebeeRequestStrategy> # default undefined,
       primaryKey?: string // default 'primaryKey',
 

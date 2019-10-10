@@ -1,7 +1,14 @@
 /* tslint:disable max-line-length */
-import { assocPath, omit, mergeDeepRight } from 'ramda';
+import { assocPath, mergeDeepRight, omit } from 'ramda';
 import { get } from 'lodash';
-import { cdeebeeMergeStrategy, cdeebeeEntityState, cdeebeeValueList, IEntity, IDefaultNormolize, cdeebeActiveRequest } from './definition';
+import {
+  cdeebeActiveRequest,
+  cdeebeeEntityState,
+  cdeebeeMergeStrategy,
+  cdeebeeValueList,
+  IDefaultNormolize,
+  IEntity
+} from './definition';
 
 const omitKeys = <T>(entity: T): T & any => omit<T, any>(['__entity', '__state'], entity);
 
@@ -95,7 +102,7 @@ export const batchingUpdate = (
 export const defaultNormalize: (d: IDefaultNormolize) => object = (
   {
     response: { responseStatus, ...response },
-    cdeebee, mergeStrategy, primaryKey,
+    cdeebee, mergeListStrategy, primaryKey,
   },
 ) => {
   const keys = Object.keys(response);
@@ -105,11 +112,12 @@ export const defaultNormalize: (d: IDefaultNormolize) => object = (
       for (const element of response[key].data) {
         newStorageData[element[response[key][primaryKey]]] = element;
       }
-      if (mergeStrategy === cdeebeeMergeStrategy.merge) {
+
+      if (mergeListStrategy[key] === cdeebeeMergeStrategy.replace) {
+        response[key] = newStorageData;
+      } else {
         // @ts-ignore
         response[key] = mergeDeepRight(cdeebee[key], newStorageData);
-      } else if (mergeStrategy === cdeebeeMergeStrategy.replace) {
-        response[key] = newStorageData;
       }
     } else if (response[key] === null || response[key] === undefined || typeof response[key] === 'string') {
       response = omit([key], response);
