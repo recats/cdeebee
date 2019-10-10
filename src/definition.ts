@@ -1,4 +1,4 @@
-import {Dispatch} from 'redux';
+import { Dispatch } from 'redux';
 
 export enum cdeebeeTypes {
   CDEEBEE_REQUESTMANAGER_SHIFT = '@@cdeebee/REQUESTMANAGER_SHIFT',
