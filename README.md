@@ -76,6 +76,8 @@ const request = new CdeebeeRequest(
     data: { sessionToken: 'cdeebee master' },
   },
   {
+    // option params
+    globalErrorHandler: (error, request) => (dispatch, getState) => void,
     // default request options
     fileKey: 'files',
     bodyKey: 'body',
@@ -87,7 +89,7 @@ const request = new CdeebeeRequest(
   }
 ).send;
 
-export function ***(fn: () => void) {
+export function requestServer(fn: () => void) {
   return (dispatch: Function, getState: Function) => (
     request({
       api: apiUrl.requestCdeebeee,

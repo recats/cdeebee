@@ -1,3 +1,4 @@
+import { Dispatch } from 'redux';
 export declare enum cdeebeeTypes {
     CDEEBEE_REQUESTMANAGER_SHIFT = "@@cdeebee/REQUESTMANAGER_SHIFT",
     CDEEBEE_REQUESTMANAGER_SET = "@@cdeebee/REQUESTMANAGER_SET",
@@ -40,6 +41,7 @@ export declare type IDefaultOption = {
     preError?: (payload: object) => void;
     method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
     postError?: (payload: object) => void;
+    globalErrorHandler?: (error: object, request: object) => (dispatch: Dispatch, getState: () => object) => void;
 };
 export interface IRequestOptions extends IDefaultOption {
     api: string;
