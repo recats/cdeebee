@@ -61,16 +61,17 @@ export default class requestManager {
       responseKeyCode = this.options.responseKeyCode,
     } = mergeDeepRight(this.requestObject, rq);
 
-    try {
-      const nanoID = nanoid(EnumAlphabet, 15);
+    const requestID = nanoid(EnumAlphabet, 15);
+    const requestStartTime = new Date();
 
-      let body: any = JSON.stringify({ ...data, requestID: nanoID });
+    try {
+      let body: any = JSON.stringify({ ...data, requestID });
 
       const source = axios.CancelToken.source();
 
       dispatch({
         type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SET,
-        payload: { nanoID, api, source, data, requestCancel },
+        payload: { nanoID: requestID, api, source, data, requestCancel },
       });
 
       if (files) {
@@ -91,19 +92,18 @@ export default class requestManager {
 
       if (resp) {
         responsePosition = Object.assign(
-          { [nanoID]: { response: resp.data, requestApi: api } },
+          { [requestID]: { response: resp.data, requestApi: api } },
           responsePosition,
         );
 
         while (responsePosition[get(getState().requestManager.activeRequest, '[0].nanoID')]) {
           const processID = getState().requestManager.activeRequest[0].nanoID;
 
-          const { response, requestApi } = responsePosition[processID];
+          const { response, requestApi }: any = responsePosition[processID];
 
           delete responsePosition[processID];
 
           dispatch({ type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT });
-          // @ts-ignore
           if (responseKeyCode && response[responseKeyCode] === 0) {
             if (preUpdate) {
               preUpdate(resp.data);
@@ -143,14 +143,22 @@ export default class requestManager {
         }
       }
     } catch (error) {
+      const requestEndTime = new Date();
+
       dispatch({ type: cdeebeeTypes.CDEEBEE_INTERNAL_ERROR });
       // tslint:disable-next-line
       console.warn('@@makeRequest-error', error);
       // tslint:disable-next-line
       console.warn('@@makeRequest-object', mergeDeepRight(this.requestObject, rq));
+      // tslint:disable-next-line
+      console.warn('@@makeRequest-info', { requestStartTime, requestEndTime, requestID });
 
       if (this.options.hasOwnProperty('globalErrorHandler') && this.options.globalErrorHandler instanceof Function) {
-        this.options.globalErrorHandler(error, mergeDeepRight(this.requestObject, rq))(dispatch, getState);
+        this.options.globalErrorHandler(
+          error,
+          mergeDeepRight(this.requestObject, rq),
+          { requestStartTime, requestEndTime, requestID }
+        )(dispatch, getState);
       }
     }
   }

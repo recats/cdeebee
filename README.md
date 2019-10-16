@@ -77,7 +77,7 @@ const request = new CdeebeeRequest(
   },
   {
     // option params
-    globalErrorHandler: (error, request) => (dispatch, getState) => void,
+    globalErrorHandler: (error, request, meta) => (dispatch, getState) => void,
     // default request options
     fileKey: 'files',
     bodyKey: 'body',
