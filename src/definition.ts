@@ -47,7 +47,11 @@ export type IDefaultOption = {
   preError?: (payload: object) => void;
   method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
   postError?: (payload: object) => void;
-  globalErrorHandler?: (error: object, request: object, meta: object)
+  globalErrorHandler?: (
+    error: object,
+    request: object,
+    meta: { requestStartTime: Date, requestEndTime: Date, requestID: string }
+  )
     => (dispatch: Dispatch, getState: () => object)
     => void;
 };

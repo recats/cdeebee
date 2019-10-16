@@ -41,7 +41,7 @@ export declare type IDefaultOption = {
     preError?: (payload: object) => void;
     method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
     postError?: (payload: object) => void;
-    globalErrorHandler?: (error: object, request: object) => (dispatch: Dispatch, getState: () => object) => void;
+    globalErrorHandler?: (error: object, request: object, meta: object) => (dispatch: Dispatch, getState: () => object) => void;
 };
 export interface IRequestOptions extends IDefaultOption {
     api: string;
