@@ -88,7 +88,12 @@ export default class requestManager {
         body = formData;
       }
 
-      const resp = await axios({ url: api, method, headers, data: body });
+      const resp = await axios({
+        url: api,
+        method,
+        headers: { 'ui-request-id': requestID, ...headers },
+        data: body,
+      });
 
       if (resp) {
         responsePosition = Object.assign(
