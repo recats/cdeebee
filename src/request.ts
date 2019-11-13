@@ -71,7 +71,7 @@ export default class requestManager {
 
       dispatch({
         type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SET,
-        payload: { nanoID: requestID, api, source, data, requestCancel },
+        payload: { requestID, api, source, data, requestCancel, requestStartTime, requestEndTime: undefined },
       });
 
       if (files) {
@@ -101,14 +101,18 @@ export default class requestManager {
           responsePosition,
         );
 
-        while (responsePosition[get(getState().requestManager.activeRequest, '[0].nanoID')]) {
-          const processID = getState().requestManager.activeRequest[0].nanoID;
+        while (responsePosition[get(getState().requestManager.activeRequest, '[0].requestID')]) {
+          const processID = getState().requestManager.activeRequest[0].requestID;
 
           const { response, requestApi }: any = responsePosition[processID];
 
           delete responsePosition[processID];
 
-          dispatch({ type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT });
+          dispatch({
+            type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT,
+            payload: { requestID, api, source, data, requestCancel, requestStartTime, requestEndTime: new Date() }
+          });
+
           if (responseKeyCode && response[responseKeyCode] === 0) {
             if (preUpdate) {
               preUpdate(resp.data);
@@ -150,7 +154,10 @@ export default class requestManager {
     } catch (error) {
       const requestEndTime = new Date();
 
-      dispatch({ type: cdeebeeTypes.CDEEBEE_INTERNAL_ERROR });
+      dispatch({
+        type: cdeebeeTypes.CDEEBEE_INTERNAL_ERROR,
+        payload: { requestStartTime, requestEndTime, requestID, api },
+      });
       // tslint:disable-next-line
       console.warn('@@makeRequest-error', error);
       // tslint:disable-next-line
