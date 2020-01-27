@@ -1,6 +1,6 @@
 {
   "name": "@recats/cdeebee",
-  "version": "2.0.6",
+  "version": "2.0.7",
   "description": "React Redux data-logic library",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -47,7 +47,6 @@
     "axios": ">=0.19.1",
     "redux": ">=4.0.5",
     "lodash": ">= 4.17.15",
-    "nanoid": ">=2.1.9",
     "ramda": ">= 0.26.1"
   }
 }

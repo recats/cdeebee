@@ -4,12 +4,9 @@ import { get } from 'lodash';
 import { mergeDeepRight } from 'ramda';
 // @ts-ignore
 import { Dispatch } from 'redux';
-// @ts-ignore
-import nanoid from 'nanoid/generate';
 
 import { defaultNormalize } from './helpers';
 
-import { EnumAlphabet } from './constants';
 import { cdeebeeTypes, IDefaultOption, IRequestOptions } from './definition';
 
 interface IResponse {
@@ -61,7 +58,7 @@ export default class requestManager {
       responseKeyCode = this.options.responseKeyCode,
     } = mergeDeepRight(this.requestObject, rq);
 
-    const requestID = nanoid(EnumAlphabet, 15);
+    const requestID = Math.random().toString(36).substr(2);
     const requestStartTime = new Date();
 
     try {
