@@ -35,8 +35,8 @@ export const cdeebee = (state: any = INITIAL_STORAGE, action: ICdeebee) => {
     }
     case cdeebeeTypes.CDEEBEEE_DROP:
       return INITIAL_STORAGE;
-    case cdeebeeTypes.CDEEBEEE_DROP_ELEMENT:
-      return omit([payload.entityList, payload.entityID], state);
+    case cdeebeeTypes.CDEEBEEE_DROP_PATH:
+      return omit(payload.path, state);
     default:
       return state;
   }

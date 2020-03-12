@@ -8,7 +8,7 @@ export declare enum cdeebeeTypes {
     CDEEBEE_SET_ENTITY = "@@cdeebee/SET_ENTITY",
     CDEEBEEE_UPDATE = "@@cdeebee/UPDATE",
     CDEEBEEE_DROP = "@@cdeebee/DROP",
-    CDEEBEEE_DROP_ELEMENT = "@@cdeebee/DROP_ELEMENT",
+    CDEEBEEE_DROP_PATH = "@@cdeebee/DROP_PATH",
     CDEEBEE_INTERNAL_ERROR = "@@cdeebee/INTERNAL_ERROR",
     CDEEBEEE_DROP_REQUEST_BY_API_URL = "@@cdeebee/DROP_REQUEST_BY_API_URL",
     CDEEBEEE_DROP_ERROR_BY_API_URL = "@@cdeebee/DROP_ERROR_BY_API_URL",
@@ -57,7 +57,7 @@ export interface IEntity {
     };
 }
 export declare type cdeebeeValueList = {
-    key: Array<string | number>;
+    key: (string | number)[];
     value: any;
 };
 export declare type cdeebeActiveRequest = {
@@ -71,6 +71,7 @@ export declare type EntityID = string | number;
 export interface cdeebeeIActions {
     dropRequestByApiUrl: (api: string) => void;
     dropErrorsByApiUrl: (api: string) => void;
+    dropCdeebeePath: (path: (string | number)[]) => void;
     setKeyValue: (entityList: string, entityID: EntityID, valueList: cdeebeeValueList[]) => void;
     commitEntity: (entityList: string, entityID: EntityID, entity: object) => void;
     resetEntity: (entityList: string, entityID: EntityID) => void;
@@ -132,10 +133,10 @@ export interface CDEEBEEUpadte {
 export interface CDEEBEEChangeField {
     readonly type: cdeebeeTypes.CDEEBEE_ENTITY_CHANGE_FIELD;
     readonly payload: {
-        list: Array<{
+        list: {
             key: string;
             value: object;
-        }>;
+        }[];
         entityList: string;
         entityID: number | string;
     };
@@ -159,14 +160,13 @@ export interface CDEEBEEDrop {
     readonly type: cdeebeeTypes.CDEEBEEE_DROP;
     readonly payload?: any;
 }
-export interface CDEEBEEDropElement {
-    readonly type: cdeebeeTypes.CDEEBEEE_DROP_ELEMENT;
+export interface CDEEBEEDropPath {
+    readonly type: cdeebeeTypes.CDEEBEEE_DROP_PATH;
     readonly payload: {
-        entityList: string;
-        entityID: number | string;
+        path: (string | number)[];
     };
 }
-export declare type ICdeebee = CDEEBEEUpadte | CDEEBEEChangeField | CDEEBEESetEntity | CDEEBEEResetEntity | CDEEBEEDrop | CDEEBEEDropElement;
+export declare type ICdeebee = CDEEBEEUpadte | CDEEBEEChangeField | CDEEBEESetEntity | CDEEBEEResetEntity | CDEEBEEDrop | CDEEBEEDropPath;
 export interface IDefaultNormolize {
     response: {
         responseStatus: string;

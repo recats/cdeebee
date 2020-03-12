@@ -145,6 +145,10 @@ export function requestServer(fn: () => void) {
 // setKeyValue
 import { cdeebeeActions } form '@recats/cdeebee';
 
+this.props.cdeebeeActions.dropRequestByApiUrl: (api: string);
+this.props.cdeebeeActions.dropErrorsByApiUrl: (api: string);
+this.props.cdeebeeActions.dropCdeebeePath(path: (string | number)[]);
+
 this.props.cdeebeeActions.setKeyValue(
   entityList: string,
   entityID: EntityID,

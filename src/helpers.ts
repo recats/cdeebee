@@ -85,7 +85,7 @@ export const editEntity = (store: IEntity, list: string, id: number | string) =>
 export const batchingUpdate = (
   state: object,
   valueList: cdeebeeValueList[],
-  prePath?: Array<string | number>,
+  prePath?: (string | number)[],
 ) => {
   const prePathEnity = prePath ? prePath : [];
 
