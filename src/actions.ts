@@ -40,6 +40,11 @@ export function resetEntity(
   };
 }
 
+
+export function dropCdeebeePath(path: (string | number)[]) {
+  return (dispatch: Dispatch) => dispatch({ type: cdeebeeTypes.CDEEBEEE_DROP_PATH, payload: { path } });
+}
+
 export function dropRequestByApiUrl(api: string) {
   return (dispatch: Dispatch) => dispatch({ type: cdeebeeTypes.CDEEBEEE_DROP_REQUEST_BY_API_URL, payload: { api } });
 }

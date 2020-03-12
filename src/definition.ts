@@ -10,7 +10,7 @@ export enum cdeebeeTypes {
   CDEEBEE_SET_ENTITY = '@@cdeebee/SET_ENTITY',
   CDEEBEEE_UPDATE = '@@cdeebee/UPDATE',
   CDEEBEEE_DROP = '@@cdeebee/DROP',
-  CDEEBEEE_DROP_ELEMENT = '@@cdeebee/DROP_ELEMENT',
+  CDEEBEEE_DROP_PATH = '@@cdeebee/DROP_PATH',
 
   CDEEBEE_INTERNAL_ERROR = '@@cdeebee/INTERNAL_ERROR',
 
@@ -84,6 +84,7 @@ export type EntityID = string | number;
 export interface cdeebeeIActions {
   dropRequestByApiUrl: (api: string) => void;
   dropErrorsByApiUrl: (api: string) => void;
+  dropCdeebeePath: (path: (string | number)[]) => void;
 
   setKeyValue: (
     entityList: string, entityID: EntityID, valueList: cdeebeeValueList[],
@@ -192,12 +193,9 @@ export interface CDEEBEEDrop {
   readonly payload?: any;
 }
 
-export interface CDEEBEEDropElement {
-  readonly type: cdeebeeTypes.CDEEBEEE_DROP_ELEMENT;
-  readonly payload: {
-    entityList: string,
-    entityID: number | string,
-  };
+export interface CDEEBEEDropPath {
+  readonly type: cdeebeeTypes.CDEEBEEE_DROP_PATH;
+  readonly payload: { path: (string | number)[] };
 }
 
 export type ICdeebee =
@@ -206,7 +204,7 @@ export type ICdeebee =
   | CDEEBEESetEntity
   | CDEEBEEResetEntity
   | CDEEBEEDrop
-  | CDEEBEEDropElement
+  | CDEEBEEDropPath
   ;
 
 export interface IDefaultNormolize {
