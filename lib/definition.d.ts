@@ -57,7 +57,7 @@ export interface IEntity {
     };
 }
 export declare type cdeebeeValueList = {
-    key: Array<string | number>;
+    key: (string | number)[];
     value: any;
 };
 export declare type cdeebeActiveRequest = {
@@ -133,10 +133,10 @@ export interface CDEEBEEUpadte {
 export interface CDEEBEEChangeField {
     readonly type: cdeebeeTypes.CDEEBEE_ENTITY_CHANGE_FIELD;
     readonly payload: {
-        list: Array<{
+        list: {
             key: string;
             value: object;
-        }>;
+        }[];
         entityList: string;
         entityID: number | string;
     };

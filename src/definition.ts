@@ -66,7 +66,7 @@ export interface IEntity {
 }
 
 export type cdeebeeValueList = {
-  key: Array<string | number>;
+  key: (string | number)[];
   value: any;
 };
 
@@ -165,7 +165,7 @@ export interface CDEEBEEUpadte {
 export interface CDEEBEEChangeField {
   readonly type: cdeebeeTypes.CDEEBEE_ENTITY_CHANGE_FIELD;
   readonly payload: {
-    list: Array<{ key: string, value: object }>,
+    list: { key: string, value: object }[],
     entityList: string,
     entityID: number | string,
   };
