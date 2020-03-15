@@ -13,9 +13,13 @@ import {
 const omitKeys = <T>(entity: T): T & any => omit<T, any>(['__entity', '__state'], entity);
 
 export const cancelationRequest = (activeRequest: cdeebeActiveRequest[]): cdeebeActiveRequest[] => {
-  const act = activeRequest.filter(q => (
-    !q.requestCancel && q.source && q.source.cancel instanceof Function
-  ));
+  const act = activeRequest.filter(q => {
+    if (q.requestCancel && q.controller && q.controller.abort instanceof Function) {
+      q.controller.abort();
+      return false;
+    }
+    return true;
+  });
   return act;
 };
 

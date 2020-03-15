@@ -1,3 +1,4 @@
+import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
 import { Dispatch } from 'redux';
 import { IDefaultOption, IRequestOptions } from './definition';
 export default class requestManager {

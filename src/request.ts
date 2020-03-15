@@ -1,5 +1,7 @@
+import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
 // @ts-ignore
-import axios from 'axios';
+import { fetch } from 'whatwg-fetch';
+
 import { get } from 'lodash';
 import { mergeDeepRight } from 'ramda';
 // @ts-ignore
@@ -17,6 +19,9 @@ interface IResponse {
 }
 
 let responsePosition: IResponse = {};
+
+
+const abortableFetch = ('signal' in new Request('')) ? window.fetch : fetch;
 
 // tslint:disable-next-line
 export default class requestManager {
@@ -64,11 +69,12 @@ export default class requestManager {
     try {
       let body: any = JSON.stringify({ ...data, requestID });
 
-      const source = axios.CancelToken.source();
+      const controller = new AbortController();
+      const { signal } = controller;
 
       dispatch({
         type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SET,
-        payload: { requestID, api, source, data, requestCancel, requestStartTime, requestEndTime: undefined },
+        payload: { requestID, api, controller, data, requestCancel, requestStartTime, requestEndTime: undefined },
       });
 
       if (files) {
@@ -85,16 +91,17 @@ export default class requestManager {
         body = formData;
       }
 
-      const resp = await axios({
-        url: api,
+      const responseData = await (await abortableFetch(api, {
         method,
+        signal,
         headers: { 'ui-request-id': requestID, ...headers },
-        data: body,
-      });
+        body,
+      })).json();
 
-      if (resp) {
+
+      if (responseData) {
         responsePosition = Object.assign(
-          { [requestID]: { response: resp.data, requestApi: api } },
+          { [requestID]: { response: responseData, requestApi: api } },
           responsePosition,
         );
 
@@ -107,12 +114,12 @@ export default class requestManager {
 
           dispatch({
             type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT,
-            payload: { requestID, api, source, data, requestCancel, requestStartTime, requestEndTime: new Date() }
+            payload: { requestID, api, controller, data, requestCancel, requestStartTime, requestEndTime: new Date() }
           });
 
           if (responseKeyCode && response[responseKeyCode] === 0) {
             if (preUpdate) {
-              preUpdate(resp.data);
+              preUpdate(responseData);
             }
 
             if (updateStore) {
@@ -130,11 +137,11 @@ export default class requestManager {
             }
 
             if (postUpdate) {
-              postUpdate(resp.data);
+              postUpdate(responseData);
             }
           } else {
             if (preError) {
-              preError(resp.data);
+              preError(responseData);
             }
 
             dispatch({
@@ -143,32 +150,35 @@ export default class requestManager {
             });
 
             if (postError) {
-              postError(resp.data);
+              postError(responseData);
             }
           }
         }
       }
     } catch (error) {
-      const requestEndTime = new Date();
+      if (error.name === 'AbortError') {
+        dispatch({ type: cdeebeeTypes.CDEEBEE_REQUEST_ABORTED, payload: { requestID, api } });
+      } else {
+        const requestEndTime = new Date();
+        dispatch({
+          type: cdeebeeTypes.CDEEBEE_INTERNAL_ERROR,
+          payload: { requestStartTime, requestEndTime, requestID, api },
+        });
+        // tslint:disable-next-line
+        console.warn('@@makeRequest-error', error);
+        // tslint:disable-next-line
+        console.warn('@@makeRequest-object', mergeDeepRight(this.requestObject, rq));
+        // tslint:disable-next-line
+        console.warn('@@makeRequest-info', { requestStartTime, requestEndTime, requestID });
 
-      dispatch({
-        type: cdeebeeTypes.CDEEBEE_INTERNAL_ERROR,
-        payload: { requestStartTime, requestEndTime, requestID, api },
-      });
-      // tslint:disable-next-line
-      console.warn('@@makeRequest-error', error);
-      // tslint:disable-next-line
-      console.warn('@@makeRequest-object', mergeDeepRight(this.requestObject, rq));
-      // tslint:disable-next-line
-      console.warn('@@makeRequest-info', { requestStartTime, requestEndTime, requestID });
-
-      if (this.options.hasOwnProperty('globalErrorHandler') && this.options.globalErrorHandler instanceof Function) {
-        this.options.globalErrorHandler(
-          error,
-          mergeDeepRight(this.requestObject, rq),
-          { requestStartTime, requestEndTime, requestID }
-        )(dispatch, getState);
+        if (this.options.hasOwnProperty('globalErrorHandler') && this.options.globalErrorHandler instanceof Function) {
+          this.options.globalErrorHandler(
+            error,
+            mergeDeepRight(this.requestObject, rq),
+            { requestStartTime, requestEndTime, requestID }
+          )(dispatch, getState);
+        }
       }
-    }
+      }
   }
 }
