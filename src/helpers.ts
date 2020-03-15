@@ -1,6 +1,5 @@
 /* tslint:disable max-line-length */
 import { assocPath, mergeDeepRight, omit } from 'ramda';
-import { get } from 'lodash';
 import {
   cdeebeActiveRequest,
   cdeebeeEntityState,
@@ -42,7 +41,8 @@ export const checkNetworkActivity = (activeRequest: cdeebeActiveRequest[], apiUr
 export const getSubEntity = <T>(entity: T & IEntity): { __state: cdeebeeEntityState } | (T & IEntity) => entity.__entity || entity;
 
 export const getEntityState = <T>(entity: T & IEntity): cdeebeeEntityState => {
-  const entityState = get(entity, '__entity.__state') || get(entity, '__state');
+  // @ts-ignore
+  const entityState = entity?.__entity?.__state || entity?.__state;
   if (!entityState) {
     return cdeebeeEntityState.NORMAL;
   }
@@ -74,8 +74,8 @@ export const resetEntity = <T>(entity: T & IEntity): T => {
   return omitKeys<T>(entity);
 };
 
-export const editEntity = (store: IEntity, list: string, id: number | string) => {
-  const arrayList = get(store, list);
+export const editEntity = (store: IEntity & { [key: string]: any }, list: string, id: number | string) => {
+  const arrayList = store[list];
   const state = getEntityState(arrayList[id]);
 
   if (state === cdeebeeEntityState.EDITING) {

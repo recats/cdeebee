@@ -2,7 +2,6 @@ import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
 // @ts-ignore
 import { fetch } from 'whatwg-fetch';
 
-import { get } from 'lodash';
 import { mergeDeepRight } from 'ramda';
 // @ts-ignore
 import { Dispatch } from 'redux';
@@ -105,7 +104,7 @@ export default class requestManager {
           responsePosition,
         );
 
-        while (responsePosition[get(getState().requestManager.activeRequest, '[0].requestID')]) {
+        while (responsePosition[getState().requestManager.activeRequest?.[0]?.requestID]) {
           const processID = getState().requestManager.activeRequest[0].requestID;
 
           const { response, requestApi }: any = responsePosition[processID];

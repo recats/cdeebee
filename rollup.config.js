@@ -6,7 +6,7 @@ import json from 'rollup-plugin-json';
 import typescript from 'rollup-plugin-typescript2';
 
 export default {
-  external: ['ramda', 'lodash', 'redux', 'ky', 'nanoid'],
+  external: ['ramda', 'redux', 'nanoid'],
   output: {
     name: 'cdeebee',
     format: 'cjs',
