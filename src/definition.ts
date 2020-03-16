@@ -13,9 +13,11 @@ export enum cdeebeeTypes {
   CDEEBEEE_DROP_PATH = '@@cdeebee/DROP_PATH',
 
   CDEEBEE_INTERNAL_ERROR = '@@cdeebee/INTERNAL_ERROR',
+  CDEEBEE_REQUEST_ABORTED = '@@cdeebee/REQUEST_ABORTED',
 
   CDEEBEEE_DROP_REQUEST_BY_API_URL = '@@cdeebee/DROP_REQUEST_BY_API_URL',
   CDEEBEEE_DROP_ERROR_BY_API_URL = '@@cdeebee/DROP_ERROR_BY_API_URL',
+
 
   CHANGE_ROUTE = '@@router/LOCATION_CHANGE',
 }
@@ -73,8 +75,8 @@ export type cdeebeeValueList = {
 export type cdeebeActiveRequest = {
   api: string;
   requestCancel: object;
-  source: {
-    cancel: (t: any) => void;
+  controller: {
+    abort: () => void;
   };
 };
 
@@ -207,7 +209,7 @@ export type ICdeebee =
   | CDEEBEEDropPath
   ;
 
-export interface IDefaultNormolize {
+export interface IDefaultNormalize {
   response: {
     responseStatus: string,
     [params: string]: any,

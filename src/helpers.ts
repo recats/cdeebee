@@ -1,22 +1,31 @@
 /* tslint:disable max-line-length */
 import { assocPath, mergeDeepRight, omit } from 'ramda';
-import { get } from 'lodash';
 import {
   cdeebeActiveRequest,
   cdeebeeEntityState,
   cdeebeeMergeStrategy,
   cdeebeeValueList,
-  IDefaultNormolize,
+  IDefaultNormalize,
   IEntity
 } from './definition';
 
 const omitKeys = <T>(entity: T): T & any => omit<T, any>(['__entity', '__state'], entity);
 
-export const cancelationRequest = (activeRequest: cdeebeActiveRequest[]): cdeebeActiveRequest[] => {
-  const act = activeRequest.filter(q => (
-    !q.requestCancel && q.source && q.source.cancel instanceof Function
-  ));
-  return act;
+export const dropRequestFromArray = (activeRequest: cdeebeActiveRequest[]): cdeebeActiveRequest[] => (
+  activeRequest.filter(q => {
+    if (q.requestCancel) {
+      requestCancel(q);
+      return false;
+    }
+    return true;
+  })
+);
+
+
+export const requestCancel = (request: cdeebeActiveRequest): void => {
+  if (request.controller && request.controller.abort instanceof Function) {
+    request.controller.abort();
+  }
 };
 
 export const checkNetworkActivity = (activeRequest: cdeebeActiveRequest[], apiUrl: string | string[]): boolean => {
@@ -38,7 +47,8 @@ export const checkNetworkActivity = (activeRequest: cdeebeActiveRequest[], apiUr
 export const getSubEntity = <T>(entity: T & IEntity): { __state: cdeebeeEntityState } | (T & IEntity) => entity.__entity || entity;
 
 export const getEntityState = <T>(entity: T & IEntity): cdeebeeEntityState => {
-  const entityState = get(entity, '__entity.__state') || get(entity, '__state');
+  // @ts-ignore
+  const entityState = entity?.__entity?.__state || entity?.__state;
   if (!entityState) {
     return cdeebeeEntityState.NORMAL;
   }
@@ -70,8 +80,8 @@ export const resetEntity = <T>(entity: T & IEntity): T => {
   return omitKeys<T>(entity);
 };
 
-export const editEntity = (store: IEntity, list: string, id: number | string) => {
-  const arrayList = get(store, list);
+export const editEntity = (store: IEntity & { [key: string]: any }, list: string, id: number | string) => {
+  const arrayList = store[list];
   const state = getEntityState(arrayList[id]);
 
   if (state === cdeebeeEntityState.EDITING) {
@@ -99,7 +109,7 @@ export const batchingUpdate = (
   return returnState;
 };
 
-export const defaultNormalize: (d: IDefaultNormolize) => object = (
+export const defaultNormalize: (d: IDefaultNormalize) => object = (
   {
     response: { responseStatus, ...response },
     cdeebee, mergeListStrategy, primaryKey,

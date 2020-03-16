@@ -171,8 +171,8 @@ this.props.cdeebeeActions.resetEntity(
 ```js
 import { cdeebeeHelpers } from '@recats/cdeebee';
 
-// cancelationRequest
-cdeebeeHelpers.cancelationRequest(activeRequest: cdeebeActiveRequest) => Object;
+// requestCancel
+cdeebeeHelpers.requestCancel(activeRequest: cdeebeActiveRequest) => void;
 
 // checkNetworkActivity
 cdeebeeHelpers.checkNetworkActivity(activeRequest: cdeebeActiveRequest, apiUrl: string | Array<string>) => boolean;
