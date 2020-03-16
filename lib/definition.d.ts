@@ -168,7 +168,7 @@ export interface CDEEBEEDropPath {
     };
 }
 export declare type ICdeebee = CDEEBEEUpadte | CDEEBEEChangeField | CDEEBEESetEntity | CDEEBEEResetEntity | CDEEBEEDrop | CDEEBEEDropPath;
-export interface IDefaultNormolize {
+export interface IDefaultNormalize {
     response: {
         responseStatus: string;
         [params: string]: any;

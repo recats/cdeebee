@@ -5,21 +5,27 @@ import {
   cdeebeeEntityState,
   cdeebeeMergeStrategy,
   cdeebeeValueList,
-  IDefaultNormolize,
+  IDefaultNormalize,
   IEntity
 } from './definition';
 
 const omitKeys = <T>(entity: T): T & any => omit<T, any>(['__entity', '__state'], entity);
 
-export const cancelationRequest = (activeRequest: cdeebeActiveRequest[]): cdeebeActiveRequest[] => {
-  const act = activeRequest.filter(q => {
-    if (q.requestCancel && q.controller && q.controller.abort instanceof Function) {
-      q.controller.abort();
+export const dropRequestFromArray = (activeRequest: cdeebeActiveRequest[]): cdeebeActiveRequest[] => (
+  activeRequest.filter(q => {
+    if (q.requestCancel) {
+      requestCancel(q);
       return false;
     }
     return true;
-  });
-  return act;
+  })
+);
+
+
+export const requestCancel = (request: cdeebeActiveRequest): void => {
+  if (request.controller && request.controller.abort instanceof Function) {
+    request.controller.abort();
+  }
 };
 
 export const checkNetworkActivity = (activeRequest: cdeebeActiveRequest[], apiUrl: string | string[]): boolean => {
@@ -103,7 +109,7 @@ export const batchingUpdate = (
   return returnState;
 };
 
-export const defaultNormalize: (d: IDefaultNormolize) => object = (
+export const defaultNormalize: (d: IDefaultNormalize) => object = (
   {
     response: { responseStatus, ...response },
     cdeebee, mergeListStrategy, primaryKey,

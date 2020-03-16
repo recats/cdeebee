@@ -5,8 +5,7 @@ import {
 import { cdeebeeTypes } from './index';
 
 import {
-  batchingUpdate,
-  cancelationRequest, editEntity, resetEntity,
+  batchingUpdate, dropRequestFromArray, editEntity, resetEntity,
 } from './helpers';
 
 import { ICdeebee, IRequestAction, IRequestState, cdeebeActiveRequest } from './definition';
@@ -85,7 +84,7 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
       return { ...state, activeRequest: [], requestByApiUrl: {} };
 
     case cdeebeeTypes.CHANGE_ROUTE:
-      return { ...INITIAL_REQUEST, activeRequest: cancelationRequest((state.activeRequest as cdeebeActiveRequest[])) };
+      return { ...INITIAL_REQUEST, activeRequest: dropRequestFromArray((state.activeRequest as cdeebeActiveRequest[])) };
     default:
       return state;
   }

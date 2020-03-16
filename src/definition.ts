@@ -209,7 +209,7 @@ export type ICdeebee =
   | CDEEBEEDropPath
   ;
 
-export interface IDefaultNormolize {
+export interface IDefaultNormalize {
   response: {
     responseStatus: string,
     [params: string]: any,
