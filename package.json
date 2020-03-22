@@ -28,7 +28,7 @@
     "@babel/plugin-transform-runtime": "^7.8.3",
     "@babel/preset-env": "^7.8.7",
     "@types/lodash": "^4.14.149",
-    "@types/ramda": "^0.26.44",
+    "@types/ramda": "^0.27.0",
     "@types/whatwg-fetch": "^0.0.33",
     "babel-eslint": "^10.1.0",
     "babel-plugin-lodash": "^3.3.4",
