@@ -1,6 +1,6 @@
 {
   "name": "@recats/cdeebee",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "React Redux data-logic library",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

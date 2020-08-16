@@ -47,8 +47,8 @@ export type IDefaultOption = {
   preUpdate?: (payload: object) => void;
   postUpdate?: (payload: object) => void;
   preError?: (payload: object) => void;
-  method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
   postError?: (payload: object) => void;
+  method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
   globalErrorHandler?: (
     error: object,
     request: object,
@@ -57,6 +57,20 @@ export type IDefaultOption = {
     => (dispatch: Dispatch, getState: () => object)
     => void;
 };
+
+export type IResponsePropObject = {
+  requestApi: string;
+  response: {
+    [params: string]: any,
+  };
+  requestStartTime?: Date;
+  mergeListStrategy?: { [key: string]: cdeebeeMergeStrategy };
+  normalize?: (t: any) => void;
+  preUpdate?: (payload: object) => void;
+  postUpdate?: (payload: object) => void;
+  preError?: (payload: object) => void;
+  postError?: (payload: object) => void;
+}
 
 export interface IRequestOptions extends IDefaultOption {
   api: string;

@@ -8,7 +8,7 @@ import { Dispatch } from 'redux';
 
 import { defaultNormalize } from './helpers';
 
-import { cdeebeeTypes, IDefaultOption, IRequestOptions } from './definition';
+import { cdeebeeTypes, IDefaultOption, IRequestOptions, IResponsePropObject } from './definition';
 
 interface IResponse {
   [string: string]: {
@@ -100,84 +100,106 @@ export default class requestManager {
 
       if (responseData) {
         responsePosition = Object.assign(
-          { [requestID]: { response: responseData, requestApi: api } },
+          {
+            [requestID]: {
+              response: responseData,
+              requestApi: api,
+              requestStartTime,
+              preUpdate,
+              postUpdate,
+              normalize,
+              preError,
+              postError,
+              mergeListStrategy
+            },
+          },
           responsePosition,
         );
 
         while (responsePosition[getState().requestManager.activeRequest?.[0]?.requestID]) {
           const processID = getState().requestManager.activeRequest[0].requestID;
-
-          const { response, requestApi }: any = responsePosition[processID];
-
+          const responsePropsObject: IResponsePropObject = responsePosition[processID];
           delete responsePosition[processID];
 
           dispatch({
             type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT,
-            payload: { requestID, api, controller, data, requestCancel, requestStartTime, requestEndTime: new Date() }
+            payload: {
+              requestID,
+              api: responsePropsObject.requestApi,
+              controller,
+              data,
+              requestCancel,
+              requestStartTime: responsePropsObject.requestStartTime,
+              requestEndTime: new Date(),
+            }
           });
 
-          if (responseKeyCode && response[responseKeyCode] === 0) {
-            if (preUpdate) {
-              preUpdate(responseData);
+
+          if (responseKeyCode && responsePropsObject.response[responseKeyCode] === 0) {
+            if (responsePropsObject.preUpdate) {
+              responsePropsObject.preUpdate(responsePropsObject.response);
             }
 
             if (updateStore) {
               dispatch({
                 type: cdeebeeTypes.CDEEBEEE_UPDATE,
                 payload: {
-                  response: normalize instanceof Function && normalize({
-                    response, cdeebee: getState().cdeebee, mergeListStrategy, primaryKey,
+                  response: responsePropsObject.normalize instanceof Function && responsePropsObject.normalize({
+                    response: responsePropsObject.response,
+                    cdeebee: getState().cdeebee,
+                    mergeListStrategy: responsePropsObject.mergeListStrategy,
+                    primaryKey,
                   }),
-                  cleanResponse: response,
-                  api: requestApi,
-                  mergeListStrategy,
+                  cleanResponse: responsePropsObject.response,
+                  api: responsePropsObject.requestApi,
+                  mergeListStrategy: responsePropsObject.mergeListStrategy,
                 }
               });
             }
 
-            if (postUpdate) {
-              postUpdate(responseData);
+            if (responsePropsObject.postUpdate) {
+              responsePropsObject.postUpdate(responsePropsObject.response);
             }
           } else {
-            if (preError) {
-              preError(responseData);
+            if (responsePropsObject.preError) {
+              responsePropsObject.preError(responsePropsObject.response);
             }
 
             dispatch({
               type: cdeebeeTypes.CDEEBEE_ERRORHANDLER_SET,
-              payload: { api: requestApi, cleanResponse: response },
+              payload: { api: responsePropsObject.requestApi, cleanResponse: responsePropsObject.response },
             });
 
-            if (postError) {
-              postError(responseData);
+            if (responsePropsObject.postError) {
+              responsePropsObject.postError(responseData);
             }
           }
         }
       }
     } catch (error) {
-      if (error.name === 'AbortError') {
-        dispatch({ type: cdeebeeTypes.CDEEBEE_REQUEST_ABORTED, payload: { requestID, api } });
-      } else {
-        const requestEndTime = new Date();
-        dispatch({
-          type: cdeebeeTypes.CDEEBEE_INTERNAL_ERROR,
-          payload: { requestStartTime, requestEndTime, requestID, api },
-        });
-        // tslint:disable-next-line
-        console.warn('@@makeRequest-error', error);
-        // tslint:disable-next-line
-        console.warn('@@makeRequest-object', mergeDeepRight(this.requestObject, rq));
-        // tslint:disable-next-line
-        console.warn('@@makeRequest-info', { requestStartTime, requestEndTime, requestID });
+        if (error.name === 'AbortError') {
+          dispatch({ type: cdeebeeTypes.CDEEBEE_REQUEST_ABORTED, payload: { requestID, api } });
+        } else {
+          const requestEndTime = new Date();
+          dispatch({
+            type: cdeebeeTypes.CDEEBEE_INTERNAL_ERROR,
+            payload: { requestStartTime, requestEndTime, requestID, api },
+          });
+          // tslint:disable-next-line
+          console.warn('@@makeRequest-error', error);
+          // tslint:disable-next-line
+          console.warn('@@makeRequest-object', mergeDeepRight(this.requestObject, rq));
+          // tslint:disable-next-line
+          console.warn('@@makeRequest-info', { requestStartTime, requestEndTime, requestID });
 
-        if (this.options.hasOwnProperty('globalErrorHandler') && this.options.globalErrorHandler instanceof Function) {
-          this.options.globalErrorHandler(
-            error,
-            mergeDeepRight(this.requestObject, rq),
-            { requestStartTime, requestEndTime, requestID }
-          )(dispatch, getState);
+          if (this.options.hasOwnProperty('globalErrorHandler') && this.options.globalErrorHandler instanceof Function) {
+            this.options.globalErrorHandler(
+              error,
+              mergeDeepRight(this.requestObject, rq),
+              { requestStartTime, requestEndTime, requestID }
+            )(dispatch, getState);
+          }
         }
-      }
       }
   }
 }
