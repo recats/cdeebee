@@ -5,5 +5,5 @@ export default class requestManager {
     requestObject: object;
     private options;
     constructor(requestObject: object, options: IDefaultOption);
-    send: (rq: IRequestOptions) => (dispatch: Dispatch<import("redux").AnyAction>, getState: () => any) => Promise<void>;
+    send: (rq: IRequestOptions) => (dispatch: Dispatch, getState: () => any) => Promise<void>;
 }

@@ -15,7 +15,7 @@ export declare const commitEntity: <T>(entity: T & IEntity) => T;
 export declare const resetEntity: <T>(entity: T & IEntity) => T;
 export declare const editEntity: (store: IEntity & {
     [key: string]: any;
-}, list: string, id: string | number) => IEntity & {
+}, list: string, id: number | string) => IEntity & {
     [key: string]: any;
 };
 export declare const batchingUpdate: (state: object, valueList: cdeebeeValueList[], prePath?: (string | number)[] | undefined) => object;
