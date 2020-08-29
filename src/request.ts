@@ -1,6 +1,7 @@
 import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
 // @ts-ignore
 import { fetch } from 'whatwg-fetch';
+import nodeFetch from 'node-fetch';
 
 import { mergeDeepRight } from 'ramda';
 // @ts-ignore
@@ -20,7 +21,7 @@ interface IResponse {
 let responsePosition: IResponse = {};
 
 
-const abortableFetch = ('signal' in new Request('')) ? window.fetch : fetch;
+const abortableFetch = typeof window !== 'undefined' ? (('signal' in new Request('')) ? window.fetch : fetch) : nodeFetch;
 
 // tslint:disable-next-line
 export default class requestManager {
