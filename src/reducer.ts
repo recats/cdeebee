@@ -22,6 +22,8 @@ export const cdeebee = (state: any = INITIAL_STORAGE, action: ICdeebee) => {
       const objCreate = editEntity(state, payload.entityList, payload.entityID);
       return batchingUpdate(objCreate, payload.valueList, [payload.entityList, payload.entityID, '__entity']);
     }
+    case cdeebeeTypes.CDEEBEE_ENTITY_UNSAFE_UPDATE_STORE:
+      return assocPath([payload.entityList, payload.entityID], payload.value, state);
     case cdeebeeTypes.CDEEBEE_SET_ENTITY:
       return assocPath([payload.entityList, payload.entityID], payload.entity, state);
     case cdeebeeTypes.CDEEBEE_RESET_ENTITY: {

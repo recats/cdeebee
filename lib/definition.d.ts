@@ -4,6 +4,7 @@ export declare enum cdeebeeTypes {
     CDEEBEE_REQUESTMANAGER_SET = "@@cdeebee/REQUESTMANAGER_SET",
     CDEEBEE_ERRORHANDLER_SET = "@@cdeebee/ERRORHANDLER_SET",
     CDEEBEE_ENTITY_CHANGE_FIELD = "@@cdeebee/ENTITY_CHANGE_FIELD",
+    CDEEBEE_ENTITY_UNSAFE_UPDATE_STORE = "@@cdeebee/ENTITY_UNSAFE_UPDATE_STORE",
     CDEEBEE_RESET_ENTITY = "@@cdeebee/RESET_ENTITY",
     CDEEBEE_SET_ENTITY = "@@cdeebee/SET_ENTITY",
     CDEEBEEE_UPDATE = "@@cdeebee/UPDATE",
@@ -165,6 +166,14 @@ export interface CDEEBEESetEntity {
         entity: any;
     };
 }
+export interface CDEEBEEUnsafeUpdateStore {
+    readonly type: cdeebeeTypes.CDEEBEE_ENTITY_UNSAFE_UPDATE_STORE;
+    readonly payload: {
+        entityList: string;
+        entityID: number | string;
+        value: any;
+    };
+}
 export interface CDEEBEEResetEntity {
     readonly type: cdeebeeTypes.CDEEBEE_RESET_ENTITY;
     readonly payload: {
@@ -182,7 +191,7 @@ export interface CDEEBEEDropPath {
         path: (string | number)[];
     };
 }
-export declare type ICdeebee = CDEEBEEUpadte | CDEEBEEChangeField | CDEEBEESetEntity | CDEEBEEResetEntity | CDEEBEEDrop | CDEEBEEDropPath;
+export declare type ICdeebee = CDEEBEEUpadte | CDEEBEEChangeField | CDEEBEESetEntity | CDEEBEEResetEntity | CDEEBEEDrop | CDEEBEEDropPath | CDEEBEEUnsafeUpdateStore;
 export interface IDefaultNormalize {
     response: {
         responseStatus: string;
