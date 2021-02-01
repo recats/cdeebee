@@ -90,6 +90,7 @@ export interface cdeebeeIActions {
     dropErrorsByApiUrl: (api: string) => void;
     dropCdeebeePath: (path: (string | number)[]) => void;
     setKeyValue: (entityList: string, entityID: EntityID, valueList: cdeebeeValueList[]) => void;
+    unsafe_updateStore: (entityList: string, entityID: EntityID, value: any) => void;
     commitEntity: (entityList: string, entityID: EntityID, entity: object) => void;
     resetEntity: (entityList: string, entityID: EntityID) => void;
 }
