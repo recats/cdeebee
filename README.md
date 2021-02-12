@@ -149,7 +149,7 @@ this.props.cdeebeeActions.dropRequestByApiUrl: (api: string);
 this.props.cdeebeeActions.dropErrorsByApiUrl: (api: string);
 this.props.cdeebeeActions.dropCdeebeePath(path: (string | number)[]);
 
-// these method are not recommended for usage
+// these method are not recommended for usage because is not safe
 this.props.cdeebeeActions.unsafe_updateStore(
   entityList: string,
   entityID: EntityID,
