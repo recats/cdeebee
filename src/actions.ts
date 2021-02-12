@@ -2,6 +2,19 @@
 import { Dispatch } from 'redux';
 import { cdeebeeTypes, cdeebeeValueList, EntityID } from './definition';
 
+export function unsafe_updateStore(
+  entityList: string,
+  entityID: EntityID,
+  value: any,
+) {
+  return (dispatch: Dispatch) => {
+    dispatch({
+      type: cdeebeeTypes.CDEEBEE_ENTITY_UNSAFE_UPDATE_STORE,
+      payload: { entityList, entityID, value },
+    });
+  };
+}
+
 export function setKeyValue(
   entityList: string,
   entityID: EntityID,
