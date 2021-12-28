@@ -122,20 +122,6 @@ export default class requestManager {
           const responsePropsObject: IResponsePropObject = responsePosition[processID];
           delete responsePosition[processID];
 
-          dispatch({
-            type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT,
-            payload: {
-              requestID,
-              api: responsePropsObject.requestApi,
-              controller,
-              data,
-              requestCancel,
-              requestStartTime: responsePropsObject.requestStartTime,
-              requestEndTime: new Date(),
-            }
-          });
-
-
           if (responseKeyCode && responsePropsObject.response[responseKeyCode] === 0) {
             if (responsePropsObject.preUpdate) {
               responsePropsObject.preUpdate(responsePropsObject.response);
@@ -175,6 +161,19 @@ export default class requestManager {
               responsePropsObject.postError(responseData);
             }
           }
+
+          dispatch({
+            type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT,
+            payload: {
+              requestID,
+              api: responsePropsObject.requestApi,
+              controller,
+              data,
+              requestCancel,
+              requestStartTime: responsePropsObject.requestStartTime,
+              requestEndTime: new Date(),
+            }
+          });
         }
       }
     } catch (error) {
