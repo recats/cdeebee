@@ -7,7 +7,7 @@ export declare function resetEntity(entityList: string, entityID: string | numbe
 export declare function dropCdeebeePath(path: (string | number)[]): (dispatch: Dispatch) => {
     type: cdeebeeTypes;
     payload: {
-        path: EntityID[];
+        path: (string | number)[];
     };
 };
 export declare function dropRequestByApiUrl(api: string): (dispatch: Dispatch) => {
