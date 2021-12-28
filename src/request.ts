@@ -1,6 +1,7 @@
 import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
 // @ts-ignore
 import { fetch } from 'whatwg-fetch';
+// @ts-ignore
 import nodeFetch from 'node-fetch';
 
 import { mergeDeepRight } from 'ramda';
@@ -176,7 +177,7 @@ export default class requestManager {
           });
         }
       }
-    } catch (error) {
+    } catch (error: any) {
         if (error.name === 'AbortError') {
           dispatch({ type: cdeebeeTypes.CDEEBEE_REQUEST_ABORTED, payload: { requestID, api } });
         } else {
