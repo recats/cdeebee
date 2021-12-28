@@ -1,6 +1,6 @@
 {
   "name": "@recats/cdeebee",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "React Redux data-logic library",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -28,7 +28,7 @@
     "@babel/plugin-transform-runtime": "^7.16.5",
     "@babel/preset-env": "^7.16.5",
     "@types/lodash": "^4.14.178",
-    "@types/node-fetch": "^3.0.2",
+    "@types/node-fetch": "^2.5.8",
     "@types/ramda": "^0.27.62",
     "@types/whatwg-fetch": "^0.0.33",
     "babel-eslint": "^10.1.0",
@@ -51,7 +51,7 @@
   },
   "dependencies": {
     "abortcontroller-polyfill": "^1.7.3",
-    "node-fetch": "^3.1.0",
+    "node-fetch": "^2.6.1",
     "whatwg-fetch": "^3.6.2"
   }
 }

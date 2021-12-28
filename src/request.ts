@@ -1,7 +1,6 @@
 import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
 // @ts-ignore
 import { fetch } from 'whatwg-fetch';
-// @ts-ignore
 import nodeFetch from 'node-fetch';
 
 import { mergeDeepRight } from 'ramda';
