@@ -44,7 +44,7 @@ export const checkNetworkActivity = (activeRequest: cdeebeActiveRequest[], apiUr
   return false;
 };
 
-export const getSubEntity = <T>(entity: T & IEntity): { __state: cdeebeeEntityState } | (T & IEntity) => entity.__entity || entity;
+export const getSubEntity = <T>(entity: T & IEntity): { __state: cdeebeeEntityState } | (T & IEntity) => Object.prototype.hasOwnProperty.call(entity, '__entity') ? entity.__entity! : entity;
 
 export const getEntityState = <T>(entity: T & IEntity): cdeebeeEntityState => {
   // @ts-ignore
