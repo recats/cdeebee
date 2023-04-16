@@ -18,5 +18,5 @@ export declare const editEntity: (store: IEntity & {
 }, list: string, id: number | string) => IEntity & {
     [key: string]: any;
 };
-export declare const batchingUpdate: (state: object, valueList: cdeebeeValueList[], prePath?: (string | number)[] | undefined) => object;
+export declare const batchingUpdate: (state: object, valueList: cdeebeeValueList[], prePath?: (string | number)[]) => object;
 export declare const defaultNormalize: (d: IDefaultNormalize) => object;

@@ -25,7 +25,7 @@ export declare enum cdeebeeMergeStrategy {
     merge = "merge",
     replace = "replace"
 }
-export declare type IDefaultOption = {
+export type IDefaultOption = {
     headers?: object;
     files?: File[];
     fileKey?: string;
@@ -49,7 +49,7 @@ export declare type IDefaultOption = {
         requestID: string;
     }) => (dispatch: Dispatch, getState: () => object) => void;
 };
-export declare type IResponsePropObject = {
+export type IResponsePropObject = {
     requestApi: string;
     response: {
         [params: string]: any;
@@ -73,18 +73,18 @@ export interface IEntity {
         __state: cdeebeeEntityState;
     };
 }
-export declare type cdeebeeValueList = {
+export type cdeebeeValueList = {
     key: (string | number)[];
     value: any;
 };
-export declare type cdeebeActiveRequest = {
+export type cdeebeActiveRequest = {
     api: string;
     requestCancel: object;
     controller: {
         abort: () => void;
     };
 };
-export declare type EntityID = string | number;
+export type EntityID = string | number;
 export interface cdeebeeIActions {
     dropRequestByApiUrl: (api: string) => void;
     dropErrorsByApiUrl: (api: string) => void;
@@ -94,7 +94,7 @@ export interface cdeebeeIActions {
     commitEntity: (entityList: string, entityID: EntityID, entity: object) => void;
     resetEntity: (entityList: string, entityID: EntityID) => void;
 }
-export declare type ActionCreator<A> = (...args: any[]) => A;
+export type ActionCreator<A> = (...args: any[]) => A;
 export declare class CdeebeeRequest {
     requestObject: any;
     constructor(defaultRequest: object, options: {
@@ -136,7 +136,7 @@ export interface CDEEBEEChangeRoute {
     readonly type?: any;
     readonly payload?: any;
 }
-export declare type IRequestAction = CDEEBEERequestManager | CDEEBEERequestShift | CDEEBEEUpdate | CDEEBEEErrorSet | CDEEBEEChangeRoute;
+export type IRequestAction = CDEEBEERequestManager | CDEEBEERequestShift | CDEEBEEUpdate | CDEEBEEErrorSet | CDEEBEEChangeRoute;
 export interface IRequestState {
     activeRequest: cdeebeActiveRequest[];
     requestByApiUrl: object;
@@ -151,10 +151,7 @@ export interface CDEEBEEUpadte {
 export interface CDEEBEEChangeField {
     readonly type: cdeebeeTypes.CDEEBEE_ENTITY_CHANGE_FIELD;
     readonly payload: {
-        list: {
-            key: string;
-            value: object;
-        }[];
+        valueList: cdeebeeValueList[];
         entityList: string;
         entityID: number | string;
     };
@@ -192,7 +189,7 @@ export interface CDEEBEEDropPath {
         path: (string | number)[];
     };
 }
-export declare type ICdeebee = CDEEBEEUpadte | CDEEBEEChangeField | CDEEBEESetEntity | CDEEBEEResetEntity | CDEEBEEDrop | CDEEBEEDropPath | CDEEBEEUnsafeUpdateStore;
+export type ICdeebee = CDEEBEEUpadte | CDEEBEEChangeField | CDEEBEESetEntity | CDEEBEEResetEntity | CDEEBEEDrop | CDEEBEEDropPath | CDEEBEEUnsafeUpdateStore;
 export interface IDefaultNormalize {
     response: {
         responseStatus: string;

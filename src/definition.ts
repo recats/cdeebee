@@ -183,7 +183,7 @@ export interface CDEEBEEUpadte {
 export interface CDEEBEEChangeField {
   readonly type: cdeebeeTypes.CDEEBEE_ENTITY_CHANGE_FIELD;
   readonly payload: {
-    list: { key: string, value: object }[],
+    valueList: cdeebeeValueList[],
     entityList: string,
     entityID: number | string,
   };
