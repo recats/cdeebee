@@ -2,8 +2,6 @@
   "name": "@recats/cdeebee",
   "version": "2.2.6",
   "description": "React Redux data-logic library",
-  "main": "./dist/cdeebee.umd.cjs",
-  "types": "lib/index.d.ts",
   "repository": "git@github.com:recats/cdeebee.git",
   "type": "module",
   "author": "recats",
@@ -12,13 +10,7 @@
     "lint": "eslint .",
     "build": "tsc && vite build"
   },
-  "keywords": [
-    "react",
-    "redux",
-    "fetch",
-    "data",
-    "server"
-  ],
+  "keywords": ["react", "redux", "fetch", "data", "server"],
   "module": "./dist/cdeebee.js",
   "exports": {
     ".": {
