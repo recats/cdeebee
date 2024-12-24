@@ -1,25 +1,15 @@
 import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
-// @ts-ignore
 import { fetch } from 'whatwg-fetch';
 import nodeFetch from 'node-fetch';
+import { Dispatch } from 'redux';
 
 import { mergeDeepRight } from 'ramda';
-// @ts-ignore
-import { Dispatch } from 'redux';
 
 import { defaultNormalize } from './helpers';
 
 import { cdeebeeTypes, IDefaultOption, IRequestOptions, IResponsePropObject } from './definition';
 
-interface IResponse {
-  [string: string]: {
-    response: object,
-    requestApi: string,
-  };
-}
-
-let responsePosition: IResponse = {};
-
+let responsePosition: Record<string, IResponsePropObject> = {};
 
 const abortableFetch = typeof window !== 'undefined' ? (('signal' in new Request('')) ? window.fetch : fetch) : nodeFetch;
 
@@ -98,7 +88,6 @@ export default class requestManager {
         body,
       })).json();
 
-
       if (responseData) {
         responsePosition = Object.assign(
           {
@@ -117,8 +106,8 @@ export default class requestManager {
               data,
               requestCancel,
               controller,
-            },
-          },
+            } as IResponsePropObject,
+          } as Record<string, IResponsePropObject>,
           responsePosition,
         );
 
@@ -178,9 +167,9 @@ export default class requestManager {
               requestEndTime: new Date(),
             }
           });
-        }
 
-        delete responsePosition[processID];
+				  delete responsePosition[processID];
+        }
       }
     } catch (error: any) {
         if (error.name === 'AbortError') {
@@ -198,7 +187,7 @@ export default class requestManager {
           // tslint:disable-next-line
           console.warn('@@makeRequest-info', { requestStartTime, requestEndTime, requestID });
 
-          if (this.options.hasOwnProperty('globalErrorHandler') && this.options.globalErrorHandler instanceof Function) {
+          if (Object.prototype.hasOwnProperty.call(this.options, 'globalErrorHandler') && this.options.globalErrorHandler instanceof Function) {
             this.options.globalErrorHandler(
               error,
               mergeDeepRight(this.requestObject, rq),
@@ -207,5 +196,5 @@ export default class requestManager {
           }
         }
       }
-  }
+  };
 }

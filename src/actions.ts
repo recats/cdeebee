@@ -1,11 +1,10 @@
-// @ts-ignore
 import { Dispatch } from 'redux';
 import { cdeebeeTypes, cdeebeeValueList, EntityID } from './definition';
 
 export function unsafe_updateStore(
   entityList: string,
   entityID: EntityID,
-  value: any,
+  value: unknown,
 ) {
   return (dispatch: Dispatch) => {
     dispatch({
@@ -52,7 +51,6 @@ export function resetEntity(
     });
   };
 }
-
 
 export function dropCdeebeePath(path: (string | number)[]) {
   return (dispatch: Dispatch) => dispatch({ type: cdeebeeTypes.CDEEBEEE_DROP_PATH, payload: { path } });

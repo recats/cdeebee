@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "module": "es6",
+    "moduleResolution": "bundler",
     "strict": true,
     "declaration": true,
     "noImplicitAny": true,
