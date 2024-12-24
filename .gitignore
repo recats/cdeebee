@@ -30,6 +30,7 @@ build
 
 #builder
 build
+dist
 npm-debug.log
 node_modules/
 flow-typed/
