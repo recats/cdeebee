@@ -8,9 +8,15 @@
   "license": "MIT",
   "scripts": {
     "lint": "eslint .",
-    "build": "tsc && vite build"
+    "build": "vite build"
   },
-  "keywords": ["react", "redux", "fetch", "data", "server"],
+  "keywords": [
+    "react",
+    "redux",
+    "fetch",
+    "data",
+    "server"
+  ],
   "module": "./dist/cdeebee.js",
   "exports": {
     ".": {
@@ -34,7 +40,6 @@
   },
   "dependencies": {
     "abortcontroller-polyfill": "^1.7.8",
-    "node-fetch": "^3.3.2",
     "whatwg-fetch": "^3.6.20"
   },
   "packageManager": "pnpm@9.15.1"

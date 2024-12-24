@@ -1,6 +1,6 @@
 import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
-import { fetch } from 'whatwg-fetch';
-import nodeFetch from 'node-fetch';
+// @ts-expect-error okok
+import { fetch as fetchPolyfill } from 'whatwg-fetch';
 import { Dispatch } from 'redux';
 
 import { mergeDeepRight } from 'ramda';
@@ -11,7 +11,7 @@ import { cdeebeeTypes, IDefaultOption, IRequestOptions, IResponsePropObject } fr
 
 let responsePosition: Record<string, IResponsePropObject> = {};
 
-const abortableFetch = typeof window !== 'undefined' ? (('signal' in new Request('')) ? window.fetch : fetch) : nodeFetch;
+const abortableFetch = typeof window !== 'undefined' ? (('signal' in new Request('')) ? window.fetch : fetchPolyfill) : fetch;
 
 // tslint:disable-next-line
 export default class requestManager {

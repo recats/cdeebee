@@ -5,9 +5,9 @@ import {
   cdeebeeTypes,
   cdeebeeMergeStrategy,
   cdeebeeEntityState,
-  cdeebeeValueList,
-  cdeebeActiveRequest,
-  cdeebeeIActions,
+  type cdeebeeValueList,
+  type cdeebeActiveRequest,
+  type cdeebeeIActions,
 } from './definition';
 import * as cdeebeeActions from './actions';
 
