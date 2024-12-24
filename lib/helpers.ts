@@ -21,7 +21,6 @@ export const dropRequestFromArray = (activeRequest: cdeebeActiveRequest[]): cdee
   })
 );
 
-
 export const requestCancel = (request: cdeebeActiveRequest): void => {
   if (request.controller && request.controller.abort instanceof Function) {
     request.controller.abort();
@@ -47,7 +46,7 @@ export const checkNetworkActivity = (activeRequest: cdeebeActiveRequest[], apiUr
 export const getSubEntity = <T>(entity: T & IEntity): { __state: cdeebeeEntityState } | (T & IEntity) => Object.prototype.hasOwnProperty.call(entity, '__entity') ? entity.__entity! : entity;
 
 export const getEntityState = <T>(entity: T & IEntity): cdeebeeEntityState => {
-  // @ts-ignore
+  // @ts-expect-error okok
   const entityState = entity?.__entity?.__state || entity?.__state;
   if (!entityState) {
     return cdeebeeEntityState.NORMAL;
@@ -111,6 +110,7 @@ export const batchingUpdate = (
 
 export const defaultNormalize: (d: IDefaultNormalize) => object = (
   {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     response: { responseStatus, ...response },
     cdeebee, mergeListStrategy, primaryKey,
   },
@@ -118,7 +118,7 @@ export const defaultNormalize: (d: IDefaultNormalize) => object = (
   const keys = Object.keys(response);
   for (const key of keys) {
     const newStorageData: any = {};
-    if (response[key] instanceof Object && response[key].hasOwnProperty(primaryKey)) {
+    if (response[key] instanceof Object && Object.prototype.hasOwnProperty.call(response[key], primaryKey)) {
       for (const element of response[key].data) {
         newStorageData[element[response[key][primaryKey]]] = element;
       }
@@ -126,7 +126,7 @@ export const defaultNormalize: (d: IDefaultNormalize) => object = (
       if (mergeListStrategy[key] === cdeebeeMergeStrategy.replace) {
         response[key] = newStorageData;
       } else {
-        // @ts-ignore
+      // @ts-expect-error okok
         response[key] = mergeDeepRight(cdeebee[key], newStorageData);
       }
     } else if (response[key] === null || response[key] === undefined || typeof response[key] === 'string') {

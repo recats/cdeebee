@@ -19,7 +19,6 @@ export enum cdeebeeTypes {
   CDEEBEEE_DROP_REQUEST_BY_API_URL = '@@cdeebee/DROP_REQUEST_BY_API_URL',
   CDEEBEEE_DROP_ERROR_BY_API_URL = '@@cdeebee/DROP_ERROR_BY_API_URL',
 
-
   CHANGE_ROUTE = '@@router/LOCATION_CHANGE',
 }
 
@@ -60,9 +59,14 @@ export type IDefaultOption = {
 };
 
 export type IResponsePropObject = {
+  requestID: string;
+  controller: AbortController;
+  updateStore: boolean;
+  data: object;
+  requestCancel: boolean;
   requestApi: string;
   response: {
-    [params: string]: any,
+    [params: string]: unknown,
   };
   requestStartTime?: Date;
   mergeListStrategy?: { [key: string]: cdeebeeMergeStrategy };
@@ -117,7 +121,7 @@ export type ActionCreator<A> = (...args: any[]) => A;
 export class CdeebeeRequest {
   public requestObject: any;
 
-  // @ts-ignore
+  // @ts-expect-error okok
   constructor(
     defaultRequest: object,
     options: {
