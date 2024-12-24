@@ -10,6 +10,7 @@ export default defineConfig({
   ],
   build: {
     lib: {
+      // eslint-disable-next-line
       entry: resolve(__dirname, 'lib/index.ts'),
       name: 'cdeebee',
       fileName: 'cdeebee',
