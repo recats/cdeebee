@@ -103,6 +103,7 @@ export default class requestManager {
         responsePosition = Object.assign(
           {
             [requestID]: {
+              requestID,
               response: responseData,
               requestApi: api,
               requestStartTime,
@@ -111,7 +112,11 @@ export default class requestManager {
               normalize,
               preError,
               postError,
-              mergeListStrategy
+              mergeListStrategy,
+              updateStore,
+              data,
+              requestCancel,
+              controller,
             },
           },
           responsePosition,
@@ -120,14 +125,13 @@ export default class requestManager {
         while (responsePosition[getState().requestManager.activeRequest?.[0]?.requestID]) {
           const processID = getState().requestManager.activeRequest[0].requestID;
           const responsePropsObject: IResponsePropObject = responsePosition[processID];
-          delete responsePosition[processID];
 
           if (responseKeyCode && responsePropsObject.response[responseKeyCode] === 0) {
             if (responsePropsObject.preUpdate) {
               responsePropsObject.preUpdate(responsePropsObject.response);
             }
 
-            if (updateStore) {
+            if (responsePropsObject.updateStore) {
               dispatch({
                 type: cdeebeeTypes.CDEEBEEE_UPDATE,
                 payload: {
@@ -165,16 +169,18 @@ export default class requestManager {
           dispatch({
             type: cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT,
             payload: {
-              requestID,
+              requestID: responsePropsObject.requestID,
               api: responsePropsObject.requestApi,
-              controller,
-              data,
-              requestCancel,
+              controller: responsePropsObject.controller,
+              data: responsePropsObject.data,
+              requestCancel: responsePropsObject.requestCancel,
               requestStartTime: responsePropsObject.requestStartTime,
               requestEndTime: new Date(),
             }
           });
         }
+
+        delete responsePosition[processID];
       }
     } catch (error: any) {
         if (error.name === 'AbortError') {
