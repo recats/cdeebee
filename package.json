@@ -1,9 +1,8 @@
 {
   "name": "@recats/cdeebee",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "React Redux data-logic library",
   "repository": "git@github.com:recats/cdeebee.git",
-  "type": "module",
   "author": "recats",
   "license": "MIT",
   "scripts": {
@@ -17,10 +16,15 @@
     "data",
     "server"
   ],
+  "type": "module",
+  "files": [
+    "dist"
+  ],
   "types": "./dist/index.d.ts",
   "module": "./dist/cdeebee.js",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/cdeebee.js",
       "require": "./dist/cdeebee.umd.cjs"
     }
