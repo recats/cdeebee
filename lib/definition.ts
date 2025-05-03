@@ -58,23 +58,21 @@ export type IDefaultOption = {
     => void;
 };
 
-export type IResponsePropObject = {
+export interface IResponsePropObject<R> {
   requestID: string;
   controller: AbortController;
   updateStore: boolean;
   data: object;
   requestCancel: boolean;
   requestApi: string;
-  response: {
-    [params: string]: unknown,
-  };
+  response: R;
   requestStartTime?: Date;
   mergeListStrategy?: { [key: string]: cdeebeeMergeStrategy };
   normalize?: (t: any) => void;
-  preUpdate?: (payload: object) => void;
-  postUpdate?: (payload: object) => void;
-  preError?: (payload: object) => void;
-  postError?: (payload: object) => void;
+  preUpdate?: (payload: R) => void;
+  postUpdate?: (payload: R) => void;
+  preError?: (payload: R) => void;
+  postError?: (payload: R) => void;
 }
 
 export interface IRequestOptions<T> extends IDefaultOption {
