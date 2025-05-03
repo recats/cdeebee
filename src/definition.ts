@@ -73,9 +73,9 @@ export type IResponsePropObject = {
   postError?: (payload: object) => void;
 }
 
-export interface IRequestOptions extends IDefaultOption {
+export interface IRequestOptions<T> extends IDefaultOption {
   api: string;
-  data?: object;
+  data?: T;
 }
 
 export interface IEntity {
