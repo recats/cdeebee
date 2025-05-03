@@ -38,16 +38,12 @@ export type IDefaultOption = {
   files?: File[];
   fileKey?: string;
   bodyKey?: string;
-  primaryKey?: string;
+  primaryKey: string;
   responseKeyCode?: string;
   requestCancel?: boolean;
   updateStore?: boolean;
   mergeListStrategy?: { [key: string]: cdeebeeMergeStrategy };
   normalize?: (t: any) => void;
-  preUpdate?: (payload: object) => void;
-  postUpdate?: (payload: object) => void;
-  preError?: (payload: object) => void;
-  postError?: (payload: object) => void;
   method?: 'POST' | 'GET' | 'PUT' | 'DELETE';
   globalErrorHandler?: (
     error: object,
@@ -58,7 +54,21 @@ export type IDefaultOption = {
     => void;
 };
 
-export interface IResponsePropObject<R> {
+interface ResponseCallbacks<R> {
+  normalize?: (t: any) => void;
+  preUpdate?: (payload: R) => void;
+  postUpdate?: (payload: R) => void;
+  preError?: (payload: R) => void;
+  postError?: (payload: R) => void;
+}
+
+export interface IRequestOptions<T, R> extends Omit<IDefaultOption, 'primaryKey'>, ResponseCallbacks<R> {
+  api: string;
+  primaryKey?: string;
+  data?: T;
+}
+
+export interface IResponsePropObject<R> extends ResponseCallbacks<R>{
   requestID: string;
   controller: AbortController;
   updateStore: boolean;
@@ -68,16 +78,6 @@ export interface IResponsePropObject<R> {
   response: R;
   requestStartTime?: Date;
   mergeListStrategy?: { [key: string]: cdeebeeMergeStrategy };
-  normalize?: (t: any) => void;
-  preUpdate?: (payload: R) => void;
-  postUpdate?: (payload: R) => void;
-  preError?: (payload: R) => void;
-  postError?: (payload: R) => void;
-}
-
-export interface IRequestOptions<T> extends IDefaultOption {
-  api: string;
-  data?: T;
 }
 
 export interface IEntity {

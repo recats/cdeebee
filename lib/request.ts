@@ -24,7 +24,6 @@ export default class requestManager {
       fileKey: 'files',
       bodyKey: 'body',
       method: 'POST',
-      primaryKey: 'primaryKey',
       normalize: defaultNormalize,
       responseKeyCode: 'responseStatus',
       headers: { 'content-type': 'application/json' },
@@ -32,7 +31,7 @@ export default class requestManager {
     };
   }
 
-  public send = <T, R>(rq: IRequestOptions<T>) => async (dispatch: Dispatch, getState: () => any) => {
+  public send = <T, R>(rq: IRequestOptions<T, R>) => async (dispatch: Dispatch, getState: () => any) => {
     const {
       api,
       preUpdate,
