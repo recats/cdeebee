@@ -9,7 +9,7 @@ import { defaultNormalize } from './helpers';
 
 import { cdeebeeTypes, IDefaultOption, IRequestOptions, IResponsePropObject } from './definition';
 
-let responsePosition: Record<string, IResponsePropObject> = {};
+let responsePosition: Record<string, IResponsePropObject<unknown>> = {};
 
 const abortableFetch = typeof window !== 'undefined' ? (('signal' in new Request('')) ? window.fetch : fetchPolyfill) : fetch;
 
@@ -32,7 +32,7 @@ export default class requestManager {
     };
   }
 
-  public send = (rq: IRequestOptions) => async (dispatch: Dispatch, getState: () => any) => {
+  public send = <T, R>(rq: IRequestOptions<T>) => async (dispatch: Dispatch, getState: () => any) => {
     const {
       api,
       preUpdate,
@@ -106,16 +106,16 @@ export default class requestManager {
               data,
               requestCancel,
               controller,
-            } as IResponsePropObject,
-          } as Record<string, IResponsePropObject>,
+            } as IResponsePropObject<R>,
+          } as Record<string, IResponsePropObject<R>>,
           responsePosition,
         );
 
         while (responsePosition[getState().requestManager.activeRequest?.[0]?.requestID]) {
           const processID = getState().requestManager.activeRequest[0].requestID;
-          const responsePropsObject: IResponsePropObject = responsePosition[processID];
+          const responsePropsObject = responsePosition[processID];
 
-          if (responseKeyCode && responsePropsObject.response[responseKeyCode] === 0) {
+          if (responseKeyCode && (responsePropsObject.response as any satisfies IResponsePropObject<R>)[responseKeyCode] === 0) {
             if (responsePropsObject.preUpdate) {
               responsePropsObject.preUpdate(responsePropsObject.response);
             }
