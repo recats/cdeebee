@@ -32,7 +32,7 @@ export default class requestManager {
     };
   }
 
-  public send = (rq: IRequestOptions) => async (dispatch: Dispatch, getState: () => any) => {
+  public send = <T>(rq: IRequestOptions<T>) => async (dispatch: Dispatch, getState: () => any) => {
     const {
       api,
       preUpdate,
