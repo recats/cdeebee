@@ -95,6 +95,10 @@ export type cdeebeActiveRequest = {
   controller: {
     abort: () => void;
   };
+  data: unknown;
+  requestEndTime: Date;
+  requestStartTime: Date;
+  requestID: string;
 };
 
 export type EntityID = string | number;
