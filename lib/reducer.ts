@@ -55,7 +55,8 @@ export const requestManager = (state: IRequestState = INITIAL_REQUEST, action: I
     case cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SET:
       return { ...state, activeRequest: [...state.activeRequest, payload] };
     case cdeebeeTypes.CDEEBEE_REQUESTMANAGER_SHIFT:
-      return { ...state, activeRequest: slice(1, Infinity, state.activeRequest) };
+    case cdeebeeTypes.CDEEBEE_REQUEST_ABORTED:
+      return { ...state, activeRequest: state.activeRequest.filter(q => q.requestID !== payload.requestID) };
     case cdeebeeTypes.CDEEBEEE_UPDATE:
       return {
         ...state,

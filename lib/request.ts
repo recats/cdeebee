@@ -175,10 +175,7 @@ export default class requestManager {
           dispatch({ type: cdeebeeTypes.CDEEBEE_REQUEST_ABORTED, payload: { requestID, api } });
         } else {
           const requestEndTime = new Date();
-          dispatch({
-            type: cdeebeeTypes.CDEEBEE_INTERNAL_ERROR,
-            payload: { requestStartTime, requestEndTime, requestID, api },
-          });
+          dispatch({ type: cdeebeeTypes.CDEEBEE_INTERNAL_ERROR, payload: { requestStartTime, requestEndTime, requestID, api } });
           // tslint:disable-next-line
           console.warn('@@makeRequest-error', error);
           // tslint:disable-next-line
