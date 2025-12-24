@@ -1,8 +1,7 @@
 import {  createSlice, current } from '@reduxjs/toolkit';
-import { mergeDeepRight } from 'ramda';
 
 import { type CdeebeeSettings, type CdeebeeState } from './types';
-import { checkModule } from './helpers';
+import { checkModule, mergeDeepRight } from './helpers';
 import { abortQuery } from './abortController';
 import { request } from './request';
 import { defaultNormalize } from './storage';

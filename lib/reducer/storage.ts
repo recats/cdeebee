@@ -1,7 +1,5 @@
-import omit from 'ramda/es/omit';
 import { type CdeebeeListStrategy, type CdeebeeState } from './types';
-import mergeDeepRight from 'ramda/es/mergeDeepRight';
-import { hasDataProperty, hasProperty, isRecord } from './helpers';
+import { hasDataProperty, hasProperty, isRecord, mergeDeepRight, omit } from './helpers';
 
 type ResponseValue = Record<string, unknown> & {
   data?: unknown[];
