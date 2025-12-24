@@ -8,15 +8,9 @@ importers:
 
   .:
     dependencies:
-      abortcontroller-polyfill:
-        specifier: ^1.7.8
-        version: 1.7.8
       ramda:
         specifier: '>=0.27.1'
         version: 0.32.0
-      whatwg-fetch:
-        specifier: ^3.6.20
-        version: 3.6.20
     devDependencies:
       '@reduxjs/toolkit':
         specifier: ^2.11.2
@@ -828,9 +822,6 @@ packages:
 
   '@vue/shared@3.5.26':
     resolution: {integrity: sha512-7Z6/y3uFI5PRoKeorTOSXKcDj0MSasfNNltcslbFrPpcw6aXRUALq4IfJlaTRspiWIUOEZbrpM+iQGmCOiWe4A==}
-
-  abortcontroller-polyfill@1.7.8:
-    resolution: {integrity: sha512-9f1iZ2uWh92VcrU9Y8x+LdM4DLj75VE0MJB8zuF1iUnroEptStw+DQ8EQPMUdfe5k+PkB1uUfDQfWbhstH8LrQ==}
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -1765,9 +1756,6 @@ packages:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
 
-  whatwg-fetch@3.6.20:
-    resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
-
   whatwg-mimetype@4.0.0:
     resolution: {integrity: sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg==}
     engines: {node: '>=18'}
@@ -2497,8 +2485,6 @@ snapshots:
       typescript: 5.9.3
 
   '@vue/shared@3.5.26': {}
-
-  abortcontroller-polyfill@1.7.8: {}
 
   acorn-jsx@5.3.2(acorn@8.15.0):
     dependencies:
@@ -3431,8 +3417,6 @@ snapshots:
   whatwg-encoding@3.1.1:
     dependencies:
       iconv-lite: 0.6.3
-
-  whatwg-fetch@3.6.20: {}
 
   whatwg-mimetype@4.0.0: {}
 
