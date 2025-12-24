@@ -10,6 +10,7 @@
     "lint:ts": "tsc --noEmit --project tsconfig.lint.json",
     "lint:all": "pnpm lint && pnpm lint:ts",
     "build": "vite build",
+    "prepublishOnly": "pnpm build",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage"
@@ -22,15 +23,27 @@
     "server"
   ],
   "type": "module",
-  "main": "./lib/index.ts",
-  "types": "./lib/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./lib/index.ts",
-      "import": "./lib/index.ts",
-      "default": "./lib/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "devDependencies": {
     "@reduxjs/toolkit": "^2.11.2",
     "@types/lodash": "^4.17.21",
