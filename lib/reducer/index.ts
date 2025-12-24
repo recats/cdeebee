@@ -14,6 +14,7 @@ const initialState: CdeebeeState<unknown> = {
     primaryKey: 'primaryKey',
     listStrategy: {},
     mergeWithData: {},
+    mergeWithHeaders: {},
   },
   storage: {},
   request: {
