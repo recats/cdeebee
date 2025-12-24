@@ -1,4 +1,3 @@
-import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
 import {  createSlice, current } from '@reduxjs/toolkit';
 import { mergeDeepRight } from 'ramda';
 
