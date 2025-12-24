@@ -17,16 +17,21 @@ export  function hasProperty(value: unknown, prop: string): boolean {
   return isRecord(value) && Object.prototype.hasOwnProperty.call(value, prop);
 }
 
-export function mergeDeepRight<T extends Record<string, unknown>>(
+export function mergeDeepRight<T>(
   left: T,
   right: Partial<T> | Record<string, unknown>
 ): T {
-  const result = { ...left } as Record<string, unknown>;
+  if (!isRecord(left) || !isRecord(right)) {
+    return right as T;
+  }
 
-  for (const key in right) {
-    if (Object.prototype.hasOwnProperty.call(right, key)) {
+  const result = { ...left } as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+
+  for (const key in rightRecord) {
+    if (Object.prototype.hasOwnProperty.call(rightRecord, key)) {
       const leftValue = result[key];
-      const rightValue = right[key];
+      const rightValue = rightRecord[key];
 
       if (
         isRecord(leftValue) &&
