@@ -410,9 +410,6 @@ packages:
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
 
-  abortcontroller-polyfill@1.7.8:
-    resolution: {integrity: sha512-9f1iZ2uWh92VcrU9Y8x+LdM4DLj75VE0MJB8zuF1iUnroEptStw+DQ8EQPMUdfe5k+PkB1uUfDQfWbhstH8LrQ==}
-
   baseline-browser-mapping@2.9.11:
     resolution: {integrity: sha512-Sg0xJUNDU1sJNGdfGWhVHX0kkZ+HWcvmVymJbj6NSgZZmW/8S9Y2HQ5euytnIgakgxN6papOAWiwDo1ctFDcoQ==}
     hasBin: true
@@ -645,9 +642,6 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
-  whatwg-fetch@3.6.20:
-    resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
-
 snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
@@ -804,9 +798,7 @@ snapshots:
   '@recats/cdeebee@file:../..(@reduxjs/toolkit@2.11.2(react-redux@9.2.0(@types/react@18.2.37)(react@18.3.1)(redux@5.0.1))(react@18.3.1))(ramda@0.32.0)':
     dependencies:
       '@reduxjs/toolkit': 2.11.2(react-redux@9.2.0(@types/react@18.2.37)(react@18.3.1)(redux@5.0.1))(react@18.3.1)
-      abortcontroller-polyfill: 1.7.8
       ramda: 0.32.0
-      whatwg-fetch: 3.6.20
 
   '@reduxjs/toolkit@2.11.2(react-redux@9.2.0(@types/react@18.2.37)(react@18.3.1)(redux@5.0.1))(react@18.3.1)':
     dependencies:
@@ -920,8 +912,6 @@ snapshots:
       '@babel/runtime': 7.28.4
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-
-  abortcontroller-polyfill@1.7.8: {}
 
   baseline-browser-mapping@2.9.11: {}
 
@@ -1129,5 +1119,3 @@ snapshots:
   use-sync-external-store@1.6.0(react@18.3.1):
     dependencies:
       react: 18.3.1
-
-  whatwg-fetch@3.6.20: {}

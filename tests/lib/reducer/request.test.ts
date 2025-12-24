@@ -9,6 +9,8 @@ global.fetch = vi.fn();
 
 describe('request', () => {
   let store: ReturnType<typeof configureStore>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let dispatch: any;
   let settings: CdeebeeSettings;
 
   beforeEach(() => {
@@ -29,6 +31,8 @@ describe('request', () => {
         cdeebee: slice.reducer,
       },
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    dispatch = store.dispatch as any;
   });
 
   afterEach(() => {
@@ -49,7 +53,7 @@ describe('request', () => {
         body: { test: 'data' },
       };
 
-      const result = await store.dispatch(request(options));
+      const result = await dispatch(request(options));
 
       expect(result.type).toBe('cdeebee/request/fulfilled');
       expect(global.fetch).toHaveBeenCalledWith(
@@ -76,7 +80,7 @@ describe('request', () => {
         body: { customKey: 'customValue' },
       };
 
-      await store.dispatch(request(options));
+      await dispatch(request(options));
 
       const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       const body = JSON.parse(callArgs[1].body as string);
@@ -97,7 +101,7 @@ describe('request', () => {
         method: 'GET',
       };
 
-      await store.dispatch(request(options));
+      await dispatch(request(options));
 
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/test',
@@ -119,7 +123,7 @@ describe('request', () => {
         headers: { 'Authorization': 'Bearer token' },
       };
 
-      await store.dispatch(request(options));
+      await dispatch(request(options));
 
       const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(callArgs[1].headers).toHaveProperty('Authorization', 'Bearer token');
@@ -136,7 +140,7 @@ describe('request', () => {
         api: '/api/test',
       };
 
-      await store.dispatch(request(options));
+      await dispatch(request(options));
 
       const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(callArgs[1].headers).toHaveProperty('ui-request-id');
@@ -160,7 +164,7 @@ describe('request', () => {
         body: { metadata: 'test' },
       };
 
-      await store.dispatch(request(options));
+      await dispatch(request(options));
 
       const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(callArgs[1].body).toBeInstanceOf(FormData);
@@ -183,7 +187,7 @@ describe('request', () => {
         body: { metadata: 'test' },
       };
 
-      await store.dispatch(request(options));
+      await dispatch(request(options));
 
       const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       const formData = callArgs[1].body as FormData;
@@ -206,7 +210,7 @@ describe('request', () => {
         api: '/api/test',
       };
 
-      const result = await store.dispatch(request(options));
+      const result = await dispatch(request(options));
 
       expect(result.type).toBe('cdeebee/request/rejected');
       if ('payload' in result) {
@@ -222,7 +226,7 @@ describe('request', () => {
         api: '/api/test',
       };
 
-      const result = await store.dispatch(request(options));
+      const result = await dispatch(request(options));
 
       expect(result.type).toBe('cdeebee/request/rejected');
       if ('payload' in result) {
@@ -239,7 +243,7 @@ describe('request', () => {
         api: '/api/test',
       };
 
-      const result = await store.dispatch(request(options));
+      const result = await dispatch(request(options));
 
       expect(result.type).toBe('cdeebee/request/rejected');
       if ('payload' in result) {
@@ -256,7 +260,7 @@ describe('request', () => {
         api: '/api/test',
       };
 
-      const result = await store.dispatch(request(options));
+      const result = await dispatch(request(options));
 
       expect(result.type).toBe('cdeebee/request/rejected');
       if ('payload' in result) {
@@ -277,7 +281,7 @@ describe('request', () => {
         api: '/api/test',
       };
 
-      const result = await store.dispatch(request(options));
+      const result = await dispatch(request(options));
 
       if (result.type === 'cdeebee/request/fulfilled' && 'payload' in result) {
         expect(result.payload).toHaveProperty('result', mockResponse);

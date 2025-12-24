@@ -3,7 +3,7 @@ import { type CdeebeeState, type CdeebeeSettings } from './types';
 import { checkModule } from './helpers';
 import { abortManager } from './abortController';
 
-export interface CdeebeeRequestOptions extends Partial<Pick<CdeebeeSettings, 'fileKey' | 'bodyKey'>> {
+export interface CdeebeeRequestOptions<T> extends Partial<Pick<CdeebeeSettings<T>, 'fileKey' | 'bodyKey' | 'normalize' | 'listStrategy'>> {
   api: string;
   files?: File[];
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -13,7 +13,7 @@ export interface CdeebeeRequestOptions extends Partial<Pick<CdeebeeSettings, 'fi
 
 export const request = createAsyncThunk(
   'cdeebee/request',
-  async (options: CdeebeeRequestOptions, { rejectWithValue,  getState, requestId, signal }) => {
+  async (options: CdeebeeRequestOptions<unknown>, { rejectWithValue,  getState, requestId, signal }) => {
     const startedAt = new Date().toUTCString();
     const { cdeebee: { settings } } = getState() as { cdeebee: CdeebeeState<unknown> };
 

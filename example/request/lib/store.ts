@@ -3,17 +3,35 @@ import { combineSlices, configureStore } from '@reduxjs/toolkit';
 
 import { factory } from '@recats/cdeebee';
 
+interface Storage {
+  campaignList: Record<number, { campaignID: number, campaign: string, timestamp: string }>;
+  bundleList: Record<number, { bundleID: number, bundle: string, timestamp: string }>;
+}
+
 // Create cdeebee slice with default or custom initial state
-export const cdeebeeSlice = factory({
-  modules: ['history', 'listener', 'cancelation', 'state'],
-  fileKey: 'file',
-  bodyKey: 'value',
-  primaryKey: 'primaryKey',
-  listStrategy: {},
-  mergeWithData: {
-    sessionToken: '',
+export const cdeebeeSlice = factory<Storage>(
+  {
+    modules: ['history', 'listener', 'cancelation', 'storage'],
+    fileKey: 'file',
+    bodyKey: 'value',
+    primaryKey: 'primaryKey',
+    listStrategy: {
+      bundleList: 'merge',
+      campaignList: 'replace',
+    },
+    mergeWithData: {
+      sessionToken: '',
+    },
   },
-});
+  {
+    campaignList: {
+      123: { campaignID: 123, campaign: 'Holiday Campaign', timestamp: '2025-12-01T10:15:30.000Z' },
+    },
+    bundleList: {
+      961: { t: 1 } as any,
+    },
+  }
+);
 
 // `combineSlices` automatically combines the reducers using
 // their `reducerPath`s, therefore we no longer need to call `combineReducers`.

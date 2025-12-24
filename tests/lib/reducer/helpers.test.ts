@@ -37,7 +37,7 @@ describe('checkModule', () => {
 
   it('should work with all module types', () => {
     const settings: CdeebeeSettings = {
-      modules: ['history', 'listener', 'state', 'cancelation'] as CdeebeeModule[],
+      modules: ['history', 'listener', 'storage', 'cancelation'] as CdeebeeModule[],
       fileKey: 'file',
       bodyKey: 'body',
       primaryKey: 'id',
@@ -45,7 +45,7 @@ describe('checkModule', () => {
       listStrategy: {},
     };
 
-    const modules: CdeebeeModule[] = ['history', 'listener', 'state', 'cancelation'];
+    const modules: CdeebeeModule[] = ['history', 'listener', 'storage', 'cancelation'];
     
     modules.forEach(module => {
       const resultCallback = vi.fn();

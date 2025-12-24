@@ -1,23 +1,21 @@
-export type CdeebeeModule = 'history' | 'listener' | 'state' | 'cancelation';
+export type CdeebeeModule = 'history' | 'listener' | 'storage' | 'cancelation';
 export type CdeebeeStrategy = 'merge' | 'replace';
 
-export interface CdeebeeListStrategy {
-  [key: string]: CdeebeeStrategy;
-}
+export type CdeebeeListStrategy<T> = Record<keyof T, CdeebeeStrategy>;
 
-export interface CdeebeeSettings {
+export interface CdeebeeSettings<T> {
   modules: CdeebeeModule[];
   fileKey: string;
   bodyKey: string;
   primaryKey: string;
   mergeWithData: unknown;
-  listStrategy: CdeebeeListStrategy;
+  listStrategy?: CdeebeeListStrategy<T>;
+  normalize?: <T>(storage: CdeebeeState<T>, result: T, strategyList: CdeebeeListStrategy<T>) => T;
 }
 
 interface CdeebeeHistoryState {
   requestId: string, 
   api: string, 
-  settings: CdeebeeSettings,
   request: unknown,
 }
 
@@ -33,8 +31,8 @@ interface CdeebeeRequestState {
 }
 
 export interface CdeebeeState<T> {
-  settings: CdeebeeSettings;
-  state: T;
+  settings: CdeebeeSettings<T>;
+  storage: T;
   request: CdeebeeRequestState;
 }
 

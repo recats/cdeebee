@@ -9,23 +9,27 @@ export default function Counter () {
   const dispatch = useAppDispatch();
   return (
     <>
-      <section className='grid grid-cols-3 gap-4'>
-        <aside className='sticy bottom-0 justify-around margin-auto'>
-        <div className='flex items-center gap-2'>
-          <button onClick={() => dispatch(request({ api: '/api/counter', method: 'POST', body: { amount: 1, pending: 5000, } }))}>
-            Fetch - 0
+      <header className='sticy top-0 margin-auto text-center p-3 w-full'>
+        <div className='flex items-center justify-center gap-2'>
+          <button onClick={() => dispatch(request({ api: '/api/bundle', method: 'POST', body: { pending: 5000, } }))}>
+            Slow fetch
           </button>
-          <button onClick={() => dispatch(request({ api: '/api/counter', method: 'POST', body: { amount: 1, pending: 1000, } }))}>
-            Fetch - 1
+          <button onClick={() => dispatch(request({ api: '/api/bundle', method: 'POST', body: { pending: 1000, } }))}>
+            Fast fetch
           </button>
         </div>
-        </aside>
+      </header>
+      <section className='grid grid-cols-4 gap-4'>
         <article>
-          <h3>Settings State</h3>
+          <h3>Cdeebee.storage</h3>
+          <JsonView value={state.storage ?? {}} collapsed={false} displayDataTypes={false} style={nordTheme} />
+        </article>
+        <article>
+          <h3>Cdeebee.Settings</h3>
           <JsonView value={state.settings} collapsed={false} displayDataTypes={false} style={nordTheme} />
         </article>
         <article>
-          <h3>Request State</h3>
+          <h3>Cdeebee.request</h3>
           <JsonView value={state.request} collapsed={false} displayDataTypes={false} style={nordTheme} />
         </article>
       </section>

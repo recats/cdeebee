@@ -5,3 +5,15 @@ export function checkModule(settings: CdeebeeSettings, module: CdeebeeModule, re
     result();
   }
 }
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export  function hasDataProperty(value: unknown): value is Record<string, unknown> & { data: unknown[] } {
+  return isRecord(value) && Array.isArray(value.data);
+}
+
+export  function hasProperty(value: unknown, prop: string): boolean {
+  return isRecord(value) && Object.prototype.hasOwnProperty.call(value, prop);
+}
+
