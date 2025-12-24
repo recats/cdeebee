@@ -36,3 +36,4 @@ node_modules/
 flow-typed/
 yarn-error.log
 .next
+coverage

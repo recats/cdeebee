@@ -6,7 +6,9 @@
   "author": "recats",
   "license": "MIT",
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint lib/**/*.ts",
+    "lint:ts": "tsc --noEmit --project tsconfig.lint.json",
+    "lint:all": "pnpm lint && pnpm lint:ts",
     "build": "vite build",
     "test": "vitest",
     "test:run": "vitest run",

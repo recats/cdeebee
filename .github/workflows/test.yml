@@ -1,0 +1,65 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - 'lib/**'
+      - 'tests/lib/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'vitest.config.ts'
+      - 'tsconfig.json'
+      - 'tsconfig.lint.json'
+      - 'eslint.config.mjs'
+      - '.github/workflows/test.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm lint
+
+      - name: Run TypeScript type check
+        run: pnpm lint:ts
+
+      - name: Run tests
+        run: pnpm test:run
+
+      - name: Generate coverage
+        run: pnpm test:coverage
+        continue-on-error: true
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
