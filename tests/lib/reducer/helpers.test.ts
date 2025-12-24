@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { checkModule, mergeDeepRight, omit, batchingUpdate } from '../../../lib/reducer/helpers';
+import { checkModule, mergeDeepRight, omit, batchingUpdate, assocPath } from '../../../lib/reducer/helpers';
 import { type CdeebeeSettings, type CdeebeeModule } from '../../../lib/reducer/types';
 
 describe('checkModule', () => {
@@ -165,6 +165,30 @@ describe('mergeDeepRight', () => {
 
     expect(result).toEqual({ a: 1 });
   });
+
+  it('should return right value when left is not a record', () => {
+    const left = [1, 2, 3] as unknown;
+    const right = { a: 1 };
+    const result = mergeDeepRight(left as Record<string, unknown>, right);
+
+    expect(result).toEqual({ a: 1 });
+  });
+
+  it('should return right value when right is not a record', () => {
+    const left = { a: 1 };
+    const right = [1, 2, 3] as unknown;
+    const result = mergeDeepRight(left, right as Partial<typeof left>);
+
+    expect(result).toEqual([1, 2, 3]);
+  });
+
+  it('should return right value when both are not records', () => {
+    const left = 'string' as unknown;
+    const right = 123 as unknown;
+    const result = mergeDeepRight(left as Record<string, unknown>, right as Record<string, unknown>);
+
+    expect(result).toBe(123);
+  });
 });
 
 describe('omit', () => {
@@ -224,6 +248,89 @@ describe('omit', () => {
       b: { nested: 'value' },
       c: 3,
     });
+  });
+});
+
+describe('assocPath', () => {
+  it('should set value at top-level path', () => {
+    const obj = { a: 1, b: 2 };
+    const result = assocPath(['a'], 10, obj);
+
+    expect(result).toEqual({ a: 10, b: 2 });
+    expect(result).not.toBe(obj); // Should return new object
+  });
+
+  it('should set value at nested path', () => {
+    const obj = { a: { b: { c: 1 } } };
+    const result = assocPath(['a', 'b', 'c'], 10, obj);
+
+    expect(result).toEqual({ a: { b: { c: 10 } } });
+  });
+
+  it('should create nested structure if it does not exist', () => {
+    const obj = { a: 1 };
+    const result = assocPath(['b', 'c', 'd'], 10, obj);
+
+    expect(result).toEqual({ a: 1, b: { c: { d: 10 } } });
+  });
+
+  it('should handle empty path by returning value', () => {
+    const obj = { a: 1 };
+    const result = assocPath([], 10, obj);
+
+    expect(result).toBe(10);
+  });
+
+  it('should handle numeric keys in path', () => {
+    const obj = { items: [{ id: 1 }, { id: 2 }] };
+    const result = assocPath(['items', 0, 'name'], 'Item 1', obj);
+
+    expect(result).toEqual({ items: [{ id: 1, name: 'Item 1' }, { id: 2 }] });
+  });
+
+  it('should handle array as base object', () => {
+    const obj = [{ a: 1 }, { b: 2 }];
+    const result = assocPath([0, 'a'], 10, obj);
+
+    expect(result).toEqual([{ a: 10 }, { b: 2 }]);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should create object structure when path contains numeric key (treats as string)', () => {
+    const obj = {};
+    const result = assocPath(['items', 0, 'name'], 'First', obj);
+
+    // assocPath treats numeric keys as strings, so it creates an object with '0' key
+    expect(result).toEqual({ items: { '0': { name: 'First' } } });
+  });
+
+  it('should handle deep nested paths with mixed types', () => {
+    const obj = { level1: { level2: [] } };
+    const result = assocPath(['level1', 'level2', 0, 'value'], 'deep', obj);
+
+    expect(result).toEqual({ level1: { level2: [{ value: 'deep' }] } });
+  });
+
+  it('should not mutate original object', () => {
+    const obj = { a: { b: 1 } };
+    const original = { a: { b: 1 } };
+    assocPath(['a', 'b'], 2, obj);
+
+    expect(obj).toEqual(original);
+  });
+
+  it('should handle path with single element', () => {
+    const obj = { a: 1, b: 2 };
+    const result = assocPath(['c'], 3, obj);
+
+    expect(result).toEqual({ a: 1, b: 2, c: 3 });
+  });
+
+  it('should overwrite existing nested values', () => {
+    const obj = { a: { b: { c: 1, d: 2 } } };
+    const result = assocPath(['a', 'b', 'c'], 10, obj);
+
+    expect(result).toEqual({ a: { b: { c: 10, d: 2 } } });
   });
 });
 
@@ -390,5 +497,39 @@ describe('batchingUpdate', () => {
 
     // Should mutate the same object reference
     expect(state.a).toBe(2);
+  });
+
+  it('should skip update when current becomes array after traversing path', () => {
+    const state: Record<string, unknown> = {
+      items: [{ id: 1 }, { id: 2 }],
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const valueList: any = [
+      { key: ['items', 0], value: 'should be skipped' },
+    ];
+
+    batchingUpdate(state, valueList);
+
+    // Should remain unchanged because current is an array at final step
+    // The continue statement triggers when trying to update an element in an array
+    const items = state.items as Array<Record<string, unknown>>;
+    expect(Array.isArray(state.items)).toBe(true);
+    expect(items[0]).toEqual({ id: 1 });
+    expect(items[1]).toEqual({ id: 2 });
+  });
+
+  it('should handle path where intermediate step is array but final is object', () => {
+    const state: Record<string, unknown> = {
+      items: [{ id: 1, name: 'Item 1' }, { id: 2, name: 'Item 2' }],
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const valueList: any = [
+      { key: ['items', 0, 'name'], value: 'Updated Item 1' },
+    ];
+
+    batchingUpdate(state, valueList);
+
+    const items = state.items as Array<Record<string, unknown>>;
+    expect(items[0].name).toBe('Updated Item 1');
   });
 });
