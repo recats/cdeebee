@@ -1,7 +1,7 @@
 import {  createSlice, current } from '@reduxjs/toolkit';
 
-import { type CdeebeeSettings, type CdeebeeState } from './types';
-import { checkModule, mergeDeepRight } from './helpers';
+import { type CdeebeeSettings, type CdeebeeState, type CdeebeeValueList } from './types';
+import { checkModule, mergeDeepRight, batchingUpdate } from './helpers';
 import { abortQuery } from './abortController';
 import { request } from './request';
 import { defaultNormalize } from './storage';
@@ -28,6 +28,12 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
     name: 'cdeebee',
     initialState: mergeDeepRight(initialState, { settings, storage: storage ?? {} }) as CdeebeeState<T>,
     reducers: {
+      set(state, action: { payload: CdeebeeValueList<T> }) {
+        // Directly mutate state.storage using Immer Draft
+        // This is more performant than creating a new object
+        // Immer will track changes and create minimal updates
+        batchingUpdate(state.storage as Record<string, unknown>, action.payload);
+      },
     },
     extraReducers: builder => {
       builder
