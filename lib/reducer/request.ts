@@ -15,6 +15,7 @@ export const request = createAsyncThunk(
 
     try {
       const { method = 'POST', body, headers = {} } = options;
+      const extraHeaders: Record<string, string> = { ...(settings.mergeWithHeaders ?? {}), ...headers };
 
       const b = { ...(settings.mergeWithData ?? {}), ...(body ?? {}) };
       let requestData: FormData | string = JSON.stringify(b);
@@ -43,7 +44,7 @@ export const request = createAsyncThunk(
         headers: {
           'ui-request-id': requestId,
           'Content-Type': 'application/json',
-          ...headers,
+          ...extraHeaders,
         },
         signal: abort.controller.signal,
         body: requestData,
@@ -55,6 +56,9 @@ export const request = createAsyncThunk(
         return rejectWithValue(response);
       }
       const result = await response.json();
+      if (options.onResult && typeof options.onResult === 'function') {
+        options.onResult(result);
+      }
       return { result, startedAt, endedAt: new Date().toUTCString() };
     } catch (error) {
       checkModule(settings, 'cancelation', abort.drop);

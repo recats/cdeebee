@@ -16,10 +16,10 @@ export default function Counter () {
     <>
       <header className='sticy top-0 margin-auto text-center p-3 w-full'>
         <div className='flex items-center justify-center gap-2'>
-          <button onClick={() => dispatch(request({ api, method: 'POST', body: { pending: 5000, } }))} className={btn}>
+          <button onClick={() => dispatch(request({ api, method: 'POST', body: { pending: 5000, }, onResult: console.log }))} className={btn}>
             Slow fetch 
           </button>
-          <button onClick={() => dispatch(request({ api, method: 'POST', body: { pending: 1000, } }))} className={btn}>
+          <button onClick={() => dispatch(request({ api, method: 'POST', body: { pending: 1000, }, onResult: console.log }))} className={btn}>
             Fast fetch
           </button>
         </div>

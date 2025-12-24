@@ -9,6 +9,7 @@ export interface CdeebeeSettings<T> {
   bodyKey: string;
   primaryKey: string;
   mergeWithData: unknown;
+  mergeWithHeaders: unknown;
   listStrategy?: CdeebeeListStrategy<T>;
   normalize?: <T>(storage: CdeebeeState<T>, result: T, strategyList: CdeebeeListStrategy<T>) => T;
 }
@@ -42,6 +43,7 @@ export interface CdeebeeRequestOptions<T> extends Partial<Pick<CdeebeeSettings<T
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: unknown;
   headers?: Record<string, string>;
+  onResult?: (response: T) => void;
 }
 
 type KeyOf<T> = Extract<keyof T, string | number>;

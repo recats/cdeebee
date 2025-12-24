@@ -6,22 +6,32 @@ import dts from 'vite-plugin-dts';
 
 export default defineConfig({
   plugins: [
-    dts({ include: ['lib'] }),
+    dts({ 
+      include: ['lib'],
+      outDir: 'dist',
+      rollupTypes: true,
+    }),
   ],
   build: {
     lib: {
-      // eslint-disable-next-line
       entry: resolve(__dirname, 'lib/index.ts'),
       name: 'cdeebee',
-      fileName: 'cdeebee',
+      fileName: (format) => {
+        if (format === 'es') return 'index.js';
+        if (format === 'cjs') return 'index.cjs';
+        return 'index.umd.js';
+      },
+      formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['redux'],
+      external: ['@reduxjs/toolkit', 'redux'],
       output: {
         globals: {
-          redux: 'redux',
+          '@reduxjs/toolkit': 'ReduxToolkit',
+          redux: 'Redux',
         },
       },
     },
+    sourcemap: true,
   },
 })

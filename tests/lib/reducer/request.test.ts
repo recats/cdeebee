@@ -289,6 +289,182 @@ describe('request', () => {
         expect(result.payload).toHaveProperty('endedAt');
       }
     });
+
+    it('should call onResult callback with response data when provided', async () => {
+      const mockResponse = { data: 'test', id: 123 };
+      const onResult = vi.fn();
+      
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as Response);
+
+      const options: CdeebeeRequestOptions = {
+        api: '/api/test',
+        onResult,
+      };
+
+      await dispatch(request(options));
+
+      expect(onResult).toHaveBeenCalledTimes(1);
+      expect(onResult).toHaveBeenCalledWith(mockResponse);
+    });
+
+    it('should not call onResult when it is not provided', async () => {
+      const mockResponse = { data: 'test' };
+      
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as Response);
+
+      const options: CdeebeeRequestOptions = {
+        api: '/api/test',
+      };
+
+      await dispatch(request(options));
+
+      // No error should occur when onResult is not provided
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    it('should not call onResult when request fails', async () => {
+      const onResult = vi.fn();
+      
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      } as Response);
+
+      const options: CdeebeeRequestOptions = {
+        api: '/api/test',
+        onResult,
+      };
+
+      await dispatch(request(options));
+
+      expect(onResult).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('mergeWithHeaders', () => {
+    it('should merge headers from settings with request headers', async () => {
+      const mockResponse = { data: 'test' };
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as Response);
+
+      settings.mergeWithHeaders = { 'X-Custom-Header': 'from-settings', 'X-Another': 'settings-value' };
+
+      const slice = factory(settings);
+      store = configureStore({
+        reducer: {
+          cdeebee: slice.reducer,
+        },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch = store.dispatch as any;
+
+      const options: CdeebeeRequestOptions = {
+        api: '/api/test',
+        headers: { 'Authorization': 'Bearer token', 'X-Another': 'request-value' },
+      };
+
+      await dispatch(request(options));
+
+      const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[1].headers).toHaveProperty('X-Custom-Header', 'from-settings');
+      expect(callArgs[1].headers).toHaveProperty('Authorization', 'Bearer token');
+      // Request headers should override settings headers
+      expect(callArgs[1].headers).toHaveProperty('X-Another', 'request-value');
+    });
+
+    it('should use only settings headers when request headers are not provided', async () => {
+      const mockResponse = { data: 'test' };
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as Response);
+
+      settings.mergeWithHeaders = { 'X-Settings-Header': 'settings-only' };
+
+      const slice = factory(settings);
+      store = configureStore({
+        reducer: {
+          cdeebee: slice.reducer,
+        },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch = store.dispatch as any;
+
+      const options: CdeebeeRequestOptions = {
+        api: '/api/test',
+      };
+
+      await dispatch(request(options));
+
+      const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[1].headers).toHaveProperty('X-Settings-Header', 'settings-only');
+    });
+
+    it('should handle empty mergeWithHeaders', async () => {
+      const mockResponse = { data: 'test' };
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as Response);
+
+      settings.mergeWithHeaders = {};
+
+      const slice = factory(settings);
+      store = configureStore({
+        reducer: {
+          cdeebee: slice.reducer,
+        },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch = store.dispatch as any;
+
+      const options: CdeebeeRequestOptions = {
+        api: '/api/test',
+        headers: { 'Authorization': 'Bearer token' },
+      };
+
+      await dispatch(request(options));
+
+      const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[1].headers).toHaveProperty('Authorization', 'Bearer token');
+    });
+
+    it('should handle undefined mergeWithHeaders', async () => {
+      const mockResponse = { data: 'test' };
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      } as Response);
+
+      settings.mergeWithHeaders = undefined;
+
+      const slice = factory(settings);
+      store = configureStore({
+        reducer: {
+          cdeebee: slice.reducer,
+        },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch = store.dispatch as any;
+
+      const options: CdeebeeRequestOptions = {
+        api: '/api/test',
+        headers: { 'Authorization': 'Bearer token' },
+      };
+
+      await dispatch(request(options));
+
+      const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[1].headers).toHaveProperty('Authorization', 'Bearer token');
+    });
   });
 });
 
