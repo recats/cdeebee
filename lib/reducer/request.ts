@@ -1,15 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { type CdeebeeState, type CdeebeeSettings } from './types';
 import { checkModule } from './helpers';
 import { abortManager } from './abortController';
-
-export interface CdeebeeRequestOptions<T> extends Partial<Pick<CdeebeeSettings<T>, 'fileKey' | 'bodyKey' | 'normalize' | 'listStrategy'>> {
-  api: string;
-  files?: File[];
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  body?: unknown;
-  headers?: Record<string, string>;
-}
+import { type CdeebeeState, type CdeebeeRequestOptions } from './types';
 
 export const request = createAsyncThunk(
   'cdeebee/request',

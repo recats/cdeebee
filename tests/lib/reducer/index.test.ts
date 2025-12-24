@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 
+import { type CdeebeeSettings, type CdeebeeListStrategy, CdeebeeState } from '../../../lib/reducer/types';
 import { factory } from '../../../lib/reducer/index';
 import { request } from '../../../lib/reducer/request';
-import { type CdeebeeSettings, type CdeebeeListStrategy, CdeebeeState } from '../../../lib/reducer/types';
 
 // Mock fetch globally
 global.fetch = vi.fn();
@@ -694,6 +694,179 @@ describe('factory', () => {
       expect(userList).toHaveProperty('2');
       expect((userList['1'] as Record<string, unknown>).name).toBe('John');
       expect((userList['2'] as Record<string, unknown>).name).toBe('Jane');
+    });
+  });
+
+  describe('set reducer', () => {
+    it('should update a single top-level key in storage', () => {
+      const slice = factory(settings);
+      const store = createTestStore(slice.reducer);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      dispatch(slice.actions.set([
+        { key: ['testKey'], value: 'testValue' },
+      ]));
+
+      const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
+      expect(state.storage).toHaveProperty('testKey');
+      expect((state.storage as Record<string, unknown>).testKey).toBe('testValue');
+    });
+
+    it('should update multiple top-level keys in storage', () => {
+      const slice = factory(settings);
+      const store = createTestStore(slice.reducer);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      dispatch(slice.actions.set([
+        { key: ['key1'], value: 'value1' },
+        { key: ['key2'], value: 'value2' },
+      ]));
+
+      const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
+      const storage = state.storage as Record<string, unknown>;
+      expect(storage.key1).toBe('value1');
+      expect(storage.key2).toBe('value2');
+    });
+
+    it('should update nested keys in storage', () => {
+      const slice = factory(settings, {
+        campaignList: {
+          '123': { name: 'Old Name', id: '123' },
+        },
+      });
+      const store = createTestStore(slice.reducer);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      dispatch(slice.actions.set([
+         
+        { key: ['campaignList', '123', 'name'], value: 'New Name' },
+      ] as any));
+
+      const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
+      const campaignList = (state.storage as Record<string, unknown>).campaignList as Record<string, unknown>;
+      const campaign = campaignList['123'] as Record<string, unknown>;
+      
+      expect(campaign.name).toBe('New Name');
+      expect(campaign.id).toBe('123');
+    });
+
+    it('should create nested structure if it does not exist', () => {
+      const slice = factory(settings);
+      const store = createTestStore(slice.reducer);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      dispatch(slice.actions.set([
+         
+        { key: ['campaignList', '123', 'name'], value: 'Campaign Name' },
+      ] as any));
+
+      const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
+      const campaignList = (state.storage as Record<string, unknown>).campaignList as Record<string, unknown>;
+      const campaign = campaignList['123'] as Record<string, unknown>;
+      
+      expect(campaign.name).toBe('Campaign Name');
+    });
+
+    it('should update multiple nested keys in different paths', () => {
+      const slice = factory(settings, {
+        campaignList: {
+          '123': { name: 'Campaign 1', status: 'draft' },
+          '456': { name: 'Campaign 2', status: 'active' },
+        },
+      });
+      const store = createTestStore(slice.reducer);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      dispatch(slice.actions.set([
+         
+        { key: ['campaignList', '123', 'name'], value: 'Updated Campaign 1' },
+         
+        { key: ['campaignList', '456', 'status'], value: 'paused' },
+      ] as any));
+
+      const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
+      const campaignList = (state.storage as Record<string, unknown>).campaignList as Record<string, unknown>;
+      const campaign1 = campaignList['123'] as Record<string, unknown>;
+      const campaign2 = campaignList['456'] as Record<string, unknown>;
+      
+      expect(campaign1.name).toBe('Updated Campaign 1');
+      expect(campaign1.status).toBe('draft');
+      expect(campaign2.name).toBe('Campaign 2');
+      expect(campaign2.status).toBe('paused');
+    });
+
+    it('should preserve existing storage data when updating', () => {
+      const slice = factory(settings, {
+        existingKey: 'existingValue',
+        campaignList: {
+          '123': { name: 'Old', status: 'active', id: '123' },
+        },
+      });
+      const store = createTestStore(slice.reducer);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      dispatch(slice.actions.set([ { key: ['campaignList', '123', 'name'], value: 'New' } ] as any));
+
+      const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
+      const storage = state.storage as Record<string, unknown>;
+      
+      expect(storage.existingKey).toBe('existingValue');
+      const campaign = (storage.campaignList as Record<string, unknown>)['123'] as Record<string, unknown>;
+      expect(campaign.name).toBe('New');
+      expect(campaign.status).toBe('active');
+      expect(campaign.id).toBe('123');
+    });
+
+    it('should handle numeric keys in path', () => {
+      const slice = factory(settings, {
+        items: [{ id: 1, name: 'Item 1' }, { id: 2, name: 'Item 2' }],
+      });
+      const store = createTestStore(slice.reducer);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      dispatch(slice.actions.set([ { key: ['items', 0, 'name'], value: 'Updated Item 1' } ] as any));
+
+      const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
+      const items = (state.storage as Record<string, unknown>).items as Array<Record<string, unknown>>;
+      
+      expect(items[0].name).toBe('Updated Item 1');
+      expect(items[1].name).toBe('Item 2');
+    });
+
+    it('should handle deep nested paths', () => {
+      const slice = factory(settings);
+      const store = createTestStore(slice.reducer);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      dispatch(slice.actions.set([ { key: ['level1', 'level2', 'level3', 'level4', 'value'], value: 'deep value' } ] as any));
+
+      const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
+      const level1 = (state.storage as Record<string, unknown>).level1 as Record<string, unknown>;
+      const level2 = level1.level2 as Record<string, unknown>;
+      const level3 = level2.level3 as Record<string, unknown>;
+      const level4 = level3.level4 as Record<string, unknown>;
+      
+      expect(level4.value).toBe('deep value');
+    });
+
+    it('should handle empty value list', () => {
+      const slice = factory(settings, { existing: 'value' });
+      const store = createTestStore(slice.reducer);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      dispatch(slice.actions.set([]));
+
+      const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
+      expect((state.storage as Record<string, unknown>).existing).toBe('value');
     });
   });
 });
