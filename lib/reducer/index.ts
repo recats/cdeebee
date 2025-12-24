@@ -33,7 +33,7 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
         // This is more performant than creating a new object
         // Immer will track changes and create minimal updates
         batchingUpdate(state.storage as Record<string, unknown>, action.payload);
-      },
+      }
     },
     extraReducers: builder => {
       builder
