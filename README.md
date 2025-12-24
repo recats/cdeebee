@@ -68,8 +68,7 @@ cdeebee uses a modular architecture with the following modules:
 ### 1. Setup Redux Store
 
 ```typescript
-import { configureStore } from '@reduxjs/toolkit';
-import { combineSlices } from '@reduxjs/toolkit';
+import { configureStore, combineSlices } from '@reduxjs/toolkit';
 import { factory } from '@recats/cdeebee';
 
 // Define your storage structure
@@ -85,7 +84,7 @@ export const cdeebeeSlice = factory<Storage>(
     modules: ['history', 'listener', 'cancelation', 'storage'],
     fileKey: 'file',
     bodyKey: 'value',
-    primaryKey: 'primaryKey',
+    primaryKey: 'id',
     listStrategy: {
       forumList: 'merge',
       threadList: 'replace',
