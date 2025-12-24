@@ -1,22 +1,21 @@
-import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
-import {  createSlice } from '@reduxjs/toolkit';
-import { mergeDeepRight } from 'ramda';
+import {  createSlice, current } from '@reduxjs/toolkit';
 
 import { type CdeebeeSettings, type CdeebeeState } from './types';
-import { checkModule } from './helpers';
+import { checkModule, mergeDeepRight } from './helpers';
 import { abortQuery } from './abortController';
 import { request } from './request';
+import { defaultNormalize } from './storage';
 
 const initialState: CdeebeeState<unknown> = {
   settings: {
-    modules: ['history', 'listener', 'state', 'cancelation'],
+    modules: ['history', 'listener', 'storage', 'cancelation'],
     fileKey: 'file',
     bodyKey: 'value',
     primaryKey: 'primaryKey',
     listStrategy: {},
     mergeWithData: {},
   },
-  state: {},
+  storage: {},
   request: {
     active: [],
     errors: {},
@@ -24,10 +23,10 @@ const initialState: CdeebeeState<unknown> = {
   },
 };
 
-export const factory = <T>(initial: CdeebeeSettings) => {
+export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
   const slice = createSlice({
     name: 'cdeebee',
-    initialState: mergeDeepRight(initialState, { settings: initial }) as CdeebeeState<T>,
+    initialState: mergeDeepRight(initialState, { settings, storage: storage ?? {} }) as CdeebeeState<T>,
     reducers: {
     },
     extraReducers: builder => {
@@ -52,9 +51,20 @@ export const factory = <T>(initial: CdeebeeSettings) => {
           });
           checkModule(state.settings, 'history', () => {
             if (!state.request.done[api])  state.request.done[api] = [];
-            state.request.done[api].push({ api, settings: state.settings, request: action.payload, requestId });
+            state.request.done[api].push({ api, request: action.payload, requestId });
           });
+          checkModule(state.settings, 'storage', () => {
+            const strategyList = action.meta.arg.listStrategy ?? state.settings.listStrategy ?? {};
+            const normalize = action.meta.arg.normalize ?? state.settings.normalize ?? defaultNormalize;
 
+            const currentState = current(state) as CdeebeeState<T>;
+            const normalizedData = normalize(currentState, action.payload.result, strategyList);
+
+            // Normalize already handles merge/replace and preserves keys not in response
+            // Simply apply the result
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (state.storage as any) = normalizedData;
+          });
         })
         .addCase(request.rejected, (state, action) => {
           const requestId = action.meta.requestId;
@@ -65,7 +75,7 @@ export const factory = <T>(initial: CdeebeeSettings) => {
           });
           checkModule(state.settings, 'history', () => {
             if (!state.request.errors[api])  state.request.errors[api] = [];
-            state.request.errors[api].push({ requestId: requestId, api, settings: state.settings, request: action.error });
+            state.request.errors[api].push({ requestId: requestId, api, request: action.error });
           });
         });
     },
