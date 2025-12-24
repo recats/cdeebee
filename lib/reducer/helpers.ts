@@ -49,10 +49,7 @@ export function mergeDeepRight<T>(
   return result as T;
 }
 
-export function omit<T extends Record<string, unknown>>(
-  keys: string[],
-  obj: T
-): Omit<T, keyof T> {
+export function omit<T extends Record<string, unknown>>(keys: string[], obj: T): Omit<T, keyof T> {
   const result = { ...obj };
   for (const key of keys) {
     delete result[key];

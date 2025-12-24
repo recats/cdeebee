@@ -392,4 +392,3 @@ describe('batchingUpdate', () => {
     expect(state.a).toBe(2);
   });
 });
-

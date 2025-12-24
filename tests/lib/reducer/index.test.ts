@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 
+import { type CdeebeeSettings, type CdeebeeListStrategy, CdeebeeState } from '../../../lib/reducer/types';
 import { factory } from '../../../lib/reducer/index';
 import { request } from '../../../lib/reducer/request';
-import { type CdeebeeSettings, type CdeebeeListStrategy, CdeebeeState } from '../../../lib/reducer/types';
 
 // Mock fetch globally
 global.fetch = vi.fn();

@@ -1,7 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { type CdeebeeState, type CdeebeeRequestOptions } from './types';
 import { checkModule } from './helpers';
 import { abortManager } from './abortController';
+import { type CdeebeeState, type CdeebeeRequestOptions } from './types';
 
 export const request = createAsyncThunk(
   'cdeebee/request',

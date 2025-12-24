@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
             'bundleID': 1549103,
             'timestamp': new Date().toISOString(),
             'bundle': 'test4',
-          }
+          },
         ],
         'primaryKey': 'bundleID',
       },
