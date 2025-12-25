@@ -1,17 +1,15 @@
 # cdeebee
 
-[![npm](https://img.shields.io/npm/v/@recats/cdeebee.svg)](https://www.npmjs.com/package/@recats/cdeebee)
-
 A Redux-based data management library that provides a uniform way to access, fetch, update, and manage application data with minimal boilerplate code.
 
 ## Installation
 
 ```sh
-npm i @recats/cdeebee
+npm i @recats/cdeebee@beta
 # or
-yarn add @recats/cdeebee
+yarn add @recats/cdeebee@beta
 # or
-pnpm add @recats/cdeebee
+pnpm add @recats/cdeebee@beta
 ```
 
 ## What is cdeebee?
