@@ -2,10 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { defaultNormalize } from '../../../lib/reducer/storage';
 import { type CdeebeeState, type CdeebeeListStrategy } from '../../../lib/reducer/types';
 
-type IResponse = Record<string, Record<string, unknown> & {
-  data?: unknown[];
-  [key: string]: unknown;
-}>;
+type IResponse = Record<string, Record<string, unknown>>;
 
 describe('defaultNormalize', () => {
   let mockCdeebee: CdeebeeState<unknown>;
@@ -19,8 +16,8 @@ describe('defaultNormalize', () => {
         modules: ['storage'],
         fileKey: 'file',
         bodyKey: 'body',
-        primaryKey: 'id',
         mergeWithData: {},
+        mergeWithHeaders: {},
         listStrategy: {},
       },
       storage: {},
@@ -37,14 +34,11 @@ describe('defaultNormalize', () => {
   });
 
   describe('replace strategy', () => {
-    it('should normalize response with replace strategy', () => {
+    it('should use already normalized response with replace strategy', () => {
       const response = {
         userList: {
-          data: [
-            { id: '1', name: 'John' },
-            { id: '2', name: 'Jane' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
+          '2': { id: '2', name: 'Jane' },
         },
       };
 
@@ -70,11 +64,8 @@ describe('defaultNormalize', () => {
 
       const response = {
         userList: {
-          data: [
-            { id: '1', name: 'New John' },
-            { id: '2', name: 'Jane' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'New John' },
+          '2': { id: '2', name: 'Jane' },
         },
       };
 
@@ -103,11 +94,8 @@ describe('defaultNormalize', () => {
 
       const response = {
         userList: {
-          data: [
-            { id: '1', name: 'John Updated', age: 31 },
-            { id: '2', name: 'Jane' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'John Updated', age: 31 },
+          '2': { id: '2', name: 'Jane' },
         },
       };
 
@@ -130,11 +118,8 @@ describe('defaultNormalize', () => {
     it('should create new storage when no existing state', () => {
       const response = {
         userList: {
-          data: [
-            { id: '1', name: 'John' },
-            { id: '2', name: 'Jane' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
+          '2': { id: '2', name: 'Jane' },
         },
       };
 
@@ -154,16 +139,20 @@ describe('defaultNormalize', () => {
   describe('unknown strategy', () => {
     it('should fall back to merge strategy for unknown strategy', () => {
       const response = {
-        userList: { data: [ { id: '1', name: 'John' }, ], id: 'id', },
+        userList: {
+          '1': { id: '1', name: 'John' },
+        },
       };
 
       const strategyList: CdeebeeListStrategy<unknown> = {
-        userList: 'unknown',
+        userList: 'unknown' as any,
       };
 
       const result = defaultNormalize(mockCdeebee, response, strategyList);
 
-      expect(result.userList).toEqual({ '1': { id: '1', name: 'John' }, });
+      expect(result.userList).toEqual({
+        '1': { id: '1', name: 'John' },
+      });
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Unknown strategy')
       );
@@ -171,31 +160,10 @@ describe('defaultNormalize', () => {
   });
 
   describe('edge cases', () => {
-    it('should skip normalization when primaryKey is not a string', () => {
-      const response = {
-        userList: {
-          data: [ { id: '1', name: 'John' }, ],
-          id: 123, // not a string
-        },
-      };
-
-      const strategyList: CdeebeeListStrategy<unknown> = {
-        userList: 'replace',
-      };
-
-      const result = defaultNormalize(mockCdeebee, response, strategyList);
-
-      expect(result.userList).toEqual(response.userList);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Primary key')
-      );
-    });
-
     it('should remove keys with null values', () => {
       const response = {
         userList: {
-          data: [{ id: '1', name: 'John' }],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
         },
         invalid: null,
       } as unknown as IResponse;
@@ -213,8 +181,7 @@ describe('defaultNormalize', () => {
     it('should remove keys with undefined values', () => {
       const response = {
         userList: {
-          data: [{ id: '1', name: 'John' }],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
         },
         invalid: undefined,
       } as unknown as IResponse;
@@ -232,8 +199,7 @@ describe('defaultNormalize', () => {
     it('should remove keys with string values', () => {
       const response = {
         userList: {
-          data: [{ id: '1', name: 'John' }],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
         },
         message: 'some string',
       } as unknown as IResponse;
@@ -248,49 +214,14 @@ describe('defaultNormalize', () => {
       expect(result).not.toHaveProperty('message');
     });
 
-    it('should skip normalization when response value has no data property', () => {
+    it('should handle non-normalized objects as-is', () => {
       const response = {
         userList: {
-          id: 'id',
-          // no data property
+          '1': { id: '1', name: 'John' },
         },
-      };
-
-      const strategyList: CdeebeeListStrategy<unknown> = {
-        userList: 'replace',
-      };
-
-      const result = defaultNormalize(mockCdeebee, response, strategyList);
-
-      expect(result.userList).toEqual(response.userList);
-    });
-
-    it('should skip normalization when response value has no primaryKey property', () => {
-      const response = {
-        userList: {
-          data: [{ id: '1', name: 'John' }],
-          // no id property matching primaryKey
-        },
-      };
-
-      const strategyList: CdeebeeListStrategy<unknown> = {
-        userList: 'replace',
-      };
-
-      const result = defaultNormalize(mockCdeebee, response, strategyList);
-
-      expect(result.userList).toEqual(response.userList);
-    });
-
-    it('should skip elements without primaryKey value', () => {
-      const response = {
-        userList: {
-          data: [
-            { id: '1', name: 'John' },
-            { name: 'Jane' }, // no id
-            { id: '3', name: 'Bob' },
-          ],
-          id: 'id',
+        config: {
+          theme: 'dark',
+          language: 'en',
         },
       };
 
@@ -302,17 +233,16 @@ describe('defaultNormalize', () => {
 
       expect(result.userList).toEqual({
         '1': { id: '1', name: 'John' },
-        '3': { id: '3', name: 'Bob' },
       });
-      expect(result.userList).not.toHaveProperty('undefined');
+      expect(result.config).toEqual({
+        theme: 'dark',
+        language: 'en',
+      });
     });
 
-    it('should handle empty data array', () => {
+    it('should handle empty normalized object', () => {
       const response = {
-        userList: {
-          data: [],
-          id: 'id',
-        },
+        userList: {},
       };
 
       const strategyList: CdeebeeListStrategy<unknown> = {
@@ -338,12 +268,10 @@ describe('defaultNormalize', () => {
 
       const response = {
         userList: {
-          data: [{ id: '1', name: 'New John' }],
-          id: 'id',
+          '1': { id: '1', name: 'New John' },
         },
         postList: {
-          data: [{ id: '2', title: 'New Post' }],
-          id: 'id',
+          '2': { id: '2', title: 'New Post' },
         },
       };
 
@@ -363,7 +291,9 @@ describe('defaultNormalize', () => {
 
     it('should handle keys without strategy (undefined strategy)', () => {
       const response = {
-        userList: { data: [{ id: '1', name: 'John' }], id: 'id', },
+        userList: {
+          '1': { id: '1', name: 'John' },
+        },
       };
 
       const strategyList: CdeebeeListStrategy<unknown> = {};
@@ -377,17 +307,11 @@ describe('defaultNormalize', () => {
     });
   });
 
-  describe('custom primaryKey', () => {
-    it('should use custom primaryKey from settings', () => {
-      mockCdeebee.settings.primaryKey = 'uuid';
-
+  describe('complex data structures', () => {
+    it('should handle nested objects in normalized data', () => {
       const response = {
         userList: {
-          data: [
-            { uuid: 'user-1', name: 'John' },
-            { uuid: 'user-2', name: 'Jane' },
-          ],
-          uuid: 'uuid',
+          '1': { id: '1', name: 'John', profile: { age: 30, city: 'NYC' } },
         },
       };
 
@@ -398,37 +322,21 @@ describe('defaultNormalize', () => {
       const result = defaultNormalize(mockCdeebee, response, strategyList);
 
       expect(result.userList).toEqual({
-        'user-1': { uuid: 'user-1', name: 'John' },
-        'user-2': { uuid: 'user-2', name: 'Jane' },
+        '1': { id: '1', name: 'John', profile: { age: 30, city: 'NYC' } },
       });
-    });
-  });
-
-  describe('complex data structures', () => {
-    it('should handle nested objects in data elements', () => {
-      const response = {
-        userList: {
-          data: [ { id: '1', name: 'John', profile: { age: 30, city: 'NYC', }, }, ],
-          id: 'id',
-        },
-      };
-
-      const strategyList: CdeebeeListStrategy<unknown> = {
-        userList: 'replace',
-      };
-
-      const result = defaultNormalize(mockCdeebee, response, strategyList);
-
-      expect(result.userList).toEqual({ '1': { id: '1', name: 'John', profile: { age: 30, city: 'NYC', }, } });
     });
 
     it('should handle deep merge correctly', () => {
       mockCdeebee.storage = {
-        userList: { '1': { id: '1', name: 'John', profile: { age: 30, city: 'NYC', }, } },
+        userList: {
+          '1': { id: '1', name: 'John', profile: { age: 30, city: 'NYC' } },
+        },
       };
 
       const response = {
-        userList: { data: [ { id: '1', name: 'John Updated', profile: { age: 31, }, }, ], id: 'id' },
+        userList: {
+          '1': { id: '1', name: 'John Updated', profile: { age: 31 } },
+        },
       };
 
       const strategyList: CdeebeeListStrategy<unknown> = {
@@ -446,4 +354,3 @@ describe('defaultNormalize', () => {
     });
   });
 });
-

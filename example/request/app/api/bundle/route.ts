@@ -11,19 +11,16 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(
     { 
       bundleList: {
-        'data': [
-          {
-            'bundleID': 961,
-            'timestamp': new Date().toISOString(),
-            'bundle': 'test123',
-          },
-          {
-            'bundleID': 1549103,
-            'timestamp': new Date().toISOString(),
-            'bundle': 'test4',
-          },
-        ],
-        'primaryKey': 'bundleID',
+        '961': {
+          'bundleID': 961,
+          'timestamp': new Date().toISOString(),
+          'bundle': 'test123',
+        },
+        '1549103': {
+          'bundleID': 1549103,
+          'timestamp': new Date().toISOString(),
+          'bundle': 'test4',
+        },
       },
     }
   );

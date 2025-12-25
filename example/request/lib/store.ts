@@ -14,7 +14,6 @@ export const cdeebeeSlice = factory<Storage>(
     modules: ['history', 'listener', 'cancelation', 'storage'],
     fileKey: 'file',
     bodyKey: 'value',
-    primaryKey: 'primaryKey',
     listStrategy: {
       bundleList: 'merge',
       campaignList: 'replace',
