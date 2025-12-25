@@ -352,5 +352,22 @@ describe('defaultNormalize', () => {
         city: 'NYC', // should be preserved from merge
       });
     });
+
+    it('should handle storage that is not a record', () => {
+      mockCdeebee.storage = 'not an object' as unknown as Record<string, unknown>;
+      const response: IResponse = {
+        userList: {
+          '1': { id: '1', name: 'John' },
+        },
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, {});
+
+      expect(result).toEqual({
+        userList: {
+          '1': { id: '1', name: 'John' },
+        },
+      });
+    });
   });
 });

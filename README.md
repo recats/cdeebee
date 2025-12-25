@@ -124,6 +124,8 @@ function MyComponent() {
       method: 'POST',
       body: { filter: 'active' },
       onResult: (result) => {
+        // onResult is always called with the response data
+        // For JSON responses, result is already parsed
         console.log('Request completed:', result);
       },
     }));
@@ -185,7 +187,9 @@ interface CdeebeeRequestOptions<T> {
   bodyKey?: string;                   // Override default bodyKey
   listStrategy?: CdeebeeListStrategy<T>; // Override list strategy for this request
   normalize?: (storage, result, strategyList) => T; // Override normalization
-  onResult?: (response: T) => void;  // Callback called with response data on success
+  onResult?: (response: T) => void;  // Callback called with response data (always called, even on errors)
+  ignore?: boolean;                   // Skip storing result in storage
+  responseType?: 'json' | 'text' | 'blob'; // Response parsing type (default: 'json')
 }
 ```
 
@@ -233,6 +237,61 @@ dispatch(request({
   body: { description: 'My document' },
   fileKey: 'file',    // Optional: override default
   bodyKey: 'metadata', // Optional: override default
+}));
+```
+
+### Handling Different Response Types
+
+By default, cdeebee parses responses as JSON. For other response types (CSV, text files, images, etc.), use the `responseType` option:
+
+```typescript
+// CSV/text response
+dispatch(request({
+  api: '/api/export',
+  responseType: 'text',
+  ignore: true, // Don't store in storage
+  onResult: (csvData) => {
+    // csvData is a string
+    downloadCSV(csvData);
+  },
+}));
+
+// Binary file (image, PDF, etc.)
+dispatch(request({
+  api: '/api/image/123',
+  responseType: 'blob',
+  ignore: true,
+  onResult: (blob) => {
+    // blob is a Blob object
+    const url = URL.createObjectURL(blob);
+    setImageUrl(url);
+  },
+}));
+
+// JSON (default)
+dispatch(request({
+  api: '/api/data',
+  // responseType: 'json' is default
+  onResult: (data) => {
+    console.log(data); // Already parsed JSON
+  },
+}));
+```
+
+### Ignoring Storage Updates
+
+Use the `ignore` option to prevent storing the response in storage while still receiving it in the `onResult` callback:
+
+```typescript
+// Export CSV without storing in storage
+dispatch(request({
+  api: '/api/export',
+  responseType: 'text',
+  ignore: true,
+  onResult: (csvData) => {
+    // Handle CSV data directly
+    downloadFile(csvData, 'export.csv');
+  },
 }));
 ```
 

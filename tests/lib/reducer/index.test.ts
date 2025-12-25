@@ -1,42 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { configureStore } from '@reduxjs/toolkit';
-
 import { type CdeebeeSettings, type CdeebeeListStrategy, CdeebeeState } from '../../../lib/reducer/types';
 import { factory } from '../../../lib/reducer/index';
 import { request } from '../../../lib/reducer/request';
-
-// Mock fetch globally
-global.fetch = vi.fn();
-
-// Helper to create store with proper middleware configuration for tests
-const createTestStore = (reducer: ReturnType<typeof factory<Record<string, unknown>>>['reducer']) => {
-  return configureStore({
-    reducer: {
-      cdeebee: reducer as any,
-    },
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({
-        serializableCheck: {
-          ignoredPaths: ['cdeebee.settings.normalize'],
-        },
-      }),
-  });
-};
+import { createMockResponse, createTestStore, defaultTestSettings, mockFetch, mockFetchAlways } from '../test-helpers';
 
 describe('factory', () => {
   let settings: CdeebeeSettings<Record<string, unknown>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
-    settings = {
-      modules: ['history', 'listener', 'storage', 'cancelation'],
-      fileKey: 'file',
-      bodyKey: 'value',
-      mergeWithData: {},
-      mergeWithHeaders: {},
-      listStrategy: {},
-    };
+    settings = defaultTestSettings();
   });
 
   it('should create a slice with correct name', () => {
@@ -54,8 +27,7 @@ describe('factory', () => {
       listStrategy: { list: 'merge' },
     };
 
-    const slice = factory(customSettings);
-    const store = createTestStore(slice.reducer);
+    const store = createTestStore(customSettings);
 
     const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
     expect(state.settings.fileKey).toBe('customFile');
@@ -63,8 +35,7 @@ describe('factory', () => {
   });
 
   it('should have correct initial state structure', () => {
-    const slice = factory(settings);
-    const store = createTestStore(slice.reducer);
+    const store = createTestStore(settings);
 
     const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
     expect(state).toHaveProperty('settings');
@@ -80,17 +51,11 @@ describe('factory', () => {
 
   describe('listener module', () => {
     it('should track active requests when listener module is enabled', async () => {
-      const slice = factory(settings);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settings);
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ json: async () => ({ data: 'test' }) })
+      );
 
       const options = { api: '/api/test' };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -114,17 +79,11 @@ describe('factory', () => {
         modules: ['history', 'storage', 'cancelation'],
       };
 
-      const slice = factory(settingsWithoutListener);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settingsWithoutListener);
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ json: async () => ({ data: 'test' }) })
+      );
 
       const options = { api: '/api/test' };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -138,18 +97,10 @@ describe('factory', () => {
 
   describe('history module', () => {
     it('should track successful requests when history module is enabled', async () => {
-      const slice = factory(settings);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settings);
 
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const options = { api: '/api/test' };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -165,17 +116,11 @@ describe('factory', () => {
     });
 
     it('should track failed requests when history module is enabled', async () => {
-      const slice = factory(settings);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settings);
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ ok: false, status: 500 })
+      );
 
       const options = { api: '/api/test' };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -195,17 +140,11 @@ describe('factory', () => {
         modules: ['listener', 'storage', 'cancelation'],
       };
 
-      const slice = factory(settingsWithoutHistory);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settingsWithoutHistory);
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ json: async () => ({ data: 'test' }) })
+      );
 
       const options = { api: '/api/test' };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -217,17 +156,9 @@ describe('factory', () => {
     });
 
     it('should accumulate multiple requests for the same API', async () => {
-      const slice = factory(settings);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settings);
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      } as Response);
+      mockFetchAlways(createMockResponse({ json: async () => ({ data: 'test' }) }));
 
       const options = { api: '/api/test' };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -243,12 +174,7 @@ describe('factory', () => {
 
   describe('cancelation module', () => {
     it('should abort previous requests when cancelation module is enabled', async () => {
-      const slice = factory(settings);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settings);
 
       let resolveFirstRequest: (value: Response) => void;
       const firstRequestPromise = new Promise<Response>(resolve => {
@@ -262,17 +188,15 @@ describe('factory', () => {
       const dispatch = store.dispatch as any;
       const firstRequest = dispatch(request(options));
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ data: 'second' }),
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ json: async () => ({ data: 'second' }) })
+      );
 
       const secondRequest = dispatch(request(options));
 
-      resolveFirstRequest!({
-        ok: true,
-        json: async () => ({ data: 'first' }),
-      } as Response);
+      resolveFirstRequest!(
+        createMockResponse({ json: async () => ({ data: 'first' }) })
+      );
 
       await Promise.allSettled([firstRequest, secondRequest]);
     });
@@ -283,17 +207,9 @@ describe('factory', () => {
         modules: ['history', 'listener', 'storage'],
       };
 
-      const slice = factory(settingsWithoutCancelation);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settingsWithoutCancelation);
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: 'test' }),
-      } as Response);
+      mockFetchAlways(createMockResponse({ json: async () => ({ data: 'test' }) }));
 
       const options = { api: '/api/test' };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -308,12 +224,7 @@ describe('factory', () => {
 
   describe('storage module', () => {
     it('should normalize and store data when storage module is enabled', async () => {
-      const slice = factory(settings);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settings);
 
       const mockResponse = {
         userList: {
@@ -322,10 +233,7 @@ describe('factory', () => {
         },
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const options = { api: '/api/userList' };
       await store.dispatch(request(options));
@@ -345,12 +253,7 @@ describe('factory', () => {
         },
       };
 
-      const slice = factory(settingsWithStrategy);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settingsWithStrategy);
 
       const mockResponse = {
         userList: {
@@ -359,10 +262,7 @@ describe('factory', () => {
         },
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const options = { api: '/api/userList' };
       await store.dispatch(request(options));
@@ -383,12 +283,7 @@ describe('factory', () => {
         },
       };
 
-      const slice = factory(settingsWithStrategy);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settingsWithStrategy);
 
       // First request - initial data
       const firstResponse = {
@@ -398,10 +293,9 @@ describe('factory', () => {
         },
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => firstResponse,
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ json: async () => firstResponse })
+      );
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -415,10 +309,9 @@ describe('factory', () => {
         },
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => secondResponse,
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ json: async () => secondResponse })
+      );
 
       await dispatch(request({ api: '/api/userList' }));
 
@@ -441,12 +334,7 @@ describe('factory', () => {
         },
       };
 
-      const slice = factory(settingsWithStrategy);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settingsWithStrategy);
 
       const mockResponse = {
         userList: {
@@ -454,10 +342,7 @@ describe('factory', () => {
         },
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const options = {
         api: '/api/userList',
@@ -486,18 +371,10 @@ describe('factory', () => {
         normalize: settingsNormalize,
       };
 
-      const slice = factory(settingsWithNormalize);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settingsWithNormalize);
 
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const options = {
         api: '/api/test',
@@ -519,12 +396,7 @@ describe('factory', () => {
         modules: ['history', 'listener', 'cancelation'],
       };
 
-      const slice = factory(settingsWithoutStorage);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settingsWithoutStorage);
 
       const mockResponse = {
         userList: {
@@ -532,10 +404,7 @@ describe('factory', () => {
         },
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const options = { api: '/api/userList' };
       await store.dispatch(request(options));
@@ -553,8 +422,7 @@ describe('factory', () => {
         },
       };
 
-      const slice = factory(settingsWithStrategies);
-      const store = createTestStore(slice.reducer);
+      const store = createTestStore(settingsWithStrategies);
 
       // First request for userList
       const userListResponse = {
@@ -563,7 +431,9 @@ describe('factory', () => {
         },
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => userListResponse } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ json: async () => userListResponse })
+      );
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -575,7 +445,9 @@ describe('factory', () => {
         },
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => postListResponse, } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ json: async () => postListResponse })
+      );
 
       await dispatch(request({ api: '/api/postList' }));
 
@@ -589,18 +461,10 @@ describe('factory', () => {
     });
 
     it('should handle empty response', async () => {
-      const slice = factory(settings);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settings);
 
       const mockResponse = {};
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const options = { api: '/api/test' };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -612,22 +476,14 @@ describe('factory', () => {
     });
 
     it('should handle response with invalid data structure', async () => {
-      const slice = factory(settings);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settings);
 
       const mockResponse = {
         invalid: null,
         message: 'some string',
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const options = { api: '/api/test' };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -642,12 +498,7 @@ describe('factory', () => {
     });
 
     it('should use defaultNormalize when no custom normalize is provided', async () => {
-      const slice = factory(settings);
-      const store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      const store = createTestStore(settings);
 
       const mockResponse = {
         userList: {
@@ -656,13 +507,17 @@ describe('factory', () => {
         },
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({
+          contentType: 'application/json',
+          json: async () => mockResponse,
+        })
+      );
 
       const options = { api: '/api/userList' };
-      await store.dispatch(request(options));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = store.dispatch as any;
+      await dispatch(request(options));
 
       const state = store.getState().cdeebee;
       const userList = (state.storage as Record<string, unknown>).userList as Record<string, unknown>;
@@ -673,12 +528,69 @@ describe('factory', () => {
       expect((userList['1'] as Record<string, unknown>).name).toBe('John');
       expect((userList['2'] as Record<string, unknown>).name).toBe('Jane');
     });
+
+    it('should not store result in storage when ignore option is true', async () => {
+      const initialStorage = { existing: 'data' };
+      const storeWithStorage = createTestStore(settings, initialStorage);
+
+      const mockResponse = {
+        newData: {
+          '1': { id: '1', name: 'New' },
+        },
+      };
+
+      mockFetch(
+        createMockResponse({
+          contentType: 'application/json',
+          json: async () => mockResponse,
+        })
+      );
+
+      const options = { api: '/api/test', ignore: true };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = storeWithStorage.dispatch as any;
+      await dispatch(request(options));
+
+      const state = storeWithStorage.getState().cdeebee;
+      const storage = state.storage as Record<string, unknown>;
+      
+      // Storage should remain unchanged when ignore is true
+      expect(storage).toEqual(initialStorage);
+      expect(storage).not.toHaveProperty('newData');
+    });
+
+    it('should not store text/CSV responses in storage', async () => {
+      const csvData = 'RecordID,DspID,BundleID\n39021,6,27483';
+      const initialStorage = { existing: 'data' };
+      const storeWithStorage = createTestStore(settings, initialStorage);
+
+      mockFetch(
+        createMockResponse({
+          contentType: 'text/csv',
+          json: async () => {
+            throw new Error('Not JSON');
+          },
+          text: async () => csvData,
+        })
+      );
+
+      const options = { api: '/api/export' };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dispatch = storeWithStorage.dispatch as any;
+      await dispatch(request(options));
+
+      const state = storeWithStorage.getState().cdeebee;
+      const storage = state.storage as Record<string, unknown>;
+      
+      // Text responses should not be stored (they're not objects)
+      expect(storage).toEqual(initialStorage);
+    });
   });
 
   describe('set reducer', () => {
     it('should update a single top-level key in storage', () => {
       const slice = factory(settings);
-      const store = createTestStore(slice.reducer);
+      const store = createTestStore(settings);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -693,7 +605,7 @@ describe('factory', () => {
 
     it('should update multiple top-level keys in storage', () => {
       const slice = factory(settings);
-      const store = createTestStore(slice.reducer);
+      const store = createTestStore(settings);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -709,12 +621,16 @@ describe('factory', () => {
     });
 
     it('should update nested keys in storage', () => {
+      const store = createTestStore(settings, {
+        campaignList: {
+          '123': { name: 'Old Name', id: '123' },
+        },
+      });
       const slice = factory(settings, {
         campaignList: {
           '123': { name: 'Old Name', id: '123' },
         },
       });
-      const store = createTestStore(slice.reducer);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -733,7 +649,7 @@ describe('factory', () => {
 
     it('should create nested structure if it does not exist', () => {
       const slice = factory(settings);
-      const store = createTestStore(slice.reducer);
+      const store = createTestStore(settings);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -750,13 +666,18 @@ describe('factory', () => {
     });
 
     it('should update multiple nested keys in different paths', () => {
+      const store = createTestStore(settings, {
+        campaignList: {
+          '123': { name: 'Campaign 1', status: 'draft' },
+          '456': { name: 'Campaign 2', status: 'active' },
+        },
+      });
       const slice = factory(settings, {
         campaignList: {
           '123': { name: 'Campaign 1', status: 'draft' },
           '456': { name: 'Campaign 2', status: 'active' },
         },
       });
-      const store = createTestStore(slice.reducer);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -779,13 +700,18 @@ describe('factory', () => {
     });
 
     it('should preserve existing storage data when updating', () => {
+      const store = createTestStore(settings, {
+        existingKey: 'existingValue',
+        campaignList: {
+          '123': { name: 'Old', status: 'active', id: '123' },
+        },
+      });
       const slice = factory(settings, {
         existingKey: 'existingValue',
         campaignList: {
           '123': { name: 'Old', status: 'active', id: '123' },
         },
       });
-      const store = createTestStore(slice.reducer);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -802,10 +728,12 @@ describe('factory', () => {
     });
 
     it('should handle numeric keys in path', () => {
+      const store = createTestStore(settings, {
+        items: [{ id: 1, name: 'Item 1' }, { id: 2, name: 'Item 2' }],
+      });
       const slice = factory(settings, {
         items: [{ id: 1, name: 'Item 1' }, { id: 2, name: 'Item 2' }],
       });
-      const store = createTestStore(slice.reducer);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -820,7 +748,7 @@ describe('factory', () => {
 
     it('should handle deep nested paths', () => {
       const slice = factory(settings);
-      const store = createTestStore(slice.reducer);
+      const store = createTestStore(settings);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;
@@ -836,8 +764,8 @@ describe('factory', () => {
     });
 
     it('should handle empty value list', () => {
+      const store = createTestStore(settings, { existing: 'value' });
       const slice = factory(settings, { existing: 'value' });
-      const store = createTestStore(slice.reducer);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dispatch = store.dispatch as any;

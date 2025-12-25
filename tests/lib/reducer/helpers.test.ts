@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { checkModule, mergeDeepRight, omit, batchingUpdate, assocPath } from '../../../lib/reducer/helpers';
+import { checkModule, mergeDeepRight, omit, batchingUpdate, assocPath, hasDataProperty, hasProperty } from '../../../lib/reducer/helpers';
 import { type CdeebeeSettings, type CdeebeeModule } from '../../../lib/reducer/types';
 
 describe('checkModule', () => {
@@ -531,5 +531,51 @@ describe('batchingUpdate', () => {
 
     const items = state.items as Array<Record<string, unknown>>;
     expect(items[0].name).toBe('Updated Item 1');
+  });
+});
+
+describe('hasDataProperty', () => {
+  it('should return true for object with data array property', () => {
+    const value = { data: [1, 2, 3] };
+    expect(hasDataProperty(value)).toBe(true);
+  });
+
+  it('should return false for object without data property', () => {
+    const value = { other: 'value' };
+    expect(hasDataProperty(value)).toBe(false);
+  });
+
+  it('should return false for object with non-array data', () => {
+    const value = { data: 'not an array' };
+    expect(hasDataProperty(value)).toBe(false);
+  });
+
+  it('should return false for non-object values', () => {
+    expect(hasDataProperty(null)).toBe(false);
+    expect(hasDataProperty(undefined)).toBe(false);
+    expect(hasDataProperty('string')).toBe(false);
+    expect(hasDataProperty(123)).toBe(false);
+    expect(hasDataProperty([])).toBe(false);
+  });
+});
+
+describe('hasProperty', () => {
+  it('should return true when object has the property', () => {
+    const value = { prop: 'value', other: 'data' };
+    expect(hasProperty(value, 'prop')).toBe(true);
+    expect(hasProperty(value, 'other')).toBe(true);
+  });
+
+  it('should return false when object does not have the property', () => {
+    const value = { prop: 'value' };
+    expect(hasProperty(value, 'missing')).toBe(false);
+  });
+
+  it('should return false for non-object values', () => {
+    expect(hasProperty(null, 'prop')).toBe(false);
+    expect(hasProperty(undefined, 'prop')).toBe(false);
+    expect(hasProperty('string', 'prop')).toBe(false);
+    expect(hasProperty(123, 'prop')).toBe(false);
+    expect(hasProperty([], 'prop')).toBe(false);
   });
 });

@@ -43,6 +43,8 @@ export interface CdeebeeRequestOptions<T> extends Partial<Pick<CdeebeeSettings<T
   body?: unknown;
   headers?: Record<string, string>;
   onResult?: (response: T) => void;
+  ignore?: boolean;
+  responseType?: 'json' | 'text' | 'blob';
 }
 
 type KeyOf<T> = Extract<keyof T, string | number>;
