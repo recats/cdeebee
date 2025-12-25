@@ -15,7 +15,6 @@ export function defaultNormalize<T>(
   const keyList = Object.keys(response);
   const currentStorage = isRecord(cdeebee.storage) ? (cdeebee.storage as Record<string, unknown>) : {};
   
-  // Start with existing storage to preserve keys not in response
   const result = { ...currentStorage } as Record<string, ResponseValue>;
   const keyListToOmit = new Set<string>();
 
@@ -27,25 +26,21 @@ export function defaultNormalize<T>(
       continue;
     }
 
-    const isNormalized = isRecord(responseValue) && Object.keys(responseValue).length > 0;
+    const isNormalized = isRecord(responseValue);
+    const strategy = strategyList[key as keyof T] ?? 'merge';
 
     if (isNormalized) {
-      const strategy = strategyList[key as keyof T] ?? 'merge';
       const existingValue = key in currentStorage ? (currentStorage[key] as StorageData) : {};
 
       if (strategy === 'replace') {
-        // Replace: completely replace the value
         result[key] = responseValue as ResponseValue;
       } else if (strategy === 'merge') {
-        // Merge: merge with existing value
         result[key] = mergeDeepRight(existingValue, responseValue as StorageData) as ResponseValue;
       } else {
-        // Unknown strategy: warn and fall back to merge
         console.warn(`Cdeebee: Unknown strategy "${strategy}" for key "${key}". Skipping normalization.`);
         result[key] = mergeDeepRight(existingValue, responseValue as StorageData) as ResponseValue;
       }
     } else {
-      // Not a normalized object, store as-is
       result[key] = responseValue;
     }
   }
