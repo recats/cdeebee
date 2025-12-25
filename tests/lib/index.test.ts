@@ -16,7 +16,6 @@ describe('lib/index exports', () => {
         modules: [],
         fileKey: 'file',
         bodyKey: 'body',
-        primaryKey: 'id',
         mergeWithData: {},
       },
       storage: {},

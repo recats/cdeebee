@@ -33,8 +33,8 @@ describe('factory', () => {
       modules: ['history', 'listener', 'storage', 'cancelation'],
       fileKey: 'file',
       bodyKey: 'value',
-      primaryKey: 'id',
       mergeWithData: {},
+      mergeWithHeaders: {},
       listStrategy: {},
     };
   });
@@ -49,8 +49,8 @@ describe('factory', () => {
       modules: ['history'],
       fileKey: 'customFile',
       bodyKey: 'customBody',
-      primaryKey: 'customId',
       mergeWithData: { custom: 'data' },
+      mergeWithHeaders: {},
       listStrategy: { list: 'merge' },
     };
 
@@ -60,7 +60,6 @@ describe('factory', () => {
     const state = store.getState().cdeebee as CdeebeeState<Record<string, unknown>>;
     expect(state.settings.fileKey).toBe('customFile');
     expect(state.settings.bodyKey).toBe('customBody');
-    expect(state.settings.primaryKey).toBe('customId');
   });
 
   it('should have correct initial state structure', () => {
@@ -318,11 +317,8 @@ describe('factory', () => {
 
       const mockResponse = {
         userList: {
-          data: [
-            { id: '1', name: 'John' },
-            { id: '2', name: 'Jane' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
+          '2': { id: '2', name: 'Jane' },
         },
       };
 
@@ -358,11 +354,8 @@ describe('factory', () => {
 
       const mockResponse = {
         userList: {
-          data: [
-            { id: '1', name: 'John' },
-            { id: '2', name: 'Jane' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
+          '2': { id: '2', name: 'Jane' },
         },
       };
 
@@ -400,11 +393,8 @@ describe('factory', () => {
       // First request - initial data
       const firstResponse = {
         userList: {
-          data: [
-            { id: '1', name: 'John' },
-            { id: '3', name: 'Bob' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
+          '3': { id: '3', name: 'Bob' },
         },
       };
 
@@ -420,11 +410,8 @@ describe('factory', () => {
       // Second request - merge new data
       const secondResponse = {
         userList: {
-          data: [
-            { id: '1', name: 'John Updated' },
-            { id: '2', name: 'Jane' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'John Updated' },
+          '2': { id: '2', name: 'Jane' },
         },
       };
 
@@ -463,10 +450,7 @@ describe('factory', () => {
 
       const mockResponse = {
         userList: {
-          data: [
-            { id: '1', name: 'John' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
         },
       };
 
@@ -544,8 +528,7 @@ describe('factory', () => {
 
       const mockResponse = {
         userList: {
-          data: [{ id: '1', name: 'John' }],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
         },
       };
 
@@ -576,8 +559,7 @@ describe('factory', () => {
       // First request for userList
       const userListResponse = {
         userList: {
-          data: [{ id: '1', name: 'John' }],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
         },
       };
 
@@ -589,8 +571,7 @@ describe('factory', () => {
 
       const postListResponse = {
         postList: {
-          data: [{ id: '1', title: 'Post 1' }],
-          id: 'id',
+          '1': { id: '1', title: 'Post 1' },
         },
       };
 
@@ -670,11 +651,8 @@ describe('factory', () => {
 
       const mockResponse = {
         userList: {
-          data: [
-            { id: '1', name: 'John' },
-            { id: '2', name: 'Jane' },
-          ],
-          id: 'id',
+          '1': { id: '1', name: 'John' },
+          '2': { id: '2', name: 'Jane' },
         },
       };
 

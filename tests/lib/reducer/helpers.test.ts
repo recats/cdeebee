@@ -8,8 +8,8 @@ describe('checkModule', () => {
       modules: ['history', 'listener'] as CdeebeeModule[],
       fileKey: 'file',
       bodyKey: 'body',
-      primaryKey: 'id',
       mergeWithData: {},
+      mergeWithHeaders: {},
       listStrategy: {},
     };
 
@@ -21,11 +21,11 @@ describe('checkModule', () => {
 
   it('should not execute result callback when module is not included in settings', () => {
     const settings: CdeebeeSettings<unknown> = {
-      modules: ['history', 'listener'] as CdeebeeModule[],
+      modules: ['history', 'listener'],
       fileKey: 'file',
       bodyKey: 'body',
-      primaryKey: 'id',
       mergeWithData: {},
+      mergeWithHeaders: {},
       listStrategy: {},
     };
 
@@ -37,11 +37,11 @@ describe('checkModule', () => {
 
   it('should work with all module types', () => {
     const settings: CdeebeeSettings<unknown> = {
-      modules: ['history', 'listener', 'storage', 'cancelation'] as CdeebeeModule[],
+      modules: ['history', 'listener', 'storage', 'cancelation'],
       fileKey: 'file',
       bodyKey: 'body',
-      primaryKey: 'id',
       mergeWithData: {},
+      mergeWithHeaders: {},
       listStrategy: {},
     };
 
@@ -56,11 +56,11 @@ describe('checkModule', () => {
 
   it('should handle empty modules array', () => {
     const settings: CdeebeeSettings<unknown> = {
-      modules: [] as CdeebeeModule[],
+      modules: [],
       fileKey: 'file',
       bodyKey: 'body',
-      primaryKey: 'id',
       mergeWithData: {},
+      mergeWithHeaders: {},
       listStrategy: {},
     };
 

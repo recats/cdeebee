@@ -82,7 +82,6 @@ export const cdeebeeSlice = factory<Storage>(
     modules: ['history', 'listener', 'cancelation', 'storage'],
     fileKey: 'file',
     bodyKey: 'value',
-    primaryKey: 'id',
     listStrategy: {
       forumList: 'merge',
       threadList: 'replace',
@@ -166,7 +165,6 @@ interface CdeebeeSettings<T> {
   modules: CdeebeeModule[];           // Active modules: 'history' | 'listener' | 'storage' | 'cancelation'
   fileKey: string;                    // Key name for file uploads in FormData
   bodyKey: string;                    // Key name for request body in FormData
-  primaryKey: string;                 // Primary key field name in API responses (default: 'primaryKey')
   listStrategy?: CdeebeeListStrategy<T>; // Merge strategy per list: 'merge' | 'replace'
   mergeWithData?: unknown;            // Data to merge with every request body
   mergeWithHeaders?: Record<string, string>; // Headers to merge with every request
@@ -207,27 +205,7 @@ listStrategy: {
 
 ## API Response Format
 
-cdeebee expects API responses in a specific format for automatic normalization:
-
-```typescript
-{
-  forumList: {
-    primaryKey: 'id',  // The field name specified in settings.primaryKey
-    data: [
-      { id: 1, title: 'Forum 1' },
-      { id: 2, title: 'Forum 2' },
-    ]
-  },
-  threadList: {
-    primaryKey: 'id',
-    data: [
-      { id: 101, title: 'Thread 1', forumID: 1 },
-    ]
-  }
-}
-```
-
-The library automatically normalizes this into:
+cdeebee expects API responses in a normalized format where data is already organized as objects with keys representing entity IDs:
 
 ```typescript
 {

@@ -7,7 +7,6 @@ export interface CdeebeeSettings<T> {
   modules: CdeebeeModule[];
   fileKey: string;
   bodyKey: string;
-  primaryKey: string;
   mergeWithData: unknown;
   mergeWithHeaders: unknown;
   listStrategy?: CdeebeeListStrategy<T>;

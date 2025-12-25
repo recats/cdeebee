@@ -11,7 +11,6 @@ const initialState: CdeebeeState<unknown> = {
     modules: ['history', 'listener', 'storage', 'cancelation'],
     fileKey: 'file',
     bodyKey: 'value',
-    primaryKey: 'primaryKey',
     listStrategy: {},
     mergeWithData: {},
     mergeWithHeaders: {},

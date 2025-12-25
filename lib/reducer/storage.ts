@@ -1,10 +1,7 @@
 import { type CdeebeeListStrategy, type CdeebeeState } from './types';
-import { hasDataProperty, hasProperty, isRecord, mergeDeepRight, omit } from './helpers';
+import { isRecord, mergeDeepRight, omit } from './helpers';
 
-type ResponseValue = Record<string, unknown> & {
-  data?: unknown[];
-  [key: string]: unknown;
-};
+type ResponseValue = Record<string, unknown>;
 
 type IResponse = Record<string, ResponseValue>;
 
@@ -16,7 +13,6 @@ export function defaultNormalize<T>(
   strategyList: CdeebeeListStrategy<T> 
 ): Record<string, ResponseValue> {
   const keyList = Object.keys(response);
-  const primaryKey = cdeebee.settings.primaryKey;
   const currentStorage = isRecord(cdeebee.storage) ? (cdeebee.storage as Record<string, unknown>) : {};
   
   // Start with existing storage to preserve keys not in response
@@ -31,43 +27,28 @@ export function defaultNormalize<T>(
       continue;
     }
 
-    if (hasDataProperty(responseValue) && hasProperty(responseValue, primaryKey)) {
-      const primaryKeyValue = responseValue[primaryKey];
-      
-      if (typeof primaryKeyValue !== 'string') {
-        console.warn(`Cdeebee: Primary key "${primaryKey}" is not a string for API "${key}". Skipping normalization.`);
-        result[key] = responseValue;
-        continue;
-      }
+    // Check if responseValue is already normalized (object with keys mapping to objects)
+    const isNormalized = isRecord(responseValue) && 
+      Object.keys(responseValue).length > 0 &&
+      Object.values(responseValue).every(val => isRecord(val) && !Array.isArray(val));
 
-      // Pre-allocate storage data object
-      const newStorageData: StorageData = {};
-      const dataArray = responseValue.data;
-      const dataLength = dataArray.length;
-
-      for (let i = 0; i < dataLength; i++) {
-        const element = dataArray[i];
-        if (isRecord(element) && element[primaryKeyValue]) {
-          const elementKey = element[primaryKeyValue] as string;
-          newStorageData[elementKey] = element;
-        }
-      }
-
+    if (isNormalized) {
       const strategy = strategyList[key as keyof T] ?? 'merge';
       const existingValue = key in currentStorage ? (currentStorage[key] as StorageData) : {};
 
       if (strategy === 'replace') {
         // Replace: completely replace the value
-        result[key] = newStorageData as ResponseValue;
+        result[key] = responseValue as ResponseValue;
       } else if (strategy === 'merge') {
         // Merge: merge with existing value
-        result[key] = mergeDeepRight(existingValue, newStorageData) as ResponseValue;
+        result[key] = mergeDeepRight(existingValue, responseValue as StorageData) as ResponseValue;
       } else {
         // Unknown strategy: warn and fall back to merge
         console.warn(`Cdeebee: Unknown strategy "${strategy}" for key "${key}". Skipping normalization.`);
-        result[key] = mergeDeepRight(existingValue, newStorageData) as ResponseValue;
+        result[key] = mergeDeepRight(existingValue, responseValue as StorageData) as ResponseValue;
       }
     } else {
+      // Not a normalized object, store as-is
       result[key] = responseValue;
     }
   }

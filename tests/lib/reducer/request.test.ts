@@ -20,7 +20,6 @@ describe('request', () => {
       modules: ['history', 'listener', 'cancelation'],
       fileKey: 'file',
       bodyKey: 'value',
-      primaryKey: 'id',
       mergeWithData: { defaultKey: 'defaultValue' },
       listStrategy: {},
     };
