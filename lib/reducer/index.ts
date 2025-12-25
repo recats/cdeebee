@@ -60,11 +60,16 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
             state.request.done[api].push({ api, request: action.payload, requestId });
           });
           checkModule(state.settings, 'storage', () => {
+            if (action.meta.arg.ignore) {
+              return;
+            }
+            
             const strategyList = action.meta.arg.listStrategy ?? state.settings.listStrategy ?? {};
             const normalize = action.meta.arg.normalize ?? state.settings.normalize ?? defaultNormalize;
 
             const currentState = current(state) as CdeebeeState<T>;
-            const normalizedData = normalize(currentState, action.payload.result, strategyList);
+            // Type assertion is safe here because we've already checked isRecord
+            const normalizedData = normalize(currentState, action.payload.result as Record<string, Record<string, unknown>>, strategyList);
 
             // Normalize already handles merge/replace and preserves keys not in response
             // Simply apply the result
@@ -75,7 +80,7 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
         .addCase(request.rejected, (state, action) => {
           const requestId = action.meta.requestId;
           const api = action.meta.arg.api;
-          
+
           checkModule(state.settings, 'listener', () => {
             state.request.active = state.request.active.filter(q => !(q.api === api && q.requestId === requestId));
           });

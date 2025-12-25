@@ -10,6 +10,7 @@ export const request = createAsyncThunk(
     const { cdeebee: { settings } } = getState() as { cdeebee: CdeebeeState<unknown> };
 
     const abort = abortManager(signal, options.api, requestId);
+    const withCallback = options.onResult && typeof options.onResult === 'function';
 
     checkModule(settings, 'cancelation', abort.init);
 
@@ -52,25 +53,35 @@ export const request = createAsyncThunk(
 
       checkModule(settings, 'cancelation', abort.drop);
 
+      let result: unknown;
+      const responseType = options.responseType || 'json';
+      
+      if (responseType === 'text') {
+        result = await response.text();
+      } else if (responseType === 'blob') {
+        result = await response.blob();
+      } else {
+        // default: json
+        result = await response.json();
+      }
+
       if (!response.ok) {
+        if (withCallback) options.onResult!(result);
         return rejectWithValue(response);
       }
-      const result = await response.json();
-      if (options.onResult && typeof options.onResult === 'function') {
-        options.onResult(result);
-      }
+
+      if (withCallback) options.onResult!(result);
       return { result, startedAt, endedAt: new Date().toUTCString() };
     } catch (error) {
       checkModule(settings, 'cancelation', abort.drop);
+
+      if (withCallback) options.onResult!(error); 
+
       if (error instanceof Error && error.name === 'AbortError') {
-        return rejectWithValue({
-          message: 'Request was cancelled',
-          cancelled: true,
-        });
+        return rejectWithValue({ message: 'Request was cancelled', cancelled: true });
       }
-      return rejectWithValue({
-        message: error instanceof Error ? error.message : 'Unknown error occurred',
-      });
+
+      return rejectWithValue({ message: error instanceof Error ? error.message : 'Unknown error occurred' });
     }
   },
 );

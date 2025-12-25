@@ -1,35 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { configureStore } from '@reduxjs/toolkit';
-import { request, type CdeebeeRequestOptions } from '../../../lib/reducer/request';
-import { factory } from '../../../lib/reducer/index';
-import { type CdeebeeSettings } from '../../../lib/reducer/types';
-
-// Mock fetch globally
-global.fetch = vi.fn();
+import { request } from '../../../lib/reducer/request';
+import { type CdeebeeSettings, type CdeebeeRequestOptions } from '../../../lib/reducer/types';
+import { createMockResponse, createTestStore, defaultTestSettings, mockFetch } from '../test-helpers';
 
 describe('request', () => {
-  let store: ReturnType<typeof configureStore>;
+  let store: ReturnType<typeof createTestStore>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let dispatch: any;
-  let settings: CdeebeeSettings;
+  let settings: CdeebeeSettings<unknown>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     
-    settings = {
+    settings = defaultTestSettings({
       modules: ['history', 'listener', 'cancelation'],
-      fileKey: 'file',
-      bodyKey: 'value',
       mergeWithData: { defaultKey: 'defaultValue' },
-      listStrategy: {},
-    };
-
-    const slice = factory(settings);
-    store = configureStore({
-      reducer: {
-        cdeebee: slice.reducer,
-      },
     });
+
+    store = createTestStore(settings);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dispatch = store.dispatch as any;
   });
@@ -41,12 +29,9 @@ describe('request', () => {
   describe('successful requests', () => {
     it('should handle a successful POST request', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
         method: 'POST',
         body: { test: 'data' },
@@ -68,12 +53,9 @@ describe('request', () => {
 
     it('should merge mergeWithData with request body', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
         method: 'POST',
         body: { customKey: 'customValue' },
@@ -90,12 +72,9 @@ describe('request', () => {
 
     it('should handle GET request', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
         method: 'GET',
       };
@@ -112,12 +91,9 @@ describe('request', () => {
 
     it('should include custom headers', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
         headers: { 'Authorization': 'Bearer token' },
       };
@@ -130,12 +106,9 @@ describe('request', () => {
 
     it('should include requestId in headers', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
       };
 
@@ -149,15 +122,12 @@ describe('request', () => {
   describe('file uploads', () => {
     it('should handle file uploads with FormData', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const file1 = new File(['content1'], 'file1.txt', { type: 'text/plain' });
       const file2 = new File(['content2'], 'file2.txt', { type: 'text/plain' });
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/upload',
         files: [file1, file2],
         body: { metadata: 'test' },
@@ -171,14 +141,11 @@ describe('request', () => {
 
     it('should use custom fileKey and bodyKey', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       const file = new File(['content'], 'file.txt', { type: 'text/plain' });
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/upload',
         files: [file],
         fileKey: 'customFile',
@@ -198,14 +165,14 @@ describe('request', () => {
 
   describe('error handling', () => {
     it('should reject with response when response is not ok', async () => {
-      const mockResponse = {
+      const mockResponse = createMockResponse({
         ok: false,
         status: 404,
         statusText: 'Not Found',
-      };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockResponse as Response);
+      });
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockResponse);
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
       };
 
@@ -221,7 +188,7 @@ describe('request', () => {
       const networkError = new Error('Network error');
       (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(networkError);
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
       };
 
@@ -238,7 +205,7 @@ describe('request', () => {
       abortError.name = 'AbortError';
       (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(abortError);
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
       };
 
@@ -255,7 +222,7 @@ describe('request', () => {
       const unknownError = 'String error';
       (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(unknownError);
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
       };
 
@@ -271,12 +238,9 @@ describe('request', () => {
   describe('response data', () => {
     it('should return result with startedAt and endedAt', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
       };
 
@@ -293,12 +257,13 @@ describe('request', () => {
       const mockResponse = { data: 'test', id: 123 };
       const onResult = vi.fn();
       
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({
+          json: async () => mockResponse,
+        })
+      );
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
         onResult,
       };
@@ -312,12 +277,13 @@ describe('request', () => {
     it('should not call onResult when it is not provided', async () => {
       const mockResponse = { data: 'test' };
       
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({
+          json: async () => mockResponse,
+        })
+      );
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
       };
 
@@ -327,45 +293,179 @@ describe('request', () => {
       expect(global.fetch).toHaveBeenCalled();
     });
 
-    it('should not call onResult when request fails', async () => {
+    it('should call onResult with error result when request fails', async () => {
       const onResult = vi.fn();
+      const errorResponse = { error: 'Not found' };
       
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-      } as Response);
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 404,
+          contentType: 'application/json',
+          json: async () => errorResponse,
+        })
+      );
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
         onResult,
       };
 
       await dispatch(request(options));
 
-      expect(onResult).not.toHaveBeenCalled();
+      expect(onResult).toHaveBeenCalledTimes(1);
+      expect(onResult).toHaveBeenCalledWith(errorResponse);
+    });
+  });
+
+  describe('ignore option', () => {
+    it('should not store result in storage when ignore is true', async () => {
+      settings.modules = ['history', 'listener', 'storage', 'cancelation'];
+      store = createTestStore(settings);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch = store.dispatch as any;
+
+      const mockResponse = { user: { id: 1, name: 'Test' } };
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({
+          contentType: 'application/json',
+          json: async () => mockResponse,
+        })
+      );
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/user',
+        ignore: true,
+      };
+
+      await dispatch(request(options));
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const state = (store.getState() as any).cdeebee;
+      expect(state.storage).toEqual({});
+    });
+
+    it('should still call onResult when ignore is true', async () => {
+      const onResult = vi.fn();
+      const mockResponse = { data: 'test' };
+      
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({
+          contentType: 'application/json',
+          json: async () => mockResponse,
+        })
+      );
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/test',
+        ignore: true,
+        onResult,
+      };
+
+      await dispatch(request(options));
+
+      expect(onResult).toHaveBeenCalledTimes(1);
+      expect(onResult).toHaveBeenCalledWith(mockResponse);
+    });
+  });
+
+  describe('responseType option', () => {
+    it('should use json by default', async () => {
+      const jsonData = { id: 1, name: 'Test' };
+      mockFetch(createMockResponse({ json: async () => jsonData }));
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/test',
+      };
+
+      const result = await dispatch(request(options));
+
+      expect(result.type).toBe('cdeebee/request/fulfilled');
+      if (result.type === 'cdeebee/request/fulfilled' && 'payload' in result) {
+        expect(result.payload.result).toEqual(jsonData);
+      }
+    });
+
+    it('should use text when responseType is text', async () => {
+      const textData = 'CSV data here';
+      mockFetch(createMockResponse({ text: async () => textData }));
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/export',
+        responseType: 'text',
+      };
+
+      const result = await dispatch(request(options));
+
+      expect(result.type).toBe('cdeebee/request/fulfilled');
+      if (result.type === 'cdeebee/request/fulfilled' && 'payload' in result) {
+        expect(result.payload.result).toBe(textData);
+      }
+    });
+
+    it('should use blob when responseType is blob', async () => {
+      const blobData = new Blob(['binary data'], { type: 'image/png' });
+      mockFetch(createMockResponse({ blob: async () => blobData }));
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/image',
+        responseType: 'blob',
+      };
+
+      const result = await dispatch(request(options));
+
+      expect(result.type).toBe('cdeebee/request/fulfilled');
+      if (result.type === 'cdeebee/request/fulfilled' && 'payload' in result) {
+        expect(result.payload.result).toBe(blobData);
+      }
+    });
+
+    it('should use json when responseType is json explicitly', async () => {
+      const jsonData = { data: 'test' };
+      mockFetch(createMockResponse({ json: async () => jsonData }));
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/test',
+        responseType: 'json',
+      };
+
+      const result = await dispatch(request(options));
+
+      expect(result.type).toBe('cdeebee/request/fulfilled');
+      if (result.type === 'cdeebee/request/fulfilled' && 'payload' in result) {
+        expect(result.payload.result).toEqual(jsonData);
+      }
+    });
+
+    it('should call onResult with correct type based on responseType', async () => {
+      const textData = 'CSV content';
+      const onResult = vi.fn();
+      mockFetch(createMockResponse({ text: async () => textData }));
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/export',
+        responseType: 'text',
+        onResult,
+      };
+
+      await dispatch(request(options));
+
+      expect(onResult).toHaveBeenCalledWith(textData);
     });
   });
 
   describe('mergeWithHeaders', () => {
     it('should merge headers from settings with request headers', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       settings.mergeWithHeaders = { 'X-Custom-Header': 'from-settings', 'X-Another': 'settings-value' };
 
-      const slice = factory(settings);
-      store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      store = createTestStore(settings);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       dispatch = store.dispatch as any;
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
         headers: { 'Authorization': 'Bearer token', 'X-Another': 'request-value' },
       };
@@ -381,23 +481,15 @@ describe('request', () => {
 
     it('should use only settings headers when request headers are not provided', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       settings.mergeWithHeaders = { 'X-Settings-Header': 'settings-only' };
 
-      const slice = factory(settings);
-      store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      store = createTestStore(settings);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       dispatch = store.dispatch as any;
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
       };
 
@@ -409,23 +501,15 @@ describe('request', () => {
 
     it('should handle empty mergeWithHeaders', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       settings.mergeWithHeaders = {};
 
-      const slice = factory(settings);
-      store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      store = createTestStore(settings);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       dispatch = store.dispatch as any;
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
         headers: { 'Authorization': 'Bearer token' },
       };
@@ -438,23 +522,15 @@ describe('request', () => {
 
     it('should handle undefined mergeWithHeaders', async () => {
       const mockResponse = { data: 'test' };
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
 
       settings.mergeWithHeaders = undefined;
 
-      const slice = factory(settings);
-      store = configureStore({
-        reducer: {
-          cdeebee: slice.reducer,
-        },
-      });
+      store = createTestStore(settings);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       dispatch = store.dispatch as any;
 
-      const options: CdeebeeRequestOptions = {
+      const options: CdeebeeRequestOptions<unknown> = {
         api: '/api/test',
         headers: { 'Authorization': 'Bearer token' },
       };
@@ -463,6 +539,58 @@ describe('request', () => {
 
       const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(callArgs[1].headers).toHaveProperty('Authorization', 'Bearer token');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle request without body', async () => {
+      const mockResponse = { data: 'test' };
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/test',
+        method: 'GET',
+      };
+
+      await dispatch(request(options));
+
+      const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse(callArgs[1].body as string);
+      expect(body).toEqual({ defaultKey: 'defaultValue' });
+    });
+
+    it('should handle response without content-type header', async () => {
+      const mockResponse = { data: 'test' };
+      const response = createMockResponse({ 
+        json: async () => mockResponse,
+        contentType: '', // Empty content-type
+      });
+      // Override headers.get to return null
+      response.headers.get = () => null;
+      mockFetch(response);
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/test',
+      };
+
+      const result = await dispatch(request(options));
+      expect(result.type).toBe('cdeebee/request/fulfilled');
+    });
+
+    it('should call onResult with error in catch block', async () => {
+      const onResult = vi.fn();
+      const networkError = new Error('Network error');
+      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(networkError);
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/test',
+        onResult,
+      };
+
+      await dispatch(request(options));
+
+      expect(onResult).toHaveBeenCalledTimes(1);
+      expect(onResult).toHaveBeenCalledWith(networkError);
     });
   });
 });
