@@ -240,7 +240,14 @@ describe('defaultNormalize', () => {
       });
     });
 
-    it('should handle empty normalized object', () => {
+    it('should replace existing data with empty object when using replace strategy', () => {
+      mockCdeebee.storage = {
+        userList: {
+          '1': { id: '1', name: 'John' },
+          '2': { id: '2', name: 'Jane' },
+        },
+      };
+
       const response = {
         userList: {},
       };
@@ -252,6 +259,68 @@ describe('defaultNormalize', () => {
       const result = defaultNormalize(mockCdeebee, response, strategyList);
 
       expect(result.userList).toEqual({});
+      expect(Object.keys(result.userList as Record<string, unknown>)).toHaveLength(0);
+    });
+
+    it('should preserve existing data when empty object comes with merge strategy', () => {
+      mockCdeebee.storage = {
+        userList: {
+          '1': { id: '1', name: 'John' },
+          '2': { id: '2', name: 'Jane' },
+        },
+      };
+
+      const response = {
+        userList: {},
+      };
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        userList: 'merge',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      expect(result.userList).toEqual({
+        '1': { id: '1', name: 'John' },
+        '2': { id: '2', name: 'Jane' },
+      });
+      expect(Object.keys(result.userList as Record<string, unknown>)).toHaveLength(2);
+      expect((result.userList as Record<string, unknown>)['1']).toEqual({ id: '1', name: 'John' });
+      expect((result.userList as Record<string, unknown>)['2']).toEqual({ id: '2', name: 'Jane' });
+    });
+
+    it('should handle empty objects in single request: merge preserves data, replace erases data', () => {
+      mockCdeebee.storage = {
+        userList: {
+          '1': { id: '1', name: 'John' },
+          '2': { id: '2', name: 'Jane' },
+        },
+        postList: {
+          '1': { id: '1', title: 'Post 1' },
+          '2': { id: '2', title: 'Post 2' },
+        },
+      };
+
+      const response = {
+        userList: {},
+        postList: {},
+      };
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        userList: 'merge',
+        postList: 'replace',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      expect(result.userList).toEqual({
+        '1': { id: '1', name: 'John' },
+        '2': { id: '2', name: 'Jane' },
+      });
+      expect(Object.keys(result.userList as Record<string, unknown>)).toHaveLength(2);
+
+      expect(result.postList).toEqual({});
+      expect(Object.keys(result.postList as Record<string, unknown>)).toHaveLength(0);
     });
   });
 
