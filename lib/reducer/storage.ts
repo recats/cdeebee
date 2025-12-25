@@ -27,10 +27,7 @@ export function defaultNormalize<T>(
       continue;
     }
 
-    // Check if responseValue is already normalized (object with keys mapping to objects)
-    const isNormalized = isRecord(responseValue) && 
-      Object.keys(responseValue).length > 0 &&
-      Object.values(responseValue).every(val => isRecord(val) && !Array.isArray(val));
+    const isNormalized = isRecord(responseValue) && Object.keys(responseValue).length > 0;
 
     if (isNormalized) {
       const strategy = strategyList[key as keyof T] ?? 'merge';
