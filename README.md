@@ -60,6 +60,7 @@ cdeebee uses a modular architecture with the following modules:
 - **`history`**: Tracks request history (successful and failed requests)
 - **`listener`**: Tracks active requests for loading states
 - **`cancelation`**: Manages request cancellation (automatically cancels previous requests to the same API)
+- **`queryQueue`**: Processes requests sequentially in the order they were sent, ensuring they complete and are stored in the correct sequence
 
 ## Quick Start
 
@@ -79,7 +80,7 @@ interface Storage {
 // Create cdeebee slice
 export const cdeebeeSlice = factory<Storage>(
   {
-    modules: ['history', 'listener', 'cancelation', 'storage'],
+    modules: ['history', 'listener', 'cancelation', 'storage', 'queryQueue'],
     fileKey: 'file',
     bodyKey: 'value',
     listStrategy: {
@@ -164,7 +165,7 @@ The `factory` function accepts a settings object with the following options:
 
 ```typescript
 interface CdeebeeSettings<T> {
-  modules: CdeebeeModule[];           // Active modules: 'history' | 'listener' | 'storage' | 'cancelation'
+  modules: CdeebeeModule[];           // Active modules: 'history' | 'listener' | 'storage' | 'cancelation' | 'queryQueue'
   fileKey: string;                    // Key name for file uploads in FormData
   bodyKey: string;                    // Key name for request body in FormData
   listStrategy?: CdeebeeListStrategy<T>; // Merge strategy per list: 'merge' | 'replace'
@@ -326,6 +327,34 @@ dispatch(request({ api: '/api/data', body: { query: 'slow' } }));
 dispatch(request({ api: '/api/data', body: { query: 'fast' } }));
 ```
 
+### Sequential Request Processing (queryQueue)
+
+When the `queryQueue` module is enabled, all requests are processed sequentially in the order they were sent. This ensures that:
+
+- Requests complete in the exact order they were dispatched
+- Data is stored in the store in the correct sequence
+- Even if a faster request is sent after a slower one, it will wait for the previous request to complete
+
+This is particularly useful when you need to maintain data consistency and ensure that updates happen in the correct order.
+
+```typescript
+// Enable queryQueue module
+const cdeebeeSlice = factory<Storage>({
+  modules: ['history', 'listener', 'storage', 'queryQueue'],
+  // ... other settings
+});
+
+// Send multiple requests - they will be processed sequentially
+dispatch(request({ api: '/api/data', body: { id: 1 } }));  // Completes first
+dispatch(request({ api: '/api/data', body: { id: 2 } }));  // Waits for #1, then completes
+dispatch(request({ api: '/api/data', body: { id: 3 } }));  // Waits for #2, then completes
+
+// Even if request #3 is faster, it will still complete last
+// All requests are stored in the store in order: 1 → 2 → 3
+```
+
+**Note:** The `queryQueue` module processes requests sequentially across all APIs. If you need parallel processing for different APIs, you would need separate cdeebee instances or disable the module for those specific requests.
+
 ### Manual State Updates
 
 You can manually update the storage using the `set` action:
@@ -386,6 +415,7 @@ export type {
   CdeebeeRequestOptions,
   CdeebeeValueList,
   CdeebeeActiveRequest,
+  CdeebeeModule,
 } from '@recats/cdeebee';
 ```
 
