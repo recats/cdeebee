@@ -11,13 +11,14 @@ interface Storage {
 // Create cdeebee slice with default or custom initial state
 export const cdeebeeSlice = factory<Storage>(
   {
-    modules: ['history', 'listener', 'cancelation', 'storage'],
+    modules: ['history', 'listener', 'storage', 'queryQueue'],
     fileKey: 'file',
     bodyKey: 'value',
     listStrategy: {
       bundleList: 'merge',
       campaignList: 'replace',
     },
+    mergeWithHeaders: {},
     mergeWithData: {
       sessionToken: '',
     },
@@ -27,7 +28,7 @@ export const cdeebeeSlice = factory<Storage>(
       123: { campaignID: 123, campaign: 'Holiday Campaign', timestamp: '2025-12-01T10:15:30.000Z' },
     },
     bundleList: {
-      961: { t: 1 } as any,
+      961: { t: 1 } as unknown as { bundleID: number; bundle: string; timestamp: string },
     },
   }
 );
@@ -44,7 +45,25 @@ export type RootState = ReturnType<typeof rootReducer>;
 // are needed for each request to prevent cross-request state pollution.
 export const makeStore = () => {
   return configureStore({
-    reducer: rootReducer,
+    reducer: (state, action) => {
+      // Handle custom setModules action for demo
+      if (action.type === 'cdeebee/setModules' && 'payload' in action) {
+        const currentState = rootReducer(state, { type: '@@INIT' });
+        if (currentState && 'cdeebee' in currentState) {
+          return {
+            ...currentState,
+            cdeebee: {
+              ...currentState.cdeebee,
+              settings: {
+                ...currentState.cdeebee.settings,
+                modules: action.payload as string[],
+              },
+            },
+          };
+        }
+      }
+      return rootReducer(state, action);
+    },
     // Adding the api middleware enables caching, invalidation, polling,
     // and other useful features of `rtk-query`.
     middleware: getDefaultMiddleware => {

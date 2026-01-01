@@ -1,6 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { checkModule } from './helpers';
 import { abortManager } from './abortController';
+import { queryQueue } from './queryQueue';
 import { type CdeebeeState, type CdeebeeRequestOptions } from './types';
 
 export const request = createAsyncThunk(
@@ -14,7 +15,8 @@ export const request = createAsyncThunk(
 
     checkModule(settings, 'cancelation', abort.init);
 
-    try {
+    const executeRequest = async () => {
+      try {
       const { method = 'POST', body, headers = {} } = options;
       const extraHeaders: Record<string, string> = { ...(settings.mergeWithHeaders ?? {}), ...headers };
 
@@ -72,17 +74,24 @@ export const request = createAsyncThunk(
 
       if (withCallback) options.onResult!(result);
       return { result, startedAt, endedAt: new Date().toUTCString() };
-    } catch (error) {
-      checkModule(settings, 'cancelation', abort.drop);
+      } catch (error) {
+        checkModule(settings, 'cancelation', abort.drop);
 
-      if (withCallback) options.onResult!(error); 
+        if (withCallback) options.onResult!(error); 
 
-      if (error instanceof Error && error.name === 'AbortError') {
-        return rejectWithValue({ message: 'Request was cancelled', cancelled: true });
+        if (error instanceof Error && error.name === 'AbortError') {
+          return rejectWithValue({ message: 'Request was cancelled', cancelled: true });
+        }
+
+        return rejectWithValue({ message: error instanceof Error ? error.message : 'Unknown error occurred' });
       }
+    };
 
-      return rejectWithValue({ message: error instanceof Error ? error.message : 'Unknown error occurred' });
+    if (settings.modules.includes('queryQueue')) {
+      return queryQueue.enqueue(executeRequest);
     }
+
+    return executeRequest();
   },
 );
 
