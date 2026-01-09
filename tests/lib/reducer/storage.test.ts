@@ -34,13 +34,16 @@ describe('defaultNormalize', () => {
   });
 
   describe('replace strategy', () => {
-    it('should use already normalized response with replace strategy', () => {
+    it('should use data array with primaryKey and replace strategy', () => {
       const response = {
         userList: {
-          '1': { id: '1', name: 'John' },
-          '2': { id: '2', name: 'Jane' },
+          data: [
+            { id: '1', name: 'John' },
+            { id: '2', name: 'Jane' },
+          ],
+          primaryKey: 'id',
         },
-      };
+      } as unknown as IResponse;
 
       const strategyList: CdeebeeListStrategy<{ userList: string }> = {
         userList: 'replace',
@@ -54,7 +57,7 @@ describe('defaultNormalize', () => {
       });
     });
 
-    it('should replace existing data with new data', () => {
+    it('should replace existing data with new data from array format', () => {
       mockCdeebee.storage = {
         userList: {
           '1': { id: '1', name: 'Old John' },
@@ -64,10 +67,13 @@ describe('defaultNormalize', () => {
 
       const response = {
         userList: {
-          '1': { id: '1', name: 'New John' },
-          '2': { id: '2', name: 'Jane' },
+          data: [
+            { id: '1', name: 'New John' },
+            { id: '2', name: 'Jane' },
+          ],
+          primaryKey: 'id',
         },
-      };
+      } as unknown as IResponse;
 
       const strategyList: CdeebeeListStrategy<unknown> = {
         userList: 'replace',
@@ -84,7 +90,7 @@ describe('defaultNormalize', () => {
   });
 
   describe('merge strategy', () => {
-    it('should merge new data with existing state', () => {
+    it('should merge new data with existing state from array format', () => {
       mockCdeebee.storage = {
         userList: {
           '1': { id: '1', name: 'John', age: 30 },
@@ -94,10 +100,13 @@ describe('defaultNormalize', () => {
 
       const response = {
         userList: {
-          '1': { id: '1', name: 'John Updated', age: 31 },
-          '2': { id: '2', name: 'Jane' },
+          data: [
+            { id: '1', name: 'John Updated', age: 31 },
+            { id: '2', name: 'Jane' },
+          ],
+          primaryKey: 'id',
         },
-      };
+      } as unknown as IResponse;
 
       const strategyList: CdeebeeListStrategy<unknown> = {
         userList: 'merge',
@@ -115,13 +124,16 @@ describe('defaultNormalize', () => {
       });
     });
 
-    it('should create new storage when no existing state', () => {
+    it('should create new storage when no existing state from array format', () => {
       const response = {
         userList: {
-          '1': { id: '1', name: 'John' },
-          '2': { id: '2', name: 'Jane' },
+          data: [
+            { id: '1', name: 'John' },
+            { id: '2', name: 'Jane' },
+          ],
+          primaryKey: 'id',
         },
-      };
+      } as unknown as IResponse;
 
       const strategyList: CdeebeeListStrategy<unknown> = {
         userList: 'merge',
@@ -140,9 +152,12 @@ describe('defaultNormalize', () => {
     it('should fall back to merge strategy for unknown strategy', () => {
       const response = {
         userList: {
-          '1': { id: '1', name: 'John' },
+          data: [
+            { id: '1', name: 'John' },
+          ],
+          primaryKey: 'id',
         },
-      };
+      } as unknown as IResponse;
 
       const strategyList: CdeebeeListStrategy<unknown> = {
         userList: 'unknown' as any,
@@ -163,7 +178,10 @@ describe('defaultNormalize', () => {
     it('should remove keys with null values', () => {
       const response = {
         userList: {
-          '1': { id: '1', name: 'John' },
+          data: [
+            { id: '1', name: 'John' },
+          ],
+          primaryKey: 'id',
         },
         invalid: null,
       } as unknown as IResponse;
@@ -181,7 +199,10 @@ describe('defaultNormalize', () => {
     it('should remove keys with undefined values', () => {
       const response = {
         userList: {
-          '1': { id: '1', name: 'John' },
+          data: [
+            { id: '1', name: 'John' },
+          ],
+          primaryKey: 'id',
         },
         invalid: undefined,
       } as unknown as IResponse;
@@ -199,7 +220,10 @@ describe('defaultNormalize', () => {
     it('should remove keys with string values', () => {
       const response = {
         userList: {
-          '1': { id: '1', name: 'John' },
+          data: [
+            { id: '1', name: 'John' },
+          ],
+          primaryKey: 'id',
         },
         message: 'some string',
       } as unknown as IResponse;
@@ -435,6 +459,222 @@ describe('defaultNormalize', () => {
       expect(result).toEqual({
         userList: {
           '1': { id: '1', name: 'John' },
+        },
+      });
+    });
+  });
+
+  describe('data with primaryKey format', () => {
+    it('should convert data array with primaryKey to normalized object structure', () => {
+      const response = {
+        sessionList: {
+          data: [
+            {
+              sessionID: 1,
+              token: 'da6ec385bc7e4f84a510c3ecca07f3',
+              expiresAt: '2034-03-28T22:36:09',
+            },
+          ],
+          primaryKey: 'sessionID',
+        },
+      } as unknown as IResponse;
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        sessionList: 'replace',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      expect(result.sessionList).toEqual({
+        '1': {
+          sessionID: 1,
+          token: 'da6ec385bc7e4f84a510c3ecca07f3',
+          expiresAt: '2034-03-28T22:36:09',
+        },
+      });
+    });
+
+    it('should handle multiple items in data array with primaryKey', () => {
+      const response = {
+        sessionList: {
+          data: [
+            {
+              sessionID: 1,
+              token: 'token1',
+              expiresAt: '2034-03-28T22:36:09',
+            },
+            {
+              sessionID: 2,
+              token: 'token2',
+              expiresAt: '2034-03-29T22:36:09',
+            },
+          ],
+          primaryKey: 'sessionID',
+        },
+      } as unknown as IResponse;
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        sessionList: 'replace',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      expect(result.sessionList).toEqual({
+        '1': {
+          sessionID: 1,
+          token: 'token1',
+          expiresAt: '2034-03-28T22:36:09',
+        },
+        '2': {
+          sessionID: 2,
+          token: 'token2',
+          expiresAt: '2034-03-29T22:36:09',
+        },
+      });
+    });
+
+    it('should merge data array with primaryKey with existing data using merge strategy', () => {
+      mockCdeebee.storage = {
+        sessionList: {
+          '1': {
+            sessionID: 1,
+            token: 'old-token',
+            expiresAt: '2034-03-27T22:36:09',
+          },
+        },
+      };
+
+      const response = {
+        sessionList: {
+          data: [
+            {
+              sessionID: 1,
+              token: 'new-token',
+              expiresAt: '2034-03-28T22:36:09',
+            },
+            {
+              sessionID: 2,
+              token: 'token2',
+              expiresAt: '2034-03-29T22:36:09',
+            },
+          ],
+          primaryKey: 'sessionID',
+        },
+      } as unknown as IResponse;
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        sessionList: 'merge',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      expect(result.sessionList).toEqual({
+        '1': {
+          sessionID: 1,
+          token: 'new-token',
+          expiresAt: '2034-03-28T22:36:09',
+        },
+        '2': {
+          sessionID: 2,
+          token: 'token2',
+          expiresAt: '2034-03-29T22:36:09',
+        },
+      });
+    });
+
+    it('should replace existing data when using replace strategy with data array', () => {
+      mockCdeebee.storage = {
+        sessionList: {
+          '1': {
+            sessionID: 1,
+            token: 'old-token',
+            expiresAt: '2034-03-27T22:36:09',
+          },
+          '3': {
+            sessionID: 3,
+            token: 'token3',
+            expiresAt: '2034-03-30T22:36:09',
+          },
+        },
+      };
+
+      const response = {
+        sessionList: {
+          data: [
+            {
+              sessionID: 1,
+              token: 'new-token',
+              expiresAt: '2034-03-28T22:36:09',
+            },
+          ],
+          primaryKey: 'sessionID',
+        },
+      } as unknown as IResponse;
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        sessionList: 'replace',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      expect(result.sessionList).toEqual({
+        '1': {
+          sessionID: 1,
+          token: 'new-token',
+          expiresAt: '2034-03-28T22:36:09',
+        },
+      });
+      expect(result.sessionList).not.toHaveProperty('3');
+    });
+
+    it('should handle empty data array with primaryKey', () => {
+      const response = {
+        sessionList: {
+          data: [],
+          primaryKey: 'sessionID',
+        },
+      } as unknown as IResponse;
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        sessionList: 'replace',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      expect(result.sessionList).toEqual({});
+    });
+
+    it('should handle string primaryKey values', () => {
+      const response = {
+        userList: {
+          data: [
+            {
+              id: 'user-1',
+              name: 'John',
+            },
+            {
+              id: 'user-2',
+              name: 'Jane',
+            },
+          ],
+          primaryKey: 'id',
+        },
+      } as unknown as IResponse;
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        userList: 'replace',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      expect(result.userList).toEqual({
+        'user-1': {
+          id: 'user-1',
+          name: 'John',
+        },
+        'user-2': {
+          id: 'user-2',
+          name: 'Jane',
         },
       });
     });

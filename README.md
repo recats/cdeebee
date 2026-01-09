@@ -36,7 +36,7 @@ For example, a forum application might have this structure:
 }
 ```
 
-After fetching data, the storage might look like:
+After fetching data from the API (which returns data in the format `{ data: [...], primaryKey: 'id' }`), cdeebee automatically normalizes it and the storage might look like:
 
 ```typescript
 {
@@ -51,6 +51,8 @@ After fetching data, the storage might look like:
   }
 }
 ```
+
+**Note:** The API should return list data in the format `{ data: [...], primaryKey: 'fieldName' }`. cdeebee automatically converts this format into the normalized storage structure shown above. See the [API Response Format](#api-response-format) section for details.
 
 ### Modules
 
@@ -210,7 +212,32 @@ listStrategy: {
 
 ## API Response Format
 
-cdeebee expects API responses in a normalized format where data is already organized as objects with keys representing entity IDs:
+cdeebee expects API responses in a format where list data is provided as arrays with a `primaryKey` field. The library automatically normalizes this data into the storage structure.
+
+### List Format
+
+For lists (collections of entities), the API should return data in the following format:
+
+```typescript
+{
+  forumList: {
+    data: [
+      { id: 1, title: 'Forum 1' },
+      { id: 2, title: 'Forum 2' },
+    ],
+    primaryKey: 'id',
+  },
+  threadList: {
+    data: [
+      { id: 101, title: 'Thread 1', forumID: 1 },
+      { id: 102, title: 'Thread 2', forumID: 1 },
+    ],
+    primaryKey: 'id',
+  }
+}
+```
+
+cdeebee automatically converts this format into normalized storage:
 
 ```typescript
 {
@@ -220,9 +247,61 @@ cdeebee expects API responses in a normalized format where data is already organ
   },
   threadList: {
     101: { id: 101, title: 'Thread 1', forumID: 1 },
+    102: { id: 102, title: 'Thread 2', forumID: 1 },
   }
 }
 ```
+
+The `primaryKey` field specifies which property of each item should be used as the key in the normalized structure. The `primaryKey` value is converted to a string to ensure consistent key types.
+
+**Example:**
+
+If your API returns:
+```typescript
+{
+  sessionList: {
+    data: [
+      {
+        sessionID: 1,
+        token: 'da6ec385bc7e4f84a510c3ecca07f3',
+        expiresAt: '2034-03-28T22:36:09'
+      }
+    ],
+    primaryKey: 'sessionID',
+  }
+}
+```
+
+It will be automatically normalized to:
+```typescript
+{
+  sessionList: {
+    '1': {
+      sessionID: 1,
+      token: 'da6ec385bc7e4f84a510c3ecca07f3',
+      expiresAt: '2034-03-28T22:36:09'
+    }
+  }
+}
+```
+
+### Non-List Data
+
+For non-list data (configuration objects, simple values, etc.), you can return them as regular objects:
+
+```typescript
+{
+  config: {
+    theme: 'dark',
+    language: 'en',
+  },
+  userPreferences: {
+    notifications: true,
+  }
+}
+```
+
+These will be stored as-is in the storage.
 
 ## Advanced Usage
 
