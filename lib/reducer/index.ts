@@ -71,7 +71,7 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
             // Type assertion is safe here because we've already checked isRecord
             const normalizedData = normalize(currentState, action.payload.result as Record<string, Record<string, unknown>>, strategyList);
 
-            // Normalize already handles merge/replace and preserves keys not in response
+            // Normalize already handles merge/replace/skip and preserves keys not in response
             // Simply apply the result
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (state.storage as any) = normalizedData;

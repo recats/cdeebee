@@ -37,6 +37,8 @@ function applyStrategy(
     return newValue as ResponseValue;
   } else if (strategy === 'merge') {
     return mergeDeepRight(existingValue, newValue as StorageData) as ResponseValue;
+  } else if (strategy === 'skip') {
+    return existingValue as ResponseValue;
   } else {
     console.warn(`Cdeebee: Unknown strategy "${strategy}" for key "${key}". Skipping normalization.`);
     return mergeDeepRight(existingValue, newValue as StorageData) as ResponseValue;
@@ -63,6 +65,12 @@ export function defaultNormalize<T>(
     }
 
     const strategy = strategyList[key as keyof T] ?? 'merge';
+    
+    // For 'skip' strategy, if key doesn't exist in storage, skip it entirely
+    if (strategy === 'skip' && !(key in currentStorage)) {
+      continue;
+    }
+    
     const existingValue = key in currentStorage ? (currentStorage[key] as StorageData) : {};
 
     if (isDataWithPrimaryKey(responseValue)) {

@@ -148,6 +148,92 @@ describe('defaultNormalize', () => {
     });
   });
 
+  describe('skip strategy', () => {
+    it('should preserve existing data unchanged when skip strategy is used', () => {
+      mockCdeebee.storage = {
+        userList: {
+          '1': { id: '1', name: 'John', age: 30 },
+          '3': { id: '3', name: 'Bob' },
+        },
+      };
+
+      const response = {
+        userList: {
+          data: [
+            { id: '1', name: 'John Updated', age: 31 },
+            { id: '2', name: 'Jane' },
+          ],
+          primaryKey: 'id',
+        },
+      } as unknown as IResponse;
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        userList: 'skip',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      // Existing data should remain unchanged
+      expect(result.userList).toEqual({
+        '1': { id: '1', name: 'John', age: 30 },
+        '3': { id: '3', name: 'Bob' },
+      });
+      // New data from response should be ignored
+      expect(result.userList).not.toHaveProperty('2');
+    });
+
+    it('should not create new key when skip strategy is used and key does not exist', () => {
+      const response = {
+        userList: {
+          data: [
+            { id: '1', name: 'John' },
+            { id: '2', name: 'Jane' },
+          ],
+          primaryKey: 'id',
+        },
+      } as unknown as IResponse;
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        userList: 'skip',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      // Key should not be created
+      expect(result).not.toHaveProperty('userList');
+    });
+
+    it('should preserve existing data when skip strategy is used with record format', () => {
+      mockCdeebee.storage = {
+        userList: {
+          '1': { id: '1', name: 'John', age: 30 },
+          '3': { id: '3', name: 'Bob' },
+        },
+      };
+
+      const response = {
+        userList: {
+          '1': { id: '1', name: 'John Updated', age: 31 },
+          '2': { id: '2', name: 'Jane' },
+        },
+      } as unknown as IResponse;
+
+      const strategyList: CdeebeeListStrategy<unknown> = {
+        userList: 'skip',
+      };
+
+      const result = defaultNormalize(mockCdeebee, response, strategyList);
+
+      // Existing data should remain unchanged
+      expect(result.userList).toEqual({
+        '1': { id: '1', name: 'John', age: 30 },
+        '3': { id: '3', name: 'Bob' },
+      });
+      // New data from response should be ignored
+      expect(result.userList).not.toHaveProperty('2');
+    });
+  });
+
   describe('unknown strategy', () => {
     it('should fall back to merge strategy for unknown strategy', () => {
       const response = {

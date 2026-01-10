@@ -170,7 +170,7 @@ interface CdeebeeSettings<T> {
   modules: CdeebeeModule[];           // Active modules: 'history' | 'listener' | 'storage' | 'cancelation' | 'queryQueue'
   fileKey: string;                    // Key name for file uploads in FormData
   bodyKey: string;                    // Key name for request body in FormData
-  listStrategy?: CdeebeeListStrategy<T>; // Merge strategy per list: 'merge' | 'replace'
+  listStrategy?: CdeebeeListStrategy<T>; // Merge strategy per list: 'merge' | 'replace' | 'skip'
   mergeWithData?: unknown;            // Data to merge with every request body
   mergeWithHeaders?: Record<string, string>; // Headers to merge with every request
   normalize?: (storage, result, strategyList) => T; // Custom normalization function
@@ -198,15 +198,17 @@ interface CdeebeeRequestOptions<T> {
 
 ## Data Merging Strategies
 
-cdeebee supports two strategies for merging data:
+cdeebee supports three strategies for merging data:
 
 - **`merge`**: Merges new data with existing data, preserving existing keys not in the response
 - **`replace`**: Completely replaces the list with new data
+- **`skip`**: Skips updating the list entirely, preserving existing data unchanged
 
 ```typescript
 listStrategy: {
   forumList: 'merge',    // New forums are merged with existing ones
   threadList: 'replace', // Thread list is completely replaced
+  userList: 'skip',      // User list is never updated, existing data is preserved
 }
 ```
 
