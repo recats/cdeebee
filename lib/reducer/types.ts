@@ -1,5 +1,5 @@
 export type CdeebeeModule = 'history' | 'listener' | 'storage' | 'cancelation' | 'queryQueue';
-export type CdeebeeStrategy = 'merge' | 'replace';
+export type CdeebeeStrategy = 'merge' | 'replace' | 'skip';
 
 export type CdeebeeListStrategy<T> = Record<keyof T, CdeebeeStrategy>;
 
