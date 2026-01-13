@@ -24,11 +24,13 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['@reduxjs/toolkit', 'redux'],
+      external: ['@reduxjs/toolkit', 'redux', 'react', 'react-redux'],
       output: {
         globals: {
           '@reduxjs/toolkit': 'ReduxToolkit',
           redux: 'Redux',
+          react: 'React',
+          'react-redux': 'ReactRedux',
         },
       },
     },
