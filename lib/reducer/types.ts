@@ -13,9 +13,9 @@ export interface CdeebeeSettings<T> {
   normalize?: <T>(storage: CdeebeeState<T>, result: T, strategyList: CdeebeeListStrategy<T>) => T;
 }
 
-interface CdeebeeHistoryState {
-  requestId: string, 
-  api: string, 
+export interface CdeebeeHistoryState {
+  requestId: string,
+  api: string,
   request: unknown,
 }
 
@@ -36,7 +36,7 @@ export interface CdeebeeState<T> {
   request: CdeebeeRequestState;
 }
 
-export interface CdeebeeRequestOptions<T> extends Partial<Pick<CdeebeeSettings<T>, 'fileKey' | 'bodyKey' | 'normalize' | 'listStrategy'>> {
+export interface CdeebeeRequestOptions<T> extends Partial<Pick<CdeebeeSettings<T>, 'fileKey' | 'bodyKey' | 'normalize'>> {
   api: string;
   files?: File[];
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -45,6 +45,7 @@ export interface CdeebeeRequestOptions<T> extends Partial<Pick<CdeebeeSettings<T
   onResult?: (response: T) => void;
   ignore?: boolean;
   responseType?: 'json' | 'text' | 'blob';
+  listStrategy?: Partial<CdeebeeListStrategy<T>>;
 }
 
 type KeyOf<T> = Extract<keyof T, string | number>;

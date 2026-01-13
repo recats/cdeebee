@@ -17,6 +17,7 @@ describe('lib/index exports', () => {
         fileKey: 'file',
         bodyKey: 'body',
         mergeWithData: {},
+        mergeWithHeaders: {}
       },
       storage: {},
       request: {

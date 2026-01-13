@@ -138,15 +138,19 @@ function MyComponent() {
 }
 ```
 
-### 3. Access Data and Loading States
+### 3. Access Data and Loading States with Hooks
+
+cdeebee provides React hooks to easily access data and track loading states:
 
 ```typescript
-import { useAppSelector } from './hooks';
+import { useLoading, useStorageList } from '@recats/cdeebee';
 
 function ForumsList() {
-  const forums = useAppSelector(state => state.cdeebee.storage.forumList);
-  const activeRequests = useAppSelector(state => state.cdeebee.request.active);
-  const isLoading = activeRequests.some(req => req.api === '/api/forums');
+  // Check if specific APIs are loading
+  const isLoading = useLoading(['/api/forums']);
+
+  // Get data from storage with full type safety
+  const forums = useStorageList<Storage, 'forumList'>('forumList');
 
   return (
     <div>
@@ -158,6 +162,17 @@ function ForumsList() {
   );
 }
 ```
+
+**Available hooks:**
+
+- `useLoading(apiList: string[])` - Check if any of the specified APIs are loading
+- `useIsLoading()` - Check if any request is loading
+- `useStorageList(listName)` - Get a specific list from storage
+- `useStorage()` - Get the entire storage
+- `useRequestHistory(api)` - Get successful request history for an API
+- `useRequestErrors(api)` - Get error history for an API
+
+See the [React Hooks](#react-hooks) section for detailed documentation.
 
 ## Configuration
 
@@ -455,14 +470,162 @@ dispatch(cdeebeeSlice.actions.set(updates));
 
 ### Accessing Request History
 
+You can access request history using hooks or selectors:
+
 ```typescript
+import { useRequestHistory, useRequestErrors } from '@recats/cdeebee';
+
+// Using hooks (recommended)
+const apiHistory = useRequestHistory('/api/forums');
+const apiErrors = useRequestErrors('/api/forums');
+
+// Or using selectors
 const doneRequests = useAppSelector(state => state.cdeebee.request.done);
 const errors = useAppSelector(state => state.cdeebee.request.errors);
-
-// Get history for specific API
-const apiHistory = doneRequests['/api/forums'] || [];
-const apiErrors = errors['/api/forums'] || [];
 ```
+
+## React Hooks
+
+cdeebee provides a comprehensive set of React hooks for accessing state without writing selectors. These hooks assume your cdeebee slice is at `state.cdeebee` (which is the default when using `combineSlices`).
+
+### Loading State Hooks
+
+#### `useLoading(apiList: string[])`
+
+Check if any of the specified APIs are currently loading.
+
+```typescript
+import { useLoading } from '@recats/cdeebee';
+
+function MyComponent() {
+  // Check if any of these APIs are loading
+  const isLoading = useLoading(['/api/forums', '/api/threads']);
+
+  if (isLoading) return <Spinner />;
+
+  return <div>Content</div>;
+}
+```
+
+#### `useIsLoading()`
+
+Check if any request is currently loading across all APIs.
+
+```typescript
+import { useIsLoading } from '@recats/cdeebee';
+
+function GlobalSpinner() {
+  const isAnythingLoading = useIsLoading();
+
+  return isAnythingLoading ? <GlobalSpinner /> : null;
+}
+```
+
+### Storage Hooks
+
+#### `useStorageList<Storage, K>(listName: K)`
+
+Get a specific list from storage with full type safety.
+
+```typescript
+import { useStorageList } from '@recats/cdeebee';
+
+interface MyStorage {
+  forumList: Record<string, { id: string; title: string }>;
+}
+
+function ForumsList() {
+  const forums = useStorageList<MyStorage, 'forumList'>('forumList');
+
+  return (
+    <div>
+      {Object.values(forums).map(forum => (
+        <div key={forum.id}>{forum.title}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+#### `useStorage<Storage>()`
+
+Get the entire cdeebee storage.
+
+```typescript
+import { useStorage } from '@recats/cdeebee';
+
+interface MyStorage {
+  forumList: Record<string, Forum>;
+  threadList: Record<string, Thread>;
+}
+
+function DataDebug() {
+  const storage = useStorage<MyStorage>();
+
+  return <pre>{JSON.stringify(storage, null, 2)}</pre>;
+}
+```
+
+### History Hooks
+
+#### `useRequestHistory(api: string)`
+
+Get successful request history for a specific API endpoint.
+
+```typescript
+import { useRequestHistory } from '@recats/cdeebee';
+
+function RequestStats({ api }: { api: string }) {
+  const history = useRequestHistory(api);
+
+  return (
+    <div>
+      Total successful requests to {api}: {history.length}
+    </div>
+  );
+}
+```
+
+#### `useRequestErrors(api: string)`
+
+Get error history for a specific API endpoint.
+
+```typescript
+import { useRequestErrors } from '@recats/cdeebee';
+
+function ErrorDisplay({ api }: { api: string }) {
+  const errors = useRequestErrors(api);
+
+  if (errors.length === 0) return null;
+
+  const lastError = errors[errors.length - 1];
+  return <div className="error">Last error: {lastError.request.message}</div>;
+}
+```
+
+### Advanced: Custom State Path
+
+If you're **not** using `combineSlices` or have cdeebee at a custom path in your state (not `state.cdeebee`), use `createCdeebeeHooks`:
+
+```typescript
+// hooks.ts - Create once in your app
+import { createCdeebeeHooks } from '@recats/cdeebee';
+import type { RootState, MyStorage } from './store';
+
+// Tell the hooks where to find cdeebee in your state
+export const {
+  useLoading,
+  useStorageList,
+  useStorage,
+  useRequestHistory,
+  useRequestErrors,
+  useIsLoading,
+} = createCdeebeeHooks<RootState, MyStorage>(
+  state => state.myCustomPath  // Your custom path
+);
+```
+
+**Note:** Most users won't need `createCdeebeeHooks` because `combineSlices` automatically places the slice at `state.cdeebee`.
 
 ## TypeScript Support
 
@@ -488,6 +651,17 @@ const users = useSelector(state => state.cdeebee.storage.userList);
 export { factory } from '@recats/cdeebee';           // Create cdeebee slice
 export { request } from '@recats/cdeebee';            // Request thunk
 export { batchingUpdate } from '@recats/cdeebee';     // Batch update helper
+
+// React hooks
+export {
+  createCdeebeeHooks,  // Hook factory for custom state paths
+  useLoading,          // Check if APIs are loading
+  useIsLoading,        // Check if any request is loading
+  useStorageList,      // Get a list from storage
+  useStorage,          // Get entire storage
+  useRequestHistory,   // Get successful request history
+  useRequestErrors,    // Get error history
+} from '@recats/cdeebee';
 
 // Types
 export type {
