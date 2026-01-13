@@ -1,4 +1,4 @@
-import {  createSlice, current } from '@reduxjs/toolkit';
+import {  createSlice, current, type PayloadAction } from '@reduxjs/toolkit';
 
 import { type CdeebeeSettings, type CdeebeeState, type CdeebeeValueList, type CdeebeeListStrategy } from './types';
 import { checkModule, mergeDeepRight, batchingUpdate } from './helpers';
@@ -34,7 +34,7 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
         // Immer will track changes and create minimal updates
         batchingUpdate(state.storage as Record<string, unknown>, action.payload);
       },
-      historyClear(state, action: { payload?: string }) {
+      historyClear(state, action: PayloadAction<string | undefined>) {
         const api = action.payload;
 
         if (api) {
