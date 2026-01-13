@@ -1,6 +1,6 @@
 import {  createSlice, current } from '@reduxjs/toolkit';
 
-import { type CdeebeeSettings, type CdeebeeState, type CdeebeeValueList } from './types';
+import { type CdeebeeSettings, type CdeebeeState, type CdeebeeValueList, type CdeebeeListStrategy } from './types';
 import { checkModule, mergeDeepRight, batchingUpdate } from './helpers';
 import { abortQuery } from './abortController';
 import { request } from './request';
@@ -64,12 +64,13 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
               return;
             }
             
-            const strategyList = action.meta.arg.listStrategy ?? state.settings.listStrategy ?? {};
+            const strategyList = (action.meta.arg.listStrategy ?? state.settings.listStrategy ?? {}) as CdeebeeListStrategy<T>;
             const normalize = action.meta.arg.normalize ?? state.settings.normalize ?? defaultNormalize;
 
             const currentState = current(state) as CdeebeeState<T>;
             // Type assertion is safe here because we've already checked isRecord
-            const normalizedData = normalize(currentState, action.payload.result as Record<string, Record<string, unknown>>, strategyList);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const normalizedData = normalize(currentState, action.payload.result as any, strategyList);
 
             // Normalize already handles merge/replace/skip and preserves keys not in response
             // Simply apply the result
