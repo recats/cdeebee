@@ -33,6 +33,17 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
         // This is more performant than creating a new object
         // Immer will track changes and create minimal updates
         batchingUpdate(state.storage as Record<string, unknown>, action.payload);
+      },
+      historyClear(state, action: { payload?: string }) {
+        const api = action.payload;
+
+        if (api) {
+          delete state.request.done[api];
+          delete state.request.errors[api];
+        } else {
+          state.request.done = {};
+          state.request.errors = {};
+        }
       }
     },
     extraReducers: builder => {
@@ -40,6 +51,13 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
         .addCase(request.pending, (state, action) => {
           const api = action.meta.arg.api;
           const requestId = action.meta.requestId;
+
+          if (action.meta.arg.historyClear) {
+            checkModule(state.settings, 'history', () => {
+              delete state.request.done[api];
+              delete state.request.errors[api];
+            });
+          }
 
           checkModule(state.settings, 'cancelation', () => {
             abortQuery(api, requestId);

@@ -46,6 +46,7 @@ export interface CdeebeeRequestOptions<T> extends Partial<Pick<CdeebeeSettings<T
   ignore?: boolean;
   responseType?: 'json' | 'text' | 'blob';
   listStrategy?: Partial<CdeebeeListStrategy<T>>;
+  historyClear?: boolean;
 }
 
 type KeyOf<T> = Extract<keyof T, string | number>;

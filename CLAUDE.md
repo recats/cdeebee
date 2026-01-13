@@ -47,7 +47,9 @@ pnpm test tests/lib/reducer/storage.test.ts
 
 ### Key Files and Structure
 
-**`lib/reducer/index.ts`**: Entry point for the Redux slice factory. The `factory()` function creates a Redux slice with the configured modules and returns it. The reducer handles three async thunk states (pending, fulfilled, rejected) for the request thunk.
+**`lib/reducer/index.ts`**: Entry point for the Redux slice factory. The `factory()` function creates a Redux slice with the configured modules and returns it. The reducer handles three async thunk states (pending, fulfilled, rejected) for the request thunk. It also provides two synchronous reducer actions:
+- `set`: Manually update storage values using path-based updates
+- `historyClear`: Clear request history (success and error) for a specific API or all APIs
 
 **`lib/reducer/request.ts`**: Contains the `request` async thunk that handles all API calls. This is where:
 - FormData is built for file uploads
@@ -91,7 +93,10 @@ All hooks use `react-redux`'s `useSelector` internally and are fully typed for T
 ### Data Flow
 
 1. User dispatches `request()` thunk with API options
-2. Request enters `pending` state → modules handle accordingly (cancelation, listener updates)
+2. Request enters `pending` state → modules handle accordingly:
+   - If `historyClear: true` option is set, history for this API is cleared (only if history module enabled)
+   - Cancelation module aborts previous requests to same API (if enabled)
+   - Listener module adds request to active list (if enabled)
 3. If `queryQueue` enabled, request is enqueued; otherwise executes immediately
 4. Fetch executes with merged headers/body and abort signal
 5. Response is parsed based on `responseType` (json/text/blob)
@@ -133,6 +138,7 @@ Tests use Vitest with jsdom environment. Test files are in `tests/lib/` mirrorin
 - Request lifecycle (pending, fulfilled, rejected)
 - QueryQueue sequential processing
 - AbortController cancellation
+- History clearing (manual and automatic)
 - Helper functions and type guards
 - React hooks (`tests/lib/hooks.test.ts`): Tests the selector logic for all hooks by dispatching Redux actions and verifying state selections
 
@@ -149,6 +155,15 @@ When the API returns `{ data: [...], primaryKey: 'fieldName' }`, the normalizati
 ### Request Callbacks
 
 The `onResult` callback is **always called** regardless of success or failure. It receives the parsed response data (or error) directly. This allows components to handle responses without needing to check Redux state.
+
+### History Management
+
+The history module tracks both successful requests (`state.request.done`) and failed requests (`state.request.errors`). History can be cleared in two ways:
+
+1. **Automatic clearing**: Set `historyClear: true` in request options to clear history for that API before the request starts (happens in the `pending` state)
+2. **Manual clearing**: Dispatch the `historyClear` action with an API string to clear history for that API, or without arguments to clear all history
+
+History clearing is module-aware and only executes when the `history` module is enabled. It deletes both success and error history for the specified API endpoint.
 
 ### File Uploads
 

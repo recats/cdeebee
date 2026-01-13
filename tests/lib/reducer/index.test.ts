@@ -587,6 +587,168 @@ describe('factory', () => {
     });
   });
 
+  describe('historyClear reducer', () => {
+    it('should clear history for a specific API', async () => {
+      const store = createTestStore(settings);
+
+      // Create some history first
+      mockFetchAlways(createMockResponse({ json: async () => ({ data: 'test' }) }));
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/test1' }));
+      await dispatch(request({ api: '/api/test2' }));
+
+      // Verify history exists
+      let state = store.getState().cdeebee;
+      expect(state.request.done['/api/test1']).toBeDefined();
+      expect(state.request.done['/api/test2']).toBeDefined();
+
+      // Clear history for specific API
+      const slice = factory(settings);
+      dispatch(slice.actions.historyClear('/api/test1'));
+
+      state = store.getState().cdeebee;
+      expect(state.request.done['/api/test1']).toBeUndefined();
+      expect(state.request.done['/api/test2']).toBeDefined();
+    });
+
+    it('should clear error history for a specific API', async () => {
+      const store = createTestStore(settings);
+
+      // Create some error history
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ ok: false, status: 500 })
+      );
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/test' }));
+
+      // Verify error history exists
+      let state = store.getState().cdeebee;
+      expect(state.request.errors['/api/test']).toBeDefined();
+      expect(state.request.errors['/api/test'].length).toBe(1);
+
+      // Clear error history
+      const slice = factory(settings);
+      dispatch(slice.actions.historyClear('/api/test'));
+
+      state = store.getState().cdeebee;
+      expect(state.request.errors['/api/test']).toBeUndefined();
+    });
+
+    it('should clear all history when no API is provided', async () => {
+      const store = createTestStore(settings);
+
+      // Create history for multiple APIs
+      mockFetchAlways(createMockResponse({ json: async () => ({ data: 'test' }) }));
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/test1' }));
+      await dispatch(request({ api: '/api/test2' }));
+      await dispatch(request({ api: '/api/test3' }));
+
+      // Verify history exists
+      let state = store.getState().cdeebee;
+      expect(state.request.done['/api/test1']).toBeDefined();
+      expect(state.request.done['/api/test2']).toBeDefined();
+      expect(state.request.done['/api/test3']).toBeDefined();
+
+      // Clear all history
+      const slice = factory(settings);
+      dispatch(slice.actions.historyClear());
+
+      state = store.getState().cdeebee;
+      expect(state.request.done).toEqual({});
+      expect(state.request.errors).toEqual({});
+    });
+
+    it('should clear both success and error history when no API is provided', async () => {
+      const store = createTestStore(settings);
+
+      // Create success history
+      mockFetch(createMockResponse({ json: async () => ({ data: 'test' }) }));
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/success' }));
+
+      // Create error history
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        createMockResponse({ ok: false, status: 500 })
+      );
+      await dispatch(request({ api: '/api/error' }));
+
+      // Verify both types of history exist
+      let state = store.getState().cdeebee;
+      expect(state.request.done['/api/success']).toBeDefined();
+      expect(state.request.errors['/api/error']).toBeDefined();
+
+      // Clear all history
+      const slice = factory(settings);
+      dispatch(slice.actions.historyClear());
+
+      state = store.getState().cdeebee;
+      expect(state.request.done).toEqual({});
+      expect(state.request.errors).toEqual({});
+    });
+
+    it('should auto-clear history before request when historyClear option is true', async () => {
+      const store = createTestStore(settings);
+
+      // Create initial history
+      mockFetch(createMockResponse({ json: async () => ({ data: 'first' }) }));
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/test' }));
+
+      // Verify history exists
+      let state = store.getState().cdeebee;
+      expect(state.request.done['/api/test']).toBeDefined();
+      expect(state.request.done['/api/test'].length).toBe(1);
+
+      // Make another request with historyClear: true
+      mockFetch(createMockResponse({ json: async () => ({ data: 'second' }) }));
+      await dispatch(request({ api: '/api/test', historyClear: true }));
+
+      // History should only have the second request
+      state = store.getState().cdeebee;
+      expect(state.request.done['/api/test']).toBeDefined();
+      expect(state.request.done['/api/test'].length).toBe(1);
+      expect(state.request.done['/api/test'][0].request).toHaveProperty('result');
+    });
+
+    it('should not auto-clear history when historyClear option is false', async () => {
+      const store = createTestStore(settings);
+
+      // Create initial history
+      mockFetchAlways(createMockResponse({ json: async () => ({ data: 'test' }) }));
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/test' }));
+      await dispatch(request({ api: '/api/test', historyClear: false }));
+
+      // Both requests should be in history
+      const state = store.getState().cdeebee;
+      expect(state.request.done['/api/test']).toBeDefined();
+      expect(state.request.done['/api/test'].length).toBe(2);
+    });
+
+    it('should not clear history when history module is disabled', async () => {
+      const settingsWithoutHistory: CdeebeeSettings<Record<string, unknown>> = {
+        ...settings,
+        modules: ['listener', 'storage', 'cancelation'],
+      };
+
+      const store = createTestStore(settingsWithoutHistory);
+
+      // Try to make a request with historyClear: true
+      mockFetch(createMockResponse({ json: async () => ({ data: 'test' }) }));
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/test', historyClear: true }));
+
+      // History should not be tracked at all
+      const state = store.getState().cdeebee;
+      expect(state.request.done).toEqual({});
+      expect(state.request.errors).toEqual({});
+    });
+  });
+
   describe('set reducer', () => {
     it('should update a single top-level key in storage', () => {
       const slice = factory(settings);

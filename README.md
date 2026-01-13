@@ -208,6 +208,7 @@ interface CdeebeeRequestOptions<T> {
   onResult?: (response: T) => void;  // Callback called with response data (always called, even on errors)
   ignore?: boolean;                   // Skip storing result in storage
   responseType?: 'json' | 'text' | 'blob'; // Response parsing type (default: 'json')
+  historyClear?: boolean;             // Auto-clear history for this API before making the request
 }
 ```
 
@@ -482,6 +483,23 @@ const apiErrors = useRequestErrors('/api/forums');
 // Or using selectors
 const doneRequests = useAppSelector(state => state.cdeebee.request.done);
 const errors = useAppSelector(state => state.cdeebee.request.errors);
+```
+
+### Clearing Request History
+
+Clear old success/error history when needed (useful for forms that get reopened):
+
+```typescript
+// Automatic: clear before request
+dispatch(request({
+  api: '/api/posts',
+  historyClear: true,  // Clears old history for this API
+  body: formData,
+}));
+
+// Manual: clear anytime
+dispatch(cdeebeeSlice.actions.historyClear('/api/posts'));  // Specific API
+dispatch(cdeebeeSlice.actions.historyClear());              // All APIs
 ```
 
 ## React Hooks
