@@ -74,6 +74,20 @@ pnpm test tests/lib/reducer/storage.test.ts
 
 **`lib/reducer/types.ts`**: TypeScript type definitions including complex path-based types for type-safe batch updates via `CdeebeeValueList<T>`.
 
+**`lib/hooks.ts`**: React hooks for accessing cdeebee state without writing selectors. Provides two approaches:
+- **Standalone hooks**: Export individual hooks that assume the cdeebee slice is at `state.cdeebee` (default when using `combineSlices`)
+- **`createCdeebeeHooks` factory**: For edge cases where the slice is at a custom path in the state tree
+
+Available hooks:
+- `useLoading(apiList)`: Check if any APIs in the list are currently loading
+- `useIsLoading()`: Check if any request is loading globally
+- `useStorageList(listName)`: Get a specific list from storage with type safety
+- `useStorage()`: Get the entire storage object
+- `useRequestHistory(api)`: Get successful request history for a specific API
+- `useRequestErrors(api)`: Get error history for a specific API
+
+All hooks use `react-redux`'s `useSelector` internally and are fully typed for TypeScript.
+
 ### Data Flow
 
 1. User dispatches `request()` thunk with API options
@@ -94,7 +108,23 @@ The normalization system supports three strategies per list:
 - **`replace`**: Completely replaces the list with new data
 - **`skip`**: Doesn't update the list, preserving existing data unchanged (useful for immutable reference data)
 
-Strategies can be set globally in settings or overridden per-request.
+Strategies can be set globally in settings (requires all lists) or overridden per-request (accepts `Partial<>` - only specify lists you want to override):
+```typescript
+// Global setting - must provide strategy for all lists
+factory<Storage>({
+  listStrategy: {
+    forumList: 'merge',
+    threadList: 'replace',
+    postList: 'skip',
+  }
+})
+
+// Per-request - can be partial
+dispatch(request({
+  api: '/api/data',
+  listStrategy: { forumList: 'replace' } // Only override forumList
+}))
+```
 
 ### Testing
 
@@ -104,6 +134,7 @@ Tests use Vitest with jsdom environment. Test files are in `tests/lib/` mirrorin
 - QueryQueue sequential processing
 - AbortController cancellation
 - Helper functions and type guards
+- React hooks (`tests/lib/hooks.test.ts`): Tests the selector logic for all hooks by dispatching Redux actions and verifying state selections
 
 ## Important Implementation Notes
 
@@ -128,3 +159,19 @@ When `files` array is provided, the request automatically switches to FormData. 
 - Without `queryQueue`: Requests execute in parallel, may complete out of order
 - With `queryQueue`: Requests execute sequentially in dispatch order, guaranteed to complete and store in order
 - This is important when request order matters for data consistency (e.g., optimistic updates followed by server sync)
+
+### Build Configuration and External Dependencies
+
+**CRITICAL**: The `vite.config.mjs` must mark `react`, `react-redux`, `@reduxjs/toolkit`, and `redux` as external dependencies. This prevents them from being bundled with the library and avoids the "Invalid hook call" error.
+
+The external array in Vite config should include:
+```js
+external: ['@reduxjs/toolkit', 'redux', 'react', 'react-redux']
+```
+
+These dependencies are:
+- Listed in `peerDependencies` (the consuming app provides them)
+- Listed in `devDependencies` (for development and testing)
+- **NOT bundled** with the library distribution
+
+If hooks are being bundled, users will get "Cannot read properties of null (reading 'useContext')" errors because there will be multiple React instances.
