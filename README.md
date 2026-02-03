@@ -40,14 +40,14 @@ After fetching data from the API (which returns data in the format `{ data: [...
 
 ```typescript
 {
-  forumList: { 
-    1: { id: 1, title: 'Milky Way Galaxy' } 
+  forumList: {
+    1: { id: 1, title: 'Milky Way Galaxy' }
   },
-  threadList: { 
-    10001: { id: 10001, title: 'Solar system', forumID: 1 } 
+  threadList: {
+    10001: { id: 10001, title: 'Solar system', forumID: 1 }
   },
-  postList: { 
-    2: { id: 2, title: 'Earth', threadID: 10001 } 
+  postList: {
+    2: { id: 2, title: 'Earth', threadID: 10001 }
   }
 }
 ```
@@ -171,6 +171,7 @@ function ForumsList() {
 - `useStorage()` - Get the entire storage
 - `useRequestHistory(api)` - Get successful request history for an API
 - `useRequestErrors(api)` - Get error history for an API
+- `useLastResultIdList(api)` - Get the IDs returned by the last request to an API (for filtering storage)
 
 See the [React Hooks](#react-hooks) section for detailed documentation.
 
@@ -186,8 +187,8 @@ interface CdeebeeSettings<T> {
   fileKey: string;                    // Key name for file uploads in FormData
   bodyKey: string;                    // Key name for request body in FormData
   listStrategy?: CdeebeeListStrategy<T>; // Merge strategy per list: 'merge' | 'replace' | 'skip'
-  mergeWithData?: unknown;            // Data to merge with every request body
-  mergeWithHeaders?: Record<string, string>; // Headers to merge with every request
+  mergeWithData?: Record<string, unknown> | (() => Record<string, unknown>);   // Data to merge with every request body (static or dynamic)
+  mergeWithHeaders?: Record<string, string> | (() => Record<string, string>);  // Headers to merge with every request (static or dynamic)
   normalize?: (storage, result, strategyList) => T; // Custom normalization function
 }
 ```
@@ -227,6 +228,32 @@ listStrategy: {
   userList: 'skip',      // User list is never updated, existing data is preserved
 }
 ```
+
+## Dynamic Headers and Data
+
+`mergeWithHeaders` and `mergeWithData` support both static objects and dynamic functions. Functions are called on each request, making them ideal for auth tokens:
+
+```typescript
+const cdeebeeSlice = factory<Storage>({
+  modules: ['storage', 'history', 'listener'],
+
+  // Static headers (evaluated once at factory creation)
+  mergeWithHeaders: { 'X-App': 'myapp' },
+
+  // OR Dynamic headers (evaluated on each request)
+  mergeWithHeaders: () => ({
+    'Authorization': `Bearer ${getSessionToken()}`,
+  }),
+
+  // Same for mergeWithData
+  mergeWithData: () => ({
+    timestamp: Date.now(),
+    clientVersion: APP_VERSION,
+  }),
+});
+```
+
+**Note**: When using functions, Redux will warn about non-serializable values in state. Configure your store's `serializableCheck.ignoredPaths` to include `cdeebee.settings.mergeWithHeaders` and `cdeebee.settings.mergeWithData`.
 
 ## API Response Format
 
@@ -621,6 +648,46 @@ function ErrorDisplay({ api }: { api: string }) {
 }
 ```
 
+### Result ID List Hook
+
+#### `useLastResultIdList(api: string)`
+
+Get the list of IDs returned by the last successful request to an API. This is useful for filtering storage data when using `merge` strategy, so you can display only the results from the current search/request.
+
+```typescript
+import { useStorageList, useLastResultIdList } from '@recats/cdeebee';
+
+interface MyStorage {
+  productList: Record<string, { id: string; name: string; price: number }>;
+}
+
+function SearchResults() {
+  // Get all products from storage (accumulated via merge strategy)
+  const products = useStorageList<MyStorage, 'productList'>('productList');
+
+  // Get only the IDs from the last search request
+  const lastSearchIds = useLastResultIdList('/api/search');
+
+  // Filter to show only results from current search
+  const displayResults = lastSearchIds
+    .map(id => products[id])
+    .filter(Boolean);
+
+  return (
+    <div>
+      {displayResults.map(product => (
+        <div key={product.id}>{product.name} - ${product.price}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+**Why use this?** When using `replace` strategy with search/filter pages, navigating away and using browser back loses the previous results. With `merge` strategy + `useLastResultIdList`:
+- Data accumulates in storage (never lost on navigation)
+- `lastResultIdList` tracks which IDs belong to the current request
+- Filter storage by those IDs to display the correct results
+
 ### Advanced: Custom State Path
 
 If you're **not** using `combineSlices` or have cdeebee at a custom path in your state (not `state.cdeebee`), use `createCdeebeeHooks`:
@@ -638,6 +705,7 @@ export const {
   useRequestHistory,
   useRequestErrors,
   useIsLoading,
+  useLastResultIdList,
 } = createCdeebeeHooks<RootState, MyStorage>(
   state => state.myCustomPath  // Your custom path
 );
@@ -669,6 +737,7 @@ const users = useSelector(state => state.cdeebee.storage.userList);
 export { factory } from '@recats/cdeebee';           // Create cdeebee slice
 export { request } from '@recats/cdeebee';            // Request thunk
 export { batchingUpdate } from '@recats/cdeebee';     // Batch update helper
+export { defaultNormalize } from '@recats/cdeebee';   // Default normalization function
 
 // React hooks
 export {
@@ -679,6 +748,7 @@ export {
   useStorage,          // Get entire storage
   useRequestHistory,   // Get successful request history
   useRequestErrors,    // Get error history
+  useLastResultIdList,     // Get IDs from last request (for filtering storage)
 } from '@recats/cdeebee';
 
 // Types

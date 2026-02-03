@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 import { factory } from '../../lib/reducer/index';
-import { createCdeebeeHooks } from '../../lib/hooks';
+import { createCdeebeeHooks } from '../../lib/hooks/index';
 import { type CdeebeeState } from '../../lib/reducer/types';
 
 interface TestStorage {
@@ -15,7 +15,6 @@ interface RootState {
 
 describe('cdeebee hooks selector logic', () => {
   let store: ReturnType<typeof configureStore>;
-  let hooks: ReturnType<typeof createCdeebeeHooks<RootState, TestStorage>>;
 
   beforeEach(() => {
     const slice = factory<TestStorage>(
@@ -36,7 +35,8 @@ describe('cdeebee hooks selector logic', () => {
       },
     });
 
-    hooks = createCdeebeeHooks<RootState, TestStorage>(state => state.cdeebee);
+    // Verify createCdeebeeHooks works without errors
+    createCdeebeeHooks<RootState, TestStorage>(state => state.cdeebee);
   });
 
   describe('useLoading selector logic', () => {
@@ -185,6 +185,54 @@ describe('cdeebee hooks selector logic', () => {
     });
   });
 
+  describe('useLastResultIdList selector logic', () => {
+    it('should return empty array when no result IDs exist for API', () => {
+      const state = store.getState();
+      const resultIds = state.cdeebee.request.lastResultIdList['/api/users'] ?? [];
+      expect(resultIds).toEqual([]);
+    });
+
+    it('should return result IDs after fulfilled request with primaryKey data', () => {
+      // Simulate a fulfilled request with normalized data
+      store.dispatch({
+        type: 'cdeebee/request/fulfilled',
+        payload: {
+          result: {
+            userList: {
+              data: [
+                { id: '1', name: 'John' },
+                { id: '2', name: 'Jane' },
+              ],
+              primaryKey: 'id',
+            },
+          },
+        },
+        meta: { arg: { api: '/api/users' }, requestId: 'req-1' },
+      });
+
+      const state = store.getState();
+      expect(state.cdeebee.request.lastResultIdList['/api/users']).toEqual(['1', '2']);
+    });
+
+    it('should not have lastResultIdList when response has no primaryKey format', () => {
+      // Response without primaryKey format
+      store.dispatch({
+        type: 'cdeebee/request/fulfilled',
+        payload: {
+          result: {
+            userList: {
+              '1': { id: '1', name: 'John' },
+            },
+          },
+        },
+        meta: { arg: { api: '/api/users' }, requestId: 'req-1' },
+      });
+
+      const state = store.getState();
+      expect(state.cdeebee.request.lastResultIdList['/api/users']).toEqual([]);
+    });
+  });
+
   describe('createCdeebeeHooks with custom selector', () => {
     it('should create hooks factory that has all expected properties', () => {
       interface CustomRootState {
@@ -202,10 +250,12 @@ describe('cdeebee hooks selector logic', () => {
       expect(customHooks).toHaveProperty('useStorageList');
       expect(customHooks).toHaveProperty('useStorage');
       expect(customHooks).toHaveProperty('useIsLoading');
+      expect(customHooks).toHaveProperty('useLastResultIdList');
 
       // Verify they're all functions
       expect(typeof customHooks.useLoading).toBe('function');
       expect(typeof customHooks.useStorageList).toBe('function');
+      expect(typeof customHooks.useLastResultIdList).toBe('function');
     });
   });
 

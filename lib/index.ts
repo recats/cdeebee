@@ -2,4 +2,14 @@ export { type CdeebeeListStrategy, type CdeebeeState, type CdeebeeValueList, typ
 export { batchingUpdate } from './reducer/helpers';
 export { request } from './reducer/request';
 export { factory } from './reducer/index';
-export { createCdeebeeHooks, useLoading, useRequestHistory, useRequestErrors, useStorageList, useStorage, useIsLoading, } from './hooks';
+export { defaultNormalize } from './reducer/storage';
+export {
+  createCdeebeeHooks,
+  useLoading,
+  useRequestHistory,
+  useRequestErrors,
+  useStorageList,
+  useStorage,
+  useIsLoading,
+  useLastResultIdList,
+} from './hooks/index';

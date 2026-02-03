@@ -1,7 +1,7 @@
-import {  createSlice, current, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, current, type PayloadAction } from '@reduxjs/toolkit';
 
 import { type CdeebeeSettings, type CdeebeeState, type CdeebeeValueList, type CdeebeeListStrategy } from './types';
-import { checkModule, mergeDeepRight, batchingUpdate } from './helpers';
+import { checkModule, mergeDeepRight, batchingUpdate, extractResultIdList } from './helpers';
 import { abortQuery } from './abortController';
 import { request } from './request';
 import { defaultNormalize } from './storage';
@@ -19,7 +19,8 @@ const initialState: CdeebeeState<unknown> = {
   request: {
     active: [],
     errors: {},
-    done: {}
+    done: {},
+    lastResultIdList: {},
   },
 };
 
@@ -74,14 +75,14 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
             state.request.active = state.request.active.filter(q => !(q.api === api && q.requestId === requestId));
           });
           checkModule(state.settings, 'history', () => {
-            if (!state.request.done[api])  state.request.done[api] = [];
+            if (!state.request.done[api]) state.request.done[api] = [];
             state.request.done[api].push({ api, request: action.payload, requestId });
           });
           checkModule(state.settings, 'storage', () => {
             if (action.meta.arg.ignore) {
               return;
             }
-            
+
             const strategyList = (action.meta.arg.listStrategy ?? state.settings.listStrategy ?? {}) as CdeebeeListStrategy<T>;
             const normalize = action.meta.arg.normalize ?? state.settings.normalize ?? defaultNormalize;
 
@@ -94,6 +95,9 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
             // Simply apply the result
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (state.storage as any) = normalizedData;
+
+            // Extract and store result IDs for filtering
+            state.request.lastResultIdList[api] = extractResultIdList(action.payload.result);
           });
         })
         .addCase(request.rejected, (state, action) => {
@@ -104,7 +108,7 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
             state.request.active = state.request.active.filter(q => !(q.api === api && q.requestId === requestId));
           });
           checkModule(state.settings, 'history', () => {
-            if (!state.request.errors[api])  state.request.errors[api] = [];
+            if (!state.request.errors[api]) state.request.errors[api] = [];
             state.request.errors[api].push({ requestId: requestId, api, request: action.error });
           });
         });

@@ -53,7 +53,7 @@ pnpm test tests/lib/reducer/storage.test.ts
 
 **`lib/reducer/request.ts`**: Contains the `request` async thunk that handles all API calls. This is where:
 - FormData is built for file uploads
-- Headers are merged (global + per-request)
+- Headers are merged (global + per-request), supports dynamic functions
 - The fetch API is called with appropriate abort signals
 - Response types (json/text/blob) are handled
 - The queryQueue integration happens (requests are enqueued if module is enabled)
@@ -72,21 +72,24 @@ pnpm test tests/lib/reducer/storage.test.ts
 - `checkModule()`: Conditional execution based on enabled modules
 - `mergeDeepRight()`: Deep merge for objects (right takes precedence)
 - `batchingUpdate()`: Mutates Redux state using Immer for the `set` action
-- Type guards (`isRecord()`, `hasDataProperty()`, etc.)
+- `extractResultIdList()`: Extracts primary key IDs from API responses with `{ data: [...], primaryKey: 'id' }` format
+- Type guards (`isRecord()`, etc.)
 
 **`lib/reducer/types.ts`**: TypeScript type definitions including complex path-based types for type-safe batch updates via `CdeebeeValueList<T>`.
 
-**`lib/hooks.ts`**: React hooks for accessing cdeebee state without writing selectors. Provides two approaches:
-- **Standalone hooks**: Export individual hooks that assume the cdeebee slice is at `state.cdeebee` (default when using `combineSlices`)
-- **`createCdeebeeHooks` factory**: For edge cases where the slice is at a custom path in the state tree
+**`lib/hooks/`**: React hooks folder for accessing cdeebee state. Structure:
+- `index.ts`: Re-exports all hooks
+- `selectors.ts`: Standalone selector hooks (useLoading, useStorage, etc.)
+- `createCdeebeeHooks.ts`: Factory for custom state paths
 
-Available hooks:
+Available selector hooks:
 - `useLoading(apiList)`: Check if any APIs in the list are currently loading
 - `useIsLoading()`: Check if any request is loading globally
 - `useStorageList(listName)`: Get a specific list from storage with type safety
 - `useStorage()`: Get the entire storage object
 - `useRequestHistory(api)`: Get successful request history for a specific API
 - `useRequestErrors(api)`: Get error history for a specific API
+- `useLastResultIdList(api)`: Get the IDs returned by the last request to filter storage data
 
 All hooks use `react-redux`'s `useSelector` internally and are fully typed for TypeScript.
 
@@ -131,6 +134,30 @@ dispatch(request({
 }))
 ```
 
+### Dynamic Headers and Data
+
+`mergeWithHeaders` and `mergeWithData` support both static objects and dynamic functions. Functions are called on each request, useful for auth tokens:
+
+```typescript
+factory<Storage>({
+  modules: ['storage', 'history', 'listener'],
+  // Static (evaluated once at factory creation)
+  mergeWithHeaders: { 'X-App': 'myapp' },
+
+  // OR Dynamic (evaluated on each request)
+  mergeWithHeaders: () => ({
+    'Authorization': `Bearer ${getSessionToken()}`,
+  }),
+
+  // Same for mergeWithData
+  mergeWithData: () => ({
+    timestamp: Date.now(),
+  }),
+})
+```
+
+**Note**: When using functions, Redux will warn about non-serializable values in state. Configure your store's `serializableCheck.ignoredPaths` to include `cdeebee.settings.mergeWithHeaders` and `cdeebee.settings.mergeWithData`.
+
 ### Testing
 
 Tests use Vitest with jsdom environment. Test files are in `tests/lib/` mirroring the `lib/` structure. Tests cover:
@@ -139,6 +166,8 @@ Tests use Vitest with jsdom environment. Test files are in `tests/lib/` mirrorin
 - QueryQueue sequential processing
 - AbortController cancellation
 - History clearing (manual and automatic)
+- Silent request option
+- Dynamic mergeWithHeaders/mergeWithData
 - Helper functions and type guards
 - React hooks (`tests/lib/hooks.test.ts`): Tests the selector logic for all hooks by dispatching Redux actions and verifying state selections
 
@@ -174,6 +203,29 @@ When `files` array is provided, the request automatically switches to FormData. 
 - Without `queryQueue`: Requests execute in parallel, may complete out of order
 - With `queryQueue`: Requests execute sequentially in dispatch order, guaranteed to complete and store in order
 - This is important when request order matters for data consistency (e.g., optimistic updates followed by server sync)
+
+### Browser Navigation and Replace Strategy
+
+When using `replace` strategy with navigation (e.g., search pages), data can become stale on browser back. Solutions:
+
+1. **Use `merge` + `useLastResultIdList`** (recommended): Data accumulates with `merge` strategy, but `useLastResultIdList(api)` returns the IDs from the last request. Filter storage by these IDs to show only current results. This preserves data across navigation while showing correct results.
+2. **Use `merge` strategy**: Data accumulates instead of replacing (may show stale data from previous searches)
+3. **Clear and refetch**: Use `historyClear` and refetch on route change
+
+### Result ID List
+
+The `lastResultIdList` state (`state.request.lastResultIdList`) tracks which primary key IDs were returned by each API's last successful request. This is populated automatically when API responses use the `{ data: [...], primaryKey: 'id' }` format.
+
+```typescript
+// State structure
+state.request.lastResultIdList = {
+  '/api/search': ['101', '102', '103'],  // IDs from last search
+  '/api/products': ['1', '2'],           // IDs from last products request
+}
+```
+
+This enables the pattern: use `merge` strategy (data never lost), filter by `lastResultIdList` (show only current results).
+
 
 ### Build Configuration and External Dependencies
 
