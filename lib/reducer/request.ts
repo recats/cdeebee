@@ -6,7 +6,7 @@ import { type CdeebeeState, type CdeebeeRequestOptions } from './types';
 
 export const request = createAsyncThunk(
   'cdeebee/request',
-  async (options: CdeebeeRequestOptions<unknown>, { rejectWithValue,  getState, requestId, signal }) => {
+  async (options: CdeebeeRequestOptions<unknown>, { rejectWithValue, getState, requestId, signal }) => {
     const startedAt = new Date().toUTCString();
     const { cdeebee: { settings } } = getState() as { cdeebee: CdeebeeState<unknown> };
 
@@ -17,67 +17,75 @@ export const request = createAsyncThunk(
 
     const executeRequest = async () => {
       try {
-      const { method = 'POST', body, headers = {} } = options;
-      const extraHeaders: Record<string, string> = { ...(settings.mergeWithHeaders ?? {}), ...headers };
+        const { method = 'POST', body, headers = {} } = options;
+        const baseHeaders = typeof settings.mergeWithHeaders === 'function'
+          ? settings.mergeWithHeaders()
+          : (settings.mergeWithHeaders ?? {});
 
-      const b = { ...(settings.mergeWithData ?? {}), ...(body ?? {}) };
-      let requestData: FormData | string = JSON.stringify(b);
+        const extraHeaders: Record<string, string> = { ...baseHeaders, ...headers };
 
-      // handling files
-      if (options.files) {
-        const formData = new FormData();
-        const fileKey = options.fileKey || settings.fileKey;
-        const bodyKey = options.bodyKey || settings.bodyKey;
+        const baseData = typeof settings.mergeWithData === 'function'
+          ? settings.mergeWithData()
+          : (settings.mergeWithData ?? {});
 
-        for (let i = 0; i < options.files.length; i += 1) {
-          if (fileKey) {
-            formData.append(fileKey, options.files[i]);
+        const b = { ...baseData, ...(body ?? {}) };
+        let requestData: FormData | string = JSON.stringify(b);
+
+        // handling files
+        if (options.files) {
+          const formData = new FormData();
+          const fileKey = options.fileKey || settings.fileKey;
+          const bodyKey = options.bodyKey || settings.bodyKey;
+
+          for (let i = 0; i < options.files.length; i += 1) {
+            if (fileKey) {
+              formData.append(fileKey, options.files[i]);
+            }
           }
+
+          if (bodyKey) {
+            formData.append(bodyKey, requestData);
+          }
+          requestData = formData;
+        }
+        // [end] handling files
+
+        const response = await fetch(options.api, {
+          method,
+          headers: {
+            'ui-request-id': requestId,
+            'Content-Type': 'application/json',
+            ...extraHeaders,
+          },
+          signal: abort.controller.signal,
+          body: requestData,
+        });
+
+        checkModule(settings, 'cancelation', abort.drop);
+
+        let result: unknown;
+        const responseType = options.responseType || 'json';
+
+        if (responseType === 'text') {
+          result = await response.text();
+        } else if (responseType === 'blob') {
+          result = await response.blob();
+        } else {
+          // default: json
+          result = await response.json();
         }
 
-        if (bodyKey) {
-          formData.append(bodyKey, requestData);
+        if (!response.ok) {
+          if (withCallback) options.onResult!(result);
+          return rejectWithValue(response);
         }
-        requestData = formData;
-      }
-      // [end] handling files
-      
-      const response = await fetch(options.api, {
-        method,
-        headers: {
-          'ui-request-id': requestId,
-          'Content-Type': 'application/json',
-          ...extraHeaders,
-        },
-        signal: abort.controller.signal,
-        body: requestData,
-      });
 
-      checkModule(settings, 'cancelation', abort.drop);
-
-      let result: unknown;
-      const responseType = options.responseType || 'json';
-      
-      if (responseType === 'text') {
-        result = await response.text();
-      } else if (responseType === 'blob') {
-        result = await response.blob();
-      } else {
-        // default: json
-        result = await response.json();
-      }
-
-      if (!response.ok) {
         if (withCallback) options.onResult!(result);
-        return rejectWithValue(response);
-      }
-
-      if (withCallback) options.onResult!(result);
-      return { result, startedAt, endedAt: new Date().toUTCString() };
+        return { result, startedAt, endedAt: new Date().toUTCString() };
       } catch (error) {
         checkModule(settings, 'cancelation', abort.drop);
 
-        if (withCallback) options.onResult!(error); 
+        if (withCallback) options.onResult!(error);
 
         if (error instanceof Error && error.name === 'AbortError') {
           return rejectWithValue({ message: 'Request was cancelled', cancelled: true });

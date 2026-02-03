@@ -44,9 +44,11 @@ describe('factory', () => {
     expect(state.request).toHaveProperty('active');
     expect(state.request).toHaveProperty('errors');
     expect(state.request).toHaveProperty('done');
+    expect(state.request).toHaveProperty('lastResultIdList');
     expect(Array.isArray(state.request.active)).toBe(true);
     expect(typeof state.request.errors).toBe('object');
     expect(typeof state.request.done).toBe('object');
+    expect(typeof state.request.lastResultIdList).toBe('object');
   });
 
   describe('listener module', () => {
@@ -746,6 +748,180 @@ describe('factory', () => {
       const state = store.getState().cdeebee;
       expect(state.request.done).toEqual({});
       expect(state.request.errors).toEqual({});
+    });
+  });
+
+  describe('lastResultIdList', () => {
+    it('should extract and store result IDs from response with primaryKey format', async () => {
+      const store = createTestStore(settings);
+
+      const mockResponse = {
+        productList: {
+          data: [
+            { id: '101', name: 'Product A' },
+            { id: '102', name: 'Product B' },
+            { id: '103', name: 'Product C' },
+          ],
+          primaryKey: 'id',
+        },
+      };
+
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/search' }));
+
+      const state = store.getState().cdeebee;
+      expect(state.request.lastResultIdList['/api/search']).toBeDefined();
+      expect(state.request.lastResultIdList['/api/search']).toEqual(['101', '102', '103']);
+    });
+
+    it('should extract IDs from multiple lists in same response', async () => {
+      const store = createTestStore(settings);
+
+      const mockResponse = {
+        userList: {
+          data: [{ id: 'u1', name: 'User 1' }],
+          primaryKey: 'id',
+        },
+        postList: {
+          data: [
+            { postId: 'p1', title: 'Post 1' },
+            { postId: 'p2', title: 'Post 2' },
+          ],
+          primaryKey: 'postId',
+        },
+      };
+
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/data' }));
+
+      const state = store.getState().cdeebee;
+      // All IDs from all lists are combined
+      expect(state.request.lastResultIdList['/api/data']).toContain('u1');
+      expect(state.request.lastResultIdList['/api/data']).toContain('p1');
+      expect(state.request.lastResultIdList['/api/data']).toContain('p2');
+    });
+
+    it('should not store lastResultIdList when response has no primaryKey format', async () => {
+      const store = createTestStore(settings);
+
+      const mockResponse = {
+        userList: {
+          '1': { id: '1', name: 'John' },
+          '2': { id: '2', name: 'Jane' },
+        },
+      };
+
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/users' }));
+
+      const state = store.getState().cdeebee;
+      expect(state.request.lastResultIdList['/api/users']).toEqual([]);
+    });
+
+    it('should replace lastResultIdList on subsequent requests to same API', async () => {
+      const store = createTestStore(settings);
+
+      // First request
+      const firstResponse = {
+        productList: {
+          data: [{ id: '1' }, { id: '2' }],
+          primaryKey: 'id',
+        },
+      };
+
+      mockFetch(createMockResponse({ json: async () => firstResponse }));
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/search' }));
+
+      let state = store.getState().cdeebee;
+      expect(state.request.lastResultIdList['/api/search']).toEqual(['1', '2']);
+
+      // Second request
+      const secondResponse = {
+        productList: {
+          data: [{ id: '3' }, { id: '4' }, { id: '5' }],
+          primaryKey: 'id',
+        },
+      };
+
+      mockFetch(createMockResponse({ json: async () => secondResponse }));
+
+      await dispatch(request({ api: '/api/search' }));
+
+      state = store.getState().cdeebee;
+      expect(state.request.lastResultIdList['/api/search']).toEqual(['3', '4', '5']);
+    });
+
+    it('should not store lastResultIdList when ignore option is true', async () => {
+      const store = createTestStore(settings);
+
+      const mockResponse = {
+        productList: {
+          data: [{ id: '1' }],
+          primaryKey: 'id',
+        },
+      };
+
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/search', ignore: true }));
+
+      const state = store.getState().cdeebee;
+      expect(state.request.lastResultIdList['/api/search']).toBeUndefined();
+    });
+
+    it('should not store lastResultIdList when storage module is disabled', async () => {
+      const settingsWithoutStorage: CdeebeeSettings<Record<string, unknown>> = {
+        ...settings,
+        modules: ['history', 'listener', 'cancelation'],
+      };
+
+      const store = createTestStore(settingsWithoutStorage);
+
+      const mockResponse = {
+        productList: {
+          data: [{ id: '1' }],
+          primaryKey: 'id',
+        },
+      };
+
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/search' }));
+
+      const state = store.getState().cdeebee;
+      expect(state.request.lastResultIdList['/api/search']).toBeUndefined();
+    });
+
+    it('should handle numeric primary keys by converting to strings', async () => {
+      const store = createTestStore(settings);
+
+      const mockResponse = {
+        itemList: {
+          data: [
+            { itemId: 100, name: 'Item A' },
+            { itemId: 200, name: 'Item B' },
+          ],
+          primaryKey: 'itemId',
+        },
+      };
+
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      const dispatch = store.dispatch as any;
+      await dispatch(request({ api: '/api/items' }));
+
+      const state = store.getState().cdeebee;
+      expect(state.request.lastResultIdList['/api/items']).toEqual(['100', '200']);
     });
   });
 

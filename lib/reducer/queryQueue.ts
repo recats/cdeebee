@@ -4,9 +4,9 @@ class QueryQueue {
 
   async enqueue<T>(task: () => Promise<T>): Promise<T> {
     this.queueLength++;
-    
+
     const previousPromise = this.currentPromise;
-    
+
     this.currentPromise = previousPromise
       .then(() => task(), () => task())
       .finally(() => {

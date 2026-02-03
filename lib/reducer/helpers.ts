@@ -6,16 +6,9 @@ export function checkModule(settings: CdeebeeSettings<unknown> | WritableDraft<C
     result();
   }
 }
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-export  function hasDataProperty(value: unknown): value is Record<string, unknown> & { data: unknown[] } {
-  return isRecord(value) && Array.isArray(value.data);
-}
-
-export  function hasProperty(value: unknown, prop: string): boolean {
-  return isRecord(value) && Object.prototype.hasOwnProperty.call(value, prop);
 }
 
 export function mergeDeepRight<T>(
@@ -58,23 +51,36 @@ export function omit<T extends Record<string, unknown>>(keys: string[], obj: T):
   return result as Omit<T, keyof T>;
 }
 
-export function assocPath<T>(path: (string | number)[], value: unknown, obj: T): T {
-  if (path.length === 0) {
-    return value as T;
+/**
+ * Extract primary key values from API response data.
+ * Handles responses with format: { listName: { data: [...], primaryKey: 'id' } }
+ * Returns a flat array of all extracted IDs from all lists.
+ */
+export function extractResultIdList(response: unknown): string[] {
+  if (!isRecord(response)) {
+    return [];
   }
 
-  const [first, ...rest] = path;
-  const firstKey = String(first);
-  const result = Array.isArray(obj) ? [...obj] : { ...obj } as Record<string, unknown>;
+  const ids: string[] = [];
 
-  if (rest.length === 0) {
-    (result as Record<string, unknown>)[firstKey] = value;
-  } else {
-    const currentValue = (result as Record<string, unknown>)[firstKey];
-    (result as Record<string, unknown>)[firstKey] = assocPath(rest, value, currentValue ?? {});
+  for (const key of Object.keys(response)) {
+    const value = response[key];
+
+    if (
+      isRecord(value) &&
+      Array.isArray(value.data) &&
+      typeof value.primaryKey === 'string'
+    ) {
+      const primaryKey = value.primaryKey;
+      for (const item of value.data) {
+        if (isRecord(item) && primaryKey in item) {
+          ids.push(String(item[primaryKey]));
+        }
+      }
+    }
   }
 
-  return result as T;
+  return ids;
 }
 
 export function batchingUpdate<T extends Record<string, unknown>>(
@@ -85,16 +91,16 @@ export function batchingUpdate<T extends Record<string, unknown>>(
     const item = valueList[i] as { key: readonly (string | number)[]; value: unknown };
     const path = item.key;
     const value = item.value;
-    
+
     if (path.length === 0) {
       continue;
     }
 
     let current: Record<string, unknown> | unknown[] = state as Record<string, unknown>;
-    
+
     for (let j = 0; j < path.length - 1; j++) {
       const pathKey = path[j];
-      
+
       if (Array.isArray(current)) {
         const index = typeof pathKey === 'number' ? pathKey : Number(pathKey);
         if (!(index in current) || !isRecord(current[index])) {
@@ -111,7 +117,7 @@ export function batchingUpdate<T extends Record<string, unknown>>(
         current = (Array.isArray(next) ? next : (isRecord(next) ? next : {})) as Record<string, unknown> | unknown[];
       }
     }
-    
+
     if (Array.isArray(current)) {
       continue; // Can't update array element directly
     }

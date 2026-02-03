@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { checkModule, mergeDeepRight, omit, batchingUpdate, assocPath, hasDataProperty, hasProperty } from '../../../lib/reducer/helpers';
+import { checkModule, mergeDeepRight, omit, batchingUpdate } from '../../../lib/reducer/helpers';
 import { type CdeebeeSettings, type CdeebeeModule } from '../../../lib/reducer/types';
 
 describe('checkModule', () => {
@@ -251,89 +251,6 @@ describe('omit', () => {
   });
 });
 
-describe('assocPath', () => {
-  it('should set value at top-level path', () => {
-    const obj = { a: 1, b: 2 };
-    const result = assocPath(['a'], 10, obj);
-
-    expect(result).toEqual({ a: 10, b: 2 });
-    expect(result).not.toBe(obj); // Should return new object
-  });
-
-  it('should set value at nested path', () => {
-    const obj = { a: { b: { c: 1 } } };
-    const result = assocPath(['a', 'b', 'c'], 10, obj);
-
-    expect(result).toEqual({ a: { b: { c: 10 } } });
-  });
-
-  it('should create nested structure if it does not exist', () => {
-    const obj = { a: 1 };
-    const result = assocPath(['b', 'c', 'd'], 10, obj);
-
-    expect(result).toEqual({ a: 1, b: { c: { d: 10 } } });
-  });
-
-  it('should handle empty path by returning value', () => {
-    const obj = { a: 1 };
-    const result = assocPath([], 10, obj);
-
-    expect(result).toBe(10);
-  });
-
-  it('should handle numeric keys in path', () => {
-    const obj = { items: [{ id: 1 }, { id: 2 }] };
-    const result = assocPath(['items', 0, 'name'], 'Item 1', obj);
-
-    expect(result).toEqual({ items: [{ id: 1, name: 'Item 1' }, { id: 2 }] });
-  });
-
-  it('should handle array as base object', () => {
-    const obj = [{ a: 1 }, { b: 2 }];
-    const result = assocPath([0, 'a'], 10, obj);
-
-    expect(result).toEqual([{ a: 10 }, { b: 2 }]);
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it('should create object structure when path contains numeric key (treats as string)', () => {
-    const obj = {};
-    const result = assocPath(['items', 0, 'name'], 'First', obj);
-
-    // assocPath treats numeric keys as strings, so it creates an object with '0' key
-    expect(result).toEqual({ items: { '0': { name: 'First' } } });
-  });
-
-  it('should handle deep nested paths with mixed types', () => {
-    const obj = { level1: { level2: [] } };
-    const result = assocPath(['level1', 'level2', 0, 'value'], 'deep', obj);
-
-    expect(result).toEqual({ level1: { level2: [{ value: 'deep' }] } });
-  });
-
-  it('should not mutate original object', () => {
-    const obj = { a: { b: 1 } };
-    const original = { a: { b: 1 } };
-    assocPath(['a', 'b'], 2, obj);
-
-    expect(obj).toEqual(original);
-  });
-
-  it('should handle path with single element', () => {
-    const obj = { a: 1, b: 2 };
-    const result = assocPath(['c'], 3, obj);
-
-    expect(result).toEqual({ a: 1, b: 2, c: 3 });
-  });
-
-  it('should overwrite existing nested values', () => {
-    const obj = { a: { b: { c: 1, d: 2 } } };
-    const result = assocPath(['a', 'b', 'c'], 10, obj);
-
-    expect(result).toEqual({ a: { b: { c: 10, d: 2 } } });
-  });
-});
-
 describe('batchingUpdate', () => {
   it('should update a single top-level key', () => {
     const state: Record<string, unknown> = { a: 1, b: 2 };
@@ -534,48 +451,3 @@ describe('batchingUpdate', () => {
   });
 });
 
-describe('hasDataProperty', () => {
-  it('should return true for object with data array property', () => {
-    const value = { data: [1, 2, 3] };
-    expect(hasDataProperty(value)).toBe(true);
-  });
-
-  it('should return false for object without data property', () => {
-    const value = { other: 'value' };
-    expect(hasDataProperty(value)).toBe(false);
-  });
-
-  it('should return false for object with non-array data', () => {
-    const value = { data: 'not an array' };
-    expect(hasDataProperty(value)).toBe(false);
-  });
-
-  it('should return false for non-object values', () => {
-    expect(hasDataProperty(null)).toBe(false);
-    expect(hasDataProperty(undefined)).toBe(false);
-    expect(hasDataProperty('string')).toBe(false);
-    expect(hasDataProperty(123)).toBe(false);
-    expect(hasDataProperty([])).toBe(false);
-  });
-});
-
-describe('hasProperty', () => {
-  it('should return true when object has the property', () => {
-    const value = { prop: 'value', other: 'data' };
-    expect(hasProperty(value, 'prop')).toBe(true);
-    expect(hasProperty(value, 'other')).toBe(true);
-  });
-
-  it('should return false when object does not have the property', () => {
-    const value = { prop: 'value' };
-    expect(hasProperty(value, 'missing')).toBe(false);
-  });
-
-  it('should return false for non-object values', () => {
-    expect(hasProperty(null, 'prop')).toBe(false);
-    expect(hasProperty(undefined, 'prop')).toBe(false);
-    expect(hasProperty('string', 'prop')).toBe(false);
-    expect(hasProperty(123, 'prop')).toBe(false);
-    expect(hasProperty([], 'prop')).toBe(false);
-  });
-});

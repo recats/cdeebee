@@ -540,6 +540,106 @@ describe('request', () => {
       const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(callArgs[1].headers).toHaveProperty('Authorization', 'Bearer token');
     });
+
+    it('should support dynamic mergeWithHeaders as function', async () => {
+      const mockResponse = { data: 'test' };
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      let tokenCounter = 0;
+      settings.mergeWithHeaders = () => {
+        tokenCounter++;
+        return { 'Authorization': `Bearer dynamic-token-${tokenCounter}` };
+      };
+
+      store = createTestStore(settings);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch = store.dispatch as any;
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/test',
+      };
+
+      await dispatch(request(options));
+
+      const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[1].headers).toHaveProperty('Authorization', 'Bearer dynamic-token-1');
+    });
+
+    it('should call dynamic mergeWithHeaders on each request', async () => {
+      const mockResponse = { data: 'test' };
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      let tokenCounter = 0;
+      settings.mergeWithHeaders = () => {
+        tokenCounter++;
+        return { 'X-Request-Count': String(tokenCounter) };
+      };
+
+      store = createTestStore(settings);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch = store.dispatch as any;
+
+      await dispatch(request({ api: '/api/test' }));
+      await dispatch(request({ api: '/api/test' }));
+
+      const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls[0][1].headers).toHaveProperty('X-Request-Count', '1');
+      expect(calls[1][1].headers).toHaveProperty('X-Request-Count', '2');
+    });
+  });
+
+  describe('dynamic mergeWithData', () => {
+    it('should support dynamic mergeWithData as function', async () => {
+      const mockResponse = { data: 'test' };
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      settings.mergeWithData = () => ({ timestamp: 12345, source: 'dynamic' });
+
+      store = createTestStore(settings);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch = store.dispatch as any;
+
+      const options: CdeebeeRequestOptions<unknown> = {
+        api: '/api/test',
+        body: { customField: 'value' },
+      };
+
+      await dispatch(request(options));
+
+      const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse(callArgs[1].body as string);
+
+      expect(body).toHaveProperty('timestamp', 12345);
+      expect(body).toHaveProperty('source', 'dynamic');
+      expect(body).toHaveProperty('customField', 'value');
+    });
+
+    it('should call dynamic mergeWithData on each request', async () => {
+      const mockResponse = { data: 'test' };
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+      mockFetch(createMockResponse({ json: async () => mockResponse }));
+
+      let counter = 0;
+      settings.mergeWithData = () => {
+        counter++;
+        return { requestNumber: counter };
+      };
+
+      store = createTestStore(settings);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch = store.dispatch as any;
+
+      await dispatch(request({ api: '/api/test' }));
+      await dispatch(request({ api: '/api/test' }));
+
+      const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+      const body1 = JSON.parse(calls[0][1].body as string);
+      const body2 = JSON.parse(calls[1][1].body as string);
+
+      expect(body1).toHaveProperty('requestNumber', 1);
+      expect(body2).toHaveProperty('requestNumber', 2);
+    });
   });
 
   describe('edge cases', () => {
