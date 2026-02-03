@@ -1,7 +1,7 @@
 import { createSlice, current, type PayloadAction } from '@reduxjs/toolkit';
 
 import { type CdeebeeSettings, type CdeebeeState, type CdeebeeValueList, type CdeebeeListStrategy } from './types';
-import { checkModule, mergeDeepRight, batchingUpdate, extractResultIdList } from './helpers';
+import { checkModule, mergeDeepRight, batchingUpdate, extractLastResultIdList } from './helpers';
 import { abortQuery } from './abortController';
 import { request } from './request';
 import { defaultNormalize } from './storage';
@@ -96,8 +96,8 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (state.storage as any) = normalizedData;
 
-            // Extract and store result IDs for filtering
-            state.request.lastResultIdList[api] = extractResultIdList(action.payload.result);
+            // Extract and store result IDs for filtering per list
+            state.request.lastResultIdList[api] = extractLastResultIdList(action.payload.result);
           });
         })
         .addCase(request.rejected, (state, action) => {

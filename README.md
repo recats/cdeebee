@@ -171,7 +171,7 @@ function ForumsList() {
 - `useStorage()` - Get the entire storage
 - `useRequestHistory(api)` - Get successful request history for an API
 - `useRequestErrors(api)` - Get error history for an API
-- `useLastResultIdList(api)` - Get the IDs returned by the last request to an API (for filtering storage)
+- `useLastResultIdList(api, listName)` - Get the IDs returned by the last request for a specific list (for filtering storage)
 
 See the [React Hooks](#react-hooks) section for detailed documentation.
 
@@ -650,9 +650,9 @@ function ErrorDisplay({ api }: { api: string }) {
 
 ### Result ID List Hook
 
-#### `useLastResultIdList(api: string)`
+#### `useLastResultIdList(api: string, listName: string)`
 
-Get the list of IDs returned by the last successful request to an API. This is useful for filtering storage data when using `merge` strategy, so you can display only the results from the current search/request.
+Get the list of IDs returned by the last successful request to an API for a specific list. This is useful for filtering storage data when using `merge` strategy, so you can display only the results from the current search/request.
 
 ```typescript
 import { useStorageList, useLastResultIdList } from '@recats/cdeebee';
@@ -665,11 +665,11 @@ function SearchResults() {
   // Get all products from storage (accumulated via merge strategy)
   const products = useStorageList<MyStorage, 'productList'>('productList');
 
-  // Get only the IDs from the last search request
-  const lastSearchIds = useLastResultIdList('/api/search');
+  // Get only the IDs from the last search request for productList
+  const lastSearchIDList = useLastResultIdList('/api/search', 'productList');
 
   // Filter to show only results from current search
-  const displayResults = lastSearchIds
+  const displayResults = lastSearchIDList
     .map(id => products[id])
     .filter(Boolean);
 
@@ -685,7 +685,7 @@ function SearchResults() {
 
 **Why use this?** When using `replace` strategy with search/filter pages, navigating away and using browser back loses the previous results. With `merge` strategy + `useLastResultIdList`:
 - Data accumulates in storage (never lost on navigation)
-- `lastResultIdList` tracks which IDs belong to the current request
+- `lastResultIdList[api][listName]` tracks which IDs belong to the current request per list
 - Filter storage by those IDs to display the correct results
 
 ### Advanced: Custom State Path
@@ -748,7 +748,7 @@ export {
   useStorage,          // Get entire storage
   useRequestHistory,   // Get successful request history
   useRequestErrors,    // Get error history
-  useLastResultIdList,     // Get IDs from last request (for filtering storage)
+  useLastResultIdList,     // Get IDs from last request for a list (for filtering storage)
 } from '@recats/cdeebee';
 
 // Types
