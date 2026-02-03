@@ -116,21 +116,22 @@ export function createCdeebeeHooks<RootState, Storage>(
   }
 
   /**
-   * Get the list of IDs returned by the last successful request to an API.
+   * Get the list of IDs returned by the last successful request to an API for a specific list.
    * Useful for filtering storage data to show only results from a specific request.
    *
    * @param api - The API endpoint
-   * @returns Array of primary key IDs from the last response
+   * @param listName - The name of the list in storage (typed from Storage)
+   * @returns Array of primary key IDs from the last response for that list
    *
    * @example
    * const productList = useStorageList('productList');
-   * const lastIds = useLastResultIdList('/api/search');
-   * const displayResults = lastIds.map(id => productList[id]).filter(Boolean);
+   * const lastIDList = useLastResultIdList('/api/search', 'productList');
+   * const displayResults = lastIDList.map(id => productList[id]).filter(Boolean);
    */
-  function useLastResultIdList(api: string): string[] {
+  function useLastResultIdList<K extends keyof Storage>(api: string, listName: K): string[] {
     return useSelector((state: RootState) => {
       const cdeebee = selectCdeebee(state);
-      return cdeebee.request.lastResultIdList[api] ?? [];
+      return cdeebee.request.lastResultIdList[api]?.[listName as string] ?? [];
     });
   }
 

@@ -33,10 +33,10 @@ class AbortControllerStore {
   }
 
   abortAllForApi(api: string, excludeRequestId: string): void {
-    const requestIds = this.byApi.get(api);
-    if (!requestIds) return;
+    const requestIDList = this.byApi.get(api);
+    if (!requestIDList) return;
 
-    requestIds.forEach(requestId => {
+    requestIDList.forEach(requestId => {
       if (requestId !== excludeRequestId) {
         const item = this.byRequestId.get(requestId);
         if (item) {

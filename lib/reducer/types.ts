@@ -28,7 +28,7 @@ interface CdeebeeRequestState {
   active: CdeebeeActiveRequest[];
   errors: Record<string, CdeebeeHistoryState[]>;
   done: Record<string, CdeebeeHistoryState[]>;
-  lastResultIdList: Record<string, string[]>;
+  lastResultIdList: Record<string, Record<string, string[]>>;
 }
 
 export interface CdeebeeState<T> {

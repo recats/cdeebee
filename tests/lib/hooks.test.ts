@@ -188,8 +188,8 @@ describe('cdeebee hooks selector logic', () => {
   describe('useLastResultIdList selector logic', () => {
     it('should return empty array when no result IDs exist for API', () => {
       const state = store.getState();
-      const resultIds = state.cdeebee.request.lastResultIdList['/api/users'] ?? [];
-      expect(resultIds).toEqual([]);
+      const resultIDList = state.cdeebee.request.lastResultIdList['/api/users'] ?? [];
+      expect(resultIDList).toEqual([]);
     });
 
     it('should return result IDs after fulfilled request with primaryKey data', () => {
@@ -211,7 +211,7 @@ describe('cdeebee hooks selector logic', () => {
       });
 
       const state = store.getState();
-      expect(state.cdeebee.request.lastResultIdList['/api/users']).toEqual(['1', '2']);
+      expect(state.cdeebee.request.lastResultIdList['/api/users']['userList']).toEqual(['1', '2']);
     });
 
     it('should not have lastResultIdList when response has no primaryKey format', () => {
@@ -229,7 +229,7 @@ describe('cdeebee hooks selector logic', () => {
       });
 
       const state = store.getState();
-      expect(state.cdeebee.request.lastResultIdList['/api/users']).toEqual([]);
+      expect(state.cdeebee.request.lastResultIdList['/api/users']).toEqual({});
     });
   });
 

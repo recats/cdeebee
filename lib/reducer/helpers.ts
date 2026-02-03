@@ -52,19 +52,19 @@ export function omit<T extends Record<string, unknown>>(keys: string[], obj: T):
 }
 
 /**
- * Extract primary key values from API response data.
+ * Extract primary key values from API response data per list.
  * Handles responses with format: { listName: { data: [...], primaryKey: 'id' } }
- * Returns a flat array of all extracted IDs from all lists.
+ * Returns a map of listName -> array of IDs.
  */
-export function extractResultIdList(response: unknown): string[] {
+export function extractLastResultIdList(response: unknown): Record<string, string[]> {
   if (!isRecord(response)) {
-    return [];
+    return {};
   }
 
-  const ids: string[] = [];
+  const result: Record<string, string[]> = {};
 
-  for (const key of Object.keys(response)) {
-    const value = response[key];
+  for (const listName of Object.keys(response)) {
+    const value = response[listName];
 
     if (
       isRecord(value) &&
@@ -72,15 +72,19 @@ export function extractResultIdList(response: unknown): string[] {
       typeof value.primaryKey === 'string'
     ) {
       const primaryKey = value.primaryKey;
+      const idList: string[] = [];
+
       for (const item of value.data) {
         if (isRecord(item) && primaryKey in item) {
-          ids.push(String(item[primaryKey]));
+          idList.push(String(item[primaryKey]));
         }
       }
+
+      result[listName] = idList;
     }
   }
 
-  return ids;
+  return result;
 }
 
 export function batchingUpdate<T extends Record<string, unknown>>(

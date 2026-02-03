@@ -89,7 +89,7 @@ Available selector hooks:
 - `useStorage()`: Get the entire storage object
 - `useRequestHistory(api)`: Get successful request history for a specific API
 - `useRequestErrors(api)`: Get error history for a specific API
-- `useLastResultIdList(api)`: Get the IDs returned by the last request to filter storage data
+- `useLastResultIdList(api, listName)`: Get the IDs returned by the last request for a specific list to filter storage data
 
 All hooks use `react-redux`'s `useSelector` internally and are fully typed for TypeScript.
 
@@ -208,23 +208,28 @@ When `files` array is provided, the request automatically switches to FormData. 
 
 When using `replace` strategy with navigation (e.g., search pages), data can become stale on browser back. Solutions:
 
-1. **Use `merge` + `useLastResultIdList`** (recommended): Data accumulates with `merge` strategy, but `useLastResultIdList(api)` returns the IDs from the last request. Filter storage by these IDs to show only current results. This preserves data across navigation while showing correct results.
+1. **Use `merge` + `useLastResultIdList`** (recommended): Data accumulates with `merge` strategy, but `useLastResultIdList(api, listName)` returns the IDs from the last request for that list. Filter storage by these IDs to show only current results. This preserves data across navigation while showing correct results.
 2. **Use `merge` strategy**: Data accumulates instead of replacing (may show stale data from previous searches)
 3. **Clear and refetch**: Use `historyClear` and refetch on route change
 
 ### Result ID List
 
-The `lastResultIdList` state (`state.request.lastResultIdList`) tracks which primary key IDs were returned by each API's last successful request. This is populated automatically when API responses use the `{ data: [...], primaryKey: 'id' }` format.
+The `lastResultIdList` state (`state.request.lastResultIdList`) tracks which primary key IDs were returned by each API's last successful request, organized per list. This is populated automatically when API responses use the `{ data: [...], primaryKey: 'id' }` format.
 
 ```typescript
 // State structure
 state.request.lastResultIdList = {
-  '/api/search': ['101', '102', '103'],  // IDs from last search
-  '/api/products': ['1', '2'],           // IDs from last products request
+  '/api/search': {
+    'productList': ['101', '102', '103'],  // IDs from last search for productList
+    'categoryList': ['1', '2'],            // IDs from last search for categoryList
+  },
+  '/api/products': {
+    'productList': ['1', '2'],             // IDs from last products request
+  },
 }
 ```
 
-This enables the pattern: use `merge` strategy (data never lost), filter by `lastResultIdList` (show only current results).
+This enables the pattern: use `merge` strategy (data never lost), filter by `lastResultIdList[api][listName]` (show only current results).
 
 
 ### Build Configuration and External Dependencies
@@ -242,3 +247,9 @@ These dependencies are:
 - **NOT bundled** with the library distribution
 
 If hooks are being bundled, users will get "Cannot read properties of null (reading 'useContext')" errors because there will be multiple React instances.
+
+
+## Naming Conventions
+
+- Use plural form for list-type variable names without trailing 's': `lastIdList` (not `lastIdLists`), `resultIdList` (not `resultIdLists`)
+- Storage list names should end with `List`: `productList`, `userList`, `categoryList`

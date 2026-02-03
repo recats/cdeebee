@@ -773,7 +773,7 @@ describe('factory', () => {
 
       const state = store.getState().cdeebee;
       expect(state.request.lastResultIdList['/api/search']).toBeDefined();
-      expect(state.request.lastResultIdList['/api/search']).toEqual(['101', '102', '103']);
+      expect(state.request.lastResultIdList['/api/search']['productList']).toEqual(['101', '102', '103']);
     });
 
     it('should extract IDs from multiple lists in same response', async () => {
@@ -799,10 +799,9 @@ describe('factory', () => {
       await dispatch(request({ api: '/api/data' }));
 
       const state = store.getState().cdeebee;
-      // All IDs from all lists are combined
-      expect(state.request.lastResultIdList['/api/data']).toContain('u1');
-      expect(state.request.lastResultIdList['/api/data']).toContain('p1');
-      expect(state.request.lastResultIdList['/api/data']).toContain('p2');
+      // IDs are stored per list
+      expect(state.request.lastResultIdList['/api/data']['userList']).toEqual(['u1']);
+      expect(state.request.lastResultIdList['/api/data']['postList']).toEqual(['p1', 'p2']);
     });
 
     it('should not store lastResultIdList when response has no primaryKey format', async () => {
@@ -821,7 +820,7 @@ describe('factory', () => {
       await dispatch(request({ api: '/api/users' }));
 
       const state = store.getState().cdeebee;
-      expect(state.request.lastResultIdList['/api/users']).toEqual([]);
+      expect(state.request.lastResultIdList['/api/users']).toEqual({});
     });
 
     it('should replace lastResultIdList on subsequent requests to same API', async () => {
@@ -841,7 +840,7 @@ describe('factory', () => {
       await dispatch(request({ api: '/api/search' }));
 
       let state = store.getState().cdeebee;
-      expect(state.request.lastResultIdList['/api/search']).toEqual(['1', '2']);
+      expect(state.request.lastResultIdList['/api/search']['productList']).toEqual(['1', '2']);
 
       // Second request
       const secondResponse = {
@@ -856,7 +855,7 @@ describe('factory', () => {
       await dispatch(request({ api: '/api/search' }));
 
       state = store.getState().cdeebee;
-      expect(state.request.lastResultIdList['/api/search']).toEqual(['3', '4', '5']);
+      expect(state.request.lastResultIdList['/api/search']['productList']).toEqual(['3', '4', '5']);
     });
 
     it('should not store lastResultIdList when ignore option is true', async () => {
@@ -921,7 +920,7 @@ describe('factory', () => {
       await dispatch(request({ api: '/api/items' }));
 
       const state = store.getState().cdeebee;
-      expect(state.request.lastResultIdList['/api/items']).toEqual(['100', '200']);
+      expect(state.request.lastResultIdList['/api/items']['itemList']).toEqual(['100', '200']);
     });
   });
 

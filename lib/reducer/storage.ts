@@ -16,14 +16,14 @@ function isDataWithPrimaryKey(value: unknown): value is { data: unknown[]; prima
 }
 function normalizeDataWithPrimaryKey(data: unknown[], primaryKey: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  
+
   for (const item of data) {
     if (isRecord(item) && primaryKey in item) {
       const key = String(item[primaryKey]);
       result[key] = item;
     }
   }
-  
+
   return result;
 }
 
@@ -48,11 +48,11 @@ function applyStrategy(
 export function defaultNormalize<T>(
   cdeebee: CdeebeeState<T>,
   response: IResponse,
-  strategyList: CdeebeeListStrategy<T> 
+  strategyList: CdeebeeListStrategy<T>
 ): Record<string, ResponseValue> {
   const keyList = Object.keys(response);
   const currentStorage = isRecord(cdeebee.storage) ? (cdeebee.storage as Record<string, unknown>) : {};
-  
+
   const result = { ...currentStorage } as Record<string, ResponseValue>;
   const keyListToOmit = new Set<string>();
 
@@ -65,12 +65,12 @@ export function defaultNormalize<T>(
     }
 
     const strategy = strategyList[key as keyof T] ?? 'merge';
-    
+
     // For 'skip' strategy, if key doesn't exist in storage, skip it entirely
     if (strategy === 'skip' && !(key in currentStorage)) {
       continue;
     }
-    
+
     const existingValue = key in currentStorage ? (currentStorage[key] as StorageData) : {};
 
     if (isDataWithPrimaryKey(responseValue)) {
