@@ -45,6 +45,8 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^10.0.1",
     "@reduxjs/toolkit": "^2.11.2",
     "@types/lodash": "^4.17.24",
     "@types/node": "^25.4.0",
