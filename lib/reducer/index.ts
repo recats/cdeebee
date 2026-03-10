@@ -27,7 +27,7 @@ const initialState: CdeebeeState<unknown> = {
 export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
   const slice = createSlice({
     name: 'cdeebee',
-    initialState: mergeDeepRight(initialState, { settings, storage: storage ?? {} }) as CdeebeeState<T>,
+    initialState: mergeDeepRight(initialState as CdeebeeState<T>, { settings, storage: storage ?? {} }) as CdeebeeState<T>,
     reducers: {
       set(state, action: { payload: CdeebeeValueList<T> }) {
         // Directly mutate state.storage using Immer Draft
@@ -77,6 +77,10 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
           checkModule(state.settings, 'history', () => {
             if (!state.request.done[api]) state.request.done[api] = [];
             state.request.done[api].push({ api, request: action.payload, requestId });
+            const max = state.settings.maxHistorySize;
+            if (max && state.request.done[api].length > max) {
+              state.request.done[api] = state.request.done[api].slice(-max);
+            }
           });
           checkModule(state.settings, 'storage', () => {
             if (action.meta.arg.ignore) {
@@ -110,6 +114,10 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
           checkModule(state.settings, 'history', () => {
             if (!state.request.errors[api]) state.request.errors[api] = [];
             state.request.errors[api].push({ requestId: requestId, api, request: action.error });
+            const max = state.settings.maxHistorySize;
+            if (max && state.request.errors[api].length > max) {
+              state.request.errors[api] = state.request.errors[api].slice(-max);
+            }
           });
         });
     },

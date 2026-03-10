@@ -10,7 +10,8 @@ export interface CdeebeeSettings<T> {
   mergeWithData: Record<string, unknown> | (() => Record<string, unknown>);
   mergeWithHeaders: Record<string, string> | (() => Record<string, string>);
   listStrategy?: CdeebeeListStrategy<T>;
-  normalize?: <T>(storage: CdeebeeState<T>, result: T, strategyList: CdeebeeListStrategy<T>) => T;
+  normalize?: (storage: CdeebeeState<T>, result: unknown, strategyList: CdeebeeListStrategy<T>) => Record<string, unknown>;
+  maxHistorySize?: number;
 }
 
 export interface CdeebeeHistoryState {

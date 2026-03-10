@@ -22,6 +22,7 @@ class QueryQueue {
 
   clear(): void {
     this.queueLength = 0;
+    this.currentPromise = Promise.resolve();
   }
 }
 

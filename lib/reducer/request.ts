@@ -30,6 +30,7 @@ export const request = createAsyncThunk(
 
         const b = { ...baseData, ...(body ?? {}) };
         let requestData: FormData | string = JSON.stringify(b);
+        const isFormData = !!options.files;
 
         // handling files
         if (options.files) {
@@ -50,15 +51,19 @@ export const request = createAsyncThunk(
         }
         // [end] handling files
 
+        const fetchHeaders: Record<string, string> = {
+          'ui-request-id': requestId,
+          ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+          ...extraHeaders,
+        };
+
+        const isGet = method === 'GET';
+
         const response = await fetch(options.api, {
           method,
-          headers: {
-            'ui-request-id': requestId,
-            'Content-Type': 'application/json',
-            ...extraHeaders,
-          },
+          headers: fetchHeaders,
           signal: abort.controller.signal,
-          body: requestData,
+          ...(isGet ? {} : { body: requestData }),
         });
 
         checkModule(settings, 'cancelation', abort.drop);
@@ -77,7 +82,7 @@ export const request = createAsyncThunk(
 
         if (!response.ok) {
           if (withCallback) options.onResult!(result);
-          return rejectWithValue(response);
+          return rejectWithValue({ status: response.status, statusText: response.statusText, data: result });
         }
 
         if (withCallback) options.onResult!(result);

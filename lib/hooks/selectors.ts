@@ -1,5 +1,9 @@
 import { useSelector } from 'react-redux';
-import { type CdeebeeState } from '../reducer/types';
+import { type CdeebeeState, type CdeebeeHistoryState } from '../reducer/types';
+
+const EMPTY_ARRAY: readonly never[] = [];
+const EMPTY_HISTORY: readonly CdeebeeHistoryState[] = EMPTY_ARRAY;
+const EMPTY_ID_LIST: readonly string[] = EMPTY_ARRAY;
 
 /**
  * Standalone hook that can be used without createCdeebeeHooks.
@@ -26,7 +30,7 @@ export function useLoading<Storage = unknown>(apiList: string[]): boolean {
  */
 export function useRequestHistory<Storage = unknown>(api: string) {
   return useSelector((state: { cdeebee: CdeebeeState<Storage> }) => {
-    return state.cdeebee.request.done[api] ?? [];
+    return state.cdeebee.request.done[api] ?? EMPTY_HISTORY;
   });
 }
 
@@ -39,7 +43,7 @@ export function useRequestHistory<Storage = unknown>(api: string) {
  */
 export function useRequestErrors<Storage = unknown>(api: string) {
   return useSelector((state: { cdeebee: CdeebeeState<Storage> }) => {
-    return state.cdeebee.request.errors[api] ?? [];
+    return state.cdeebee.request.errors[api] ?? EMPTY_HISTORY;
   });
 }
 
@@ -98,6 +102,6 @@ export function useIsLoading<Storage = unknown>(): boolean {
  */
 export function useLastResultIdList<Storage, K extends keyof Storage>(api: string, listName: K): string[] {
   return useSelector((state: { cdeebee: CdeebeeState<Storage> }) => {
-    return state.cdeebee.request.lastResultIdList[api]?.[listName as string] ?? [];
+    return state.cdeebee.request.lastResultIdList[api]?.[listName as string] ?? EMPTY_ID_LIST;
   });
 }

@@ -180,7 +180,10 @@ describe('request', () => {
 
       expect(result.type).toBe('cdeebee/request/rejected');
       if ('payload' in result) {
-        expect(result.payload).toBe(mockResponse);
+        const payload = result.payload as { status: number; statusText: string; data: unknown };
+        expect(payload.status).toBe(404);
+        expect(payload.statusText).toBe('Not Found');
+        expect(payload.data).toEqual({});
       }
     });
 
@@ -655,8 +658,7 @@ describe('request', () => {
       await dispatch(request(options));
 
       const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body as string);
-      expect(body).toEqual({ defaultKey: 'defaultValue' });
+      expect(callArgs[1].body).toBeUndefined();
     });
 
     it('should handle response without content-type header', async () => {

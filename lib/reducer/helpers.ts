@@ -1,7 +1,7 @@
 import { type WritableDraft } from '@reduxjs/toolkit';
 import { type CdeebeeSettings, type CdeebeeModule, CdeebeeValueList } from './types';
 
-export function checkModule(settings: CdeebeeSettings<unknown> | WritableDraft<CdeebeeSettings<unknown>>, module: CdeebeeModule, result: () => void) {
+export function checkModule<T = unknown>(settings: CdeebeeSettings<T> | WritableDraft<CdeebeeSettings<T>>, module: CdeebeeModule, result: () => void) {
   if (settings.modules.includes(module)) {
     result();
   }
@@ -122,9 +122,12 @@ export function batchingUpdate<T extends Record<string, unknown>>(
       }
     }
 
+    const lastKey = path[path.length - 1];
     if (Array.isArray(current)) {
-      continue; // Can't update array element directly
+      const index = typeof lastKey === 'number' ? lastKey : Number(lastKey);
+      current[index] = value;
+    } else {
+      current[String(lastKey)] = value;
     }
-    current[String(path[path.length - 1])] = value;
   }
 }
