@@ -88,16 +88,13 @@ export const factory = <T>(settings: CdeebeeSettings<T>, storage?: T) => {
             }
 
             const strategyList = (action.meta.arg.listStrategy ?? state.settings.listStrategy ?? {}) as CdeebeeListStrategy<T>;
-            const normalize = action.meta.arg.normalize ?? state.settings.normalize ?? defaultNormalize;
+            const normalize = (action.meta.arg.normalize ?? state.settings.normalize ?? defaultNormalize) as NonNullable<CdeebeeSettings<T>['normalize']>;
 
             const currentState = current(state) as CdeebeeState<T>;
-            // Type assertion is safe here because we've already checked isRecord
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const normalizedData = normalize(currentState, action.payload.result as any, strategyList);
+            const normalizedData = normalize(currentState, action.payload.result, strategyList);
 
             // Normalize already handles merge/replace/skip and preserves keys not in response
             // Simply apply the result
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (state.storage as any) = normalizedData;
 
             // Extract and store result IDs for filtering per list
