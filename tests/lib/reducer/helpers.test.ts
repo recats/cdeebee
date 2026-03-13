@@ -416,22 +416,20 @@ describe('batchingUpdate', () => {
     expect(state.a).toBe(2);
   });
 
-  it('should skip update when current becomes array after traversing path', () => {
+  it('should update array element directly when path ends at array index', () => {
     const state: Record<string, unknown> = {
       items: [{ id: 1 }, { id: 2 }],
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const valueList: any = [
-      { key: ['items', 0], value: 'should be skipped' },
+      { key: ['items', 0], value: 'replaced' },
     ];
 
     batchingUpdate(state, valueList);
 
-    // Should remain unchanged because current is an array at final step
-    // The continue statement triggers when trying to update an element in an array
-    const items = state.items as Array<Record<string, unknown>>;
+    const items = state.items as Array<unknown>;
     expect(Array.isArray(state.items)).toBe(true);
-    expect(items[0]).toEqual({ id: 1 });
+    expect(items[0]).toBe('replaced');
     expect(items[1]).toEqual({ id: 2 });
   });
 

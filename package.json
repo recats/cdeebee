@@ -1,6 +1,6 @@
 {
   "name": "@recats/cdeebee",
-  "version": "3.0.0-beta.14",
+  "version": "3.0.0",
   "description": "React Redux data-logic library",
   "repository": "git@github.com:recats/cdeebee.git",
   "author": "recats",
@@ -45,20 +45,22 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^10.0.1",
     "@reduxjs/toolkit": "^2.11.2",
-    "@types/lodash": "^4.17.23",
-    "@types/node": "^22.19.5",
-    "@types/react": "^18.3.27",
-    "@vitest/coverage-v8": "^2.1.9",
-    "eslint": "^9.39.2",
-    "jsdom": "^27.4.0",
-    "react": "^19.2.3",
+    "@types/lodash": "^4.17.24",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@vitest/coverage-v8": "^4.1.0",
+    "eslint": "^10.0.3",
+    "jsdom": "^28.1.0",
+    "react": "^19.2.4",
     "react-redux": "^9.2.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.53.0",
-    "vite": "^6.4.1",
+    "typescript-eslint": "^8.57.0",
+    "vite": "^8.0.0",
     "vite-plugin-dts": "^4.5.4",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.0"
   },
   "peerDependencies": {
     "@reduxjs/toolkit": ">=2",

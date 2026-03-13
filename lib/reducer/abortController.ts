@@ -36,15 +36,15 @@ class AbortControllerStore {
     const requestIDList = this.byApi.get(api);
     if (!requestIDList) return;
 
-    requestIDList.forEach(requestId => {
-      if (requestId !== excludeRequestId) {
-        const item = this.byRequestId.get(requestId);
-        if (item) {
-          item.controller.abort();
-          this.delete(requestId);
-        }
+    const toAbort = Array.from(requestIDList).filter(id => id !== excludeRequestId);
+
+    for (const requestId of toAbort) {
+      const item = this.byRequestId.get(requestId);
+      if (item) {
+        item.controller.abort();
+        this.delete(requestId);
       }
-    });
+    }
   }
 }
 

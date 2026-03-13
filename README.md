@@ -5,11 +5,11 @@ A Redux-based data management library that provides a uniform way to access, fet
 ## Installation
 
 ```sh
-npm i @recats/cdeebee@beta
+npm i @recats/cdeebee
 # or
-yarn add @recats/cdeebee@beta
+yarn add @recats/cdeebee
 # or
-pnpm add @recats/cdeebee@beta
+pnpm add @recats/cdeebee
 ```
 
 ## What is cdeebee?
@@ -88,7 +88,9 @@ export const cdeebeeSlice = factory<Storage>(
     listStrategy: {
       forumList: 'merge',
       threadList: 'replace',
+      postList: 'merge',
     },
+    maxHistorySize: 50,
     mergeWithData: {
       sessionToken: 'your-session-token',
     },
@@ -189,7 +191,8 @@ interface CdeebeeSettings<T> {
   listStrategy?: CdeebeeListStrategy<T>; // Merge strategy per list: 'merge' | 'replace' | 'skip'
   mergeWithData?: Record<string, unknown> | (() => Record<string, unknown>);   // Data to merge with every request body (static or dynamic)
   mergeWithHeaders?: Record<string, string> | (() => Record<string, string>);  // Headers to merge with every request (static or dynamic)
-  normalize?: (storage, result, strategyList) => T; // Custom normalization function
+  normalize?: (storage: CdeebeeState<T>, result: unknown, strategyList: CdeebeeListStrategy<T>) => Record<string, unknown>; // Custom normalization function
+  maxHistorySize?: number;            // Max history entries per API (prevents unbounded growth)
 }
 ```
 
@@ -199,19 +202,21 @@ interface CdeebeeSettings<T> {
 interface CdeebeeRequestOptions<T> {
   api: string;                        // API endpoint URL
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  body?: unknown;                     // Request body
+  body?: unknown;                     // Request body (omitted for GET requests)
   headers?: Record<string, string>;   // Additional headers (merged with mergeWithHeaders)
-  files?: File[];                     // Files to upload
+  files?: File[];                     // Files to upload (Content-Type is set automatically)
   fileKey?: string;                   // Override default fileKey
   bodyKey?: string;                   // Override default bodyKey
-  listStrategy?: CdeebeeListStrategy<T>; // Override list strategy for this request
-  normalize?: (storage, result, strategyList) => T; // Override normalization
+  listStrategy?: Partial<CdeebeeListStrategy<T>>; // Override list strategy for this request (partial)
+  normalize?: (storage: CdeebeeState<T>, result: unknown, strategyList: CdeebeeListStrategy<T>) => Record<string, unknown>; // Override normalization
   onResult?: (response: T) => void;  // Callback called with response data (always called, even on errors)
   ignore?: boolean;                   // Skip storing result in storage
   responseType?: 'json' | 'text' | 'blob'; // Response parsing type (default: 'json')
   historyClear?: boolean;             // Auto-clear history for this API before making the request
 }
 ```
+
+**Error handling:** When a request fails (non-2xx response), the rejected action payload contains `{ status, statusText, data }` where `data` is the parsed response body.
 
 ## Data Merging Strategies
 
@@ -754,10 +759,11 @@ export {
 // Types
 export type {
   CdeebeeState,
-  CdeebeeSettings,
   CdeebeeRequestOptions,
   CdeebeeValueList,
+  CdeebeeListStrategy,
   CdeebeeActiveRequest,
+  CdeebeeHistoryState,
   CdeebeeModule,
 } from '@recats/cdeebee';
 ```

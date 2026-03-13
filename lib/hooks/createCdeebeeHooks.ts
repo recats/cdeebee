@@ -1,5 +1,9 @@
 import { useSelector } from 'react-redux';
-import { type CdeebeeState } from '../reducer/types';
+import { type CdeebeeState, type CdeebeeHistoryState } from '../reducer/types';
+
+const EMPTY_ARRAY: readonly never[] = [];
+const EMPTY_HISTORY: readonly CdeebeeHistoryState[] = EMPTY_ARRAY;
+const EMPTY_ID_LIST: readonly string[] = EMPTY_ARRAY;
 
 /**
  * Generic hook factory that creates a selector hook for cdeebee state.
@@ -43,7 +47,7 @@ export function createCdeebeeHooks<RootState, Storage>(
   function useRequestHistory(api: string) {
     return useSelector((state: RootState) => {
       const cdeebee = selectCdeebee(state);
-      return cdeebee.request.done[api] ?? [];
+      return cdeebee.request.done[api] ?? EMPTY_HISTORY;
     });
   }
 
@@ -62,7 +66,7 @@ export function createCdeebeeHooks<RootState, Storage>(
   function useRequestErrors(api: string) {
     return useSelector((state: RootState) => {
       const cdeebee = selectCdeebee(state);
-      return cdeebee.request.errors[api] ?? [];
+      return cdeebee.request.errors[api] ?? EMPTY_HISTORY;
     });
   }
 
@@ -131,7 +135,7 @@ export function createCdeebeeHooks<RootState, Storage>(
   function useLastResultIdList<K extends keyof Storage>(api: string, listName: K): string[] {
     return useSelector((state: RootState) => {
       const cdeebee = selectCdeebee(state);
-      return cdeebee.request.lastResultIdList[api]?.[listName as string] ?? [];
+      return cdeebee.request.lastResultIdList[api]?.[listName as string] ?? EMPTY_ID_LIST;
     });
   }
 
