@@ -1,6 +1,6 @@
 {
   "name": "@recats/cdeebee",
-  "version": "4.0.0",
+  "version": "4.0.0-beta.1",
   "description": "Standalone normalized data store with a typed request pipeline",
   "repository": "git@github.com:recats/cdeebee.git",
   "author": "recats",
@@ -54,7 +54,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "MIGRATION.md"
   ],
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",
