@@ -18,6 +18,7 @@ export default tseslint.config(
       'arrow-parens': ['error', 'as-needed'],
       'no-multiple-empty-lines': ['error', { 'max': 1 }],
       '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       'object-curly-spacing': [2, 'always'],
       'quotes': [2, 'single', { 'avoidEscape': true }],
       'jsx-quotes': [2, 'prefer-single'],

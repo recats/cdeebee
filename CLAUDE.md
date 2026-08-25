@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-cdeebee is a Redux-based data management library that provides a normalized data storage system similar to relational databases. It's built on top of Redux Toolkit and focuses on reducing boilerplate for data fetching, normalization, and state management.
+cdeebee is a standalone normalized data store with a typed request pipeline. It keeps API responses in keyed lists (like tables in a relational database), runs every request through a small ordered plugin chain, and exposes React hooks that re-render only the component whose data actually changed. There is no Redux dependency — `createCdeebee` builds and owns its own state.
 
 ## Development Commands
 
 ```bash
 pnpm build              # Build library using Vite
-pnpm lint               # Lint TypeScript files with ESLint
-pnpm lint:ts            # Type-check with TypeScript (no emit)
+pnpm lint               # Lint lib/ and tests/ with ESLint
+pnpm lint:ts            # Type-check lib/ and tests/ with TypeScript (no emit)
 pnpm lint:all           # Run both linters
 pnpm test               # Run tests in watch mode with Vitest
 pnpm test:run           # Run tests once
@@ -20,87 +20,78 @@ pnpm test:coverage      # Run tests with coverage report
 
 Run a single test file:
 ```bash
-pnpm test tests/lib/reducer/storage.test.ts
+pnpm test tests/lib/core/commit.test.ts
 ```
 
-Tests use Vitest with jsdom environment. Test files are in `tests/lib/` mirroring the `lib/` structure.
+Test files are in `tests/lib/` mirroring the `lib/` structure. `vitest.config.ts` sets `environment: 'node'` by default — core, plugin, and utils tests run without a DOM. A React test needs its own `// @vitest-environment jsdom` directive at the top of the file and must use a `.tsx` extension.
 
 ## Architecture
 
-### Modular System
+```
+lib/
+  core/      createCdeebee.ts, commit.ts, subscription.ts, indexManager.ts, normalize.ts,
+             fetchClient.ts, requestError.ts, pipeline.ts, types.ts
+  plugins/   history.ts, cancelation.ts, queryQueue.ts, retry.ts, devtools.ts
+  react/     createCdeebeeHooks.ts
+  utils/     batchingUpdate.ts, shallowEqual.ts, keyBy.ts, entityID.ts, isRecord.ts, env.ts, requestID.ts
+  core.ts    entry point re-exporting core/ + plugins/ (no React import, ever)
+  index.ts   entry point re-exporting core.ts + react/ (the full package)
+```
 
-The library is composed of independent modules that can be enabled/disabled:
-- `storage`: Normalizes and stores API responses
-- `history`: Tracks request history (successful and failed requests)
-- `listener`: Tracks active requests for loading states
-- `cancelation`: Manages automatic request cancellation for duplicate API calls
-- `queryQueue`: Processes requests sequentially to maintain order
+Two package entry points: `@recats/cdeebee` (`lib/index.ts`, everything) and `@recats/cdeebee/core` (`lib/core.ts`, no React). Keeping the core entry React-free is load-bearing — see "Build note" below.
 
-### Key Files
+### Key concepts
 
-- **`lib/reducer/index.ts`**: Redux slice factory. `factory()` creates a slice with configured modules. Reducer actions: `set` (path-based storage updates) and `historyClear`.
-- **`lib/reducer/request.ts`**: `request` async thunk handling all API calls — FormData for uploads, merged headers/body (supports dynamic functions), abort signals, response types (json/text/blob), queryQueue integration. Body is omitted for GET requests. On error, `rejectWithValue` returns `{ status, statusText, data }`.
-- **`lib/reducer/storage.ts`**: `defaultNormalize()` — detects `{ data: [...], primaryKey: 'string' }` format, normalizes into keyed objects, applies merge strategies per list.
-- **`lib/reducer/queryQueue.ts`**: Sequential request queue using promise chaining.
-- **`lib/reducer/abortController.ts`**: AbortController management for request cancellation per API endpoint.
-- **`lib/reducer/helpers.ts`**: Utilities — `checkModule()`, `mergeDeepRight()`, `batchingUpdate()` (Immer mutations for `set` action), `extractLastResultIdList()`, `isRecord()`.
-- **`lib/reducer/types.ts`**: TypeScript definitions including `CdeebeeValueList<T>` (path-based type-safe batch updates).
-- **`lib/hooks/selectors.ts`**: Standalone selector hooks assuming state at `state.cdeebee`.
-- **`lib/hooks/createCdeebeeHooks.ts`**: Factory for custom state paths — returns same hooks as `selectors.ts` but with configurable selector.
+- **One immutable snapshot.** `db.getState()` returns `{ storage, activeRequestList }`; a new object is only produced when something actually changed. `db.getSnapshot()` additionally includes each plugin's `getState()` under `pluginStateList`, for devtools/SSR.
+- **`commit` is the single write path.** Every mutation — a request response, `setEntity`, `removeEntityList`, `clearList`, `replaceList` — funnels through `db.commit(changeSet, meta)` in `lib/core/createCdeebee.ts`, which calls `applyChangeSet` (`lib/core/commit.ts`) once and produces at most one new storage object and one `changedList`.
+- **`ChangeSet`.** `{ [listName]: { upsertList?, removeIDList?, replaceList? } }`. `applyChangeSet` compares each incoming entity with `shallowEqual` against the existing one and keeps the old reference when nothing changed, so unaffected entities and unaffected lists never get new references.
+- **Keyed subscriptions + microtask flush.** `SubscriptionManager` (`lib/core/subscription.ts`) tracks listeners at three granularities — global, per-list, per-entity — and batches notifications: a listener is enqueued into a `FlushScheduler` and actually called once per microtask (`db.flush()` flushes synchronously, used by tests). Commits with `meta.source === 'set'` (the local mutations) flush synchronously inside `commit`, so a controlled input bound to `useEntity` never loses its caret; request commits stay microtask-batched. `RequestSubscriptionManager` does the same for `activeRequestList`, keyed by api.
+- **`IndexManager`** (`lib/core/indexManager.ts`) maintains secondary indexes declared in `settings.indexList` incrementally on every commit (`rebuild`/`update`/`get`/`has`), so `db.getIndex(listName, fieldName, value)` and `useEntityListBy` are O(1) lookups instead of a scan.
+- **Request pipeline order** (`lib/core/pipeline.ts`, `runRequest`): an abort check for an already-aborted `options.signal` → `onRequest` (any plugin returning `false` throws an abort) → `fetchWithRetry` (retries only while some plugin's `onRetry` returns a delay) → `onResponse` (the abort signal is re-checked after every hook) → an abort re-check → normalize + `commit` (skipped when `ignoreStorage`) → `onSettled`. On any failure: `onError` then `onSettled`. `onRequest`/`onResponse` throwing aborts the request and rejects it; `onError`/`onSettled` failures are isolated — caught and `console.error`'d, never change the outcome.
+- **Error kinds** (`CdeebeeErrorKind`): `'http'` (non-ok response, body parsed first), `'network'` (fetch itself threw), `'abort'` (external signal, `cancelation`, a plugin's `false`, or an abort mid-parse of a non-ok body), `'parse'` (body could not be parsed as `responseType`).
 
-### Hooks
+### Strategies
 
-- `useLoading(apiList)`: Check if any APIs in the list are currently loading
-- `useIsLoading()`: Check if any request is loading globally
-- `useStorageList(listName)`: Get a specific list from storage with type safety
-- `useStorage()`: Get the entire storage object
-- `useRequestHistory(api)`: Get successful request history for a specific API
-- `useRequestErrors(api)`: Get error history for a specific API
-- `useLastResultIdList(api, listName)`: Get IDs returned by last request for a specific list
+Resolved per list as `options.strategyList[list] ?? settings.strategyList[list] ?? 'upsert'`:
+- **`upsert`** (default): each response entity replaces the corresponding entity whole (no deep merge); entities not in the response are kept.
+- **`replaceList`**: the list becomes exactly the response's entities.
+- **`skip`**: the list is untouched.
 
-### Merge Strategies
+There is no deep-merge strategy; a partial update has to be assembled explicitly in a custom `normalize` (spread `ctx.storage.<list>[id]` under the incoming partial entity).
 
-Three strategies per list (set globally via `listStrategy` or overridden per-request with `Partial<>`):
-- **`merge`** (default): Deep merges new data with existing, preserving keys not in response
-- **`replace`**: Completely replaces the list with new data
-- **`skip`**: Preserves existing data unchanged
+### Hooks (`lib/react/createCdeebeeHooks.ts`)
 
-### Settings
+| Hook | Re-renders on |
+|---|---|
+| `useEntity(listName, entityID)` | that one entity |
+| `useList(listName)` | any change to the list |
+| `useEntityList(listName, entityIDList)` | any of the listed entities |
+| `useListSelector(listName, selector, depList?)` | the list, re-running `selector`; keeps the previous array reference when the result is shallow-equal |
+| `useEntityListBy(listName, fieldName, value)` | the list, via an `IndexManager` index; throws if `(listName, fieldName)` is not in `settings.indexList` |
+| `useLoading(apiList)` | any api in `apiList` being in flight |
+| `useIsLoading()` | any request at all being in flight |
+| `useStore(selector, equalityFn?)` | full state through `selector` (`equalityFn` defaults to `Object.is`); last resort — prefer a more specific hook |
+| `useRequestHistory(api)` / `useRequestErrorList(api)` / `useLastResultIDList(api, listName)` | the `history` plugin's state for `api`; throw if `history()` is not in `settings.pluginList` |
 
-`factory<T>(settings, storage?)` accepts `CdeebeeSettings<T>`:
-- `modules`: Which modules to enable
-- `mergeWithHeaders` / `mergeWithData`: Static objects or dynamic functions (called per request, useful for auth tokens)
-- `listStrategy`: Default merge strategy per list
-- `normalize`: Custom normalization function (defaults to `defaultNormalize`)
-- `maxHistorySize`: Optional limit on history entries per API (prevents unbounded growth)
-- `fileKey` / `bodyKey`: Keys for FormData uploads (defaults: `'file'` / `'value'`)
-
-**Note**: Dynamic functions for `mergeWithHeaders`/`mergeWithData` require configuring `serializableCheck.ignoredPaths` in your Redux store.
+All hooks are built on `useSyncExternalStore`, so they are safe to use with concurrent React features.
 
 ## Important Implementation Notes
 
-### State Mutation with Immer
+### Build note
 
-`batchingUpdate()` and `defaultNormalize` directly mutate state via Immer Draft objects. This is safe because Redux Toolkit uses Immer internally.
+`react` is the only external dependency in `vite.config.mjs` (`rollupOptions.external`). `lib/core.ts` (and everything it transitively imports) must never import React — `lib/index.ts` is the only file allowed to. Verify after a build with `grep -c "from \"react\"\|require(\"react\")" dist/core.js dist/core.cjs`, which must both print `0`.
 
-### Request Behavior
+### FormData / headers
 
-- `onResult` callback is **always called** regardless of success or failure
-- On HTTP errors, response body is parsed first, then rejected with `{ status, statusText, data }` (serializable)
-- GET requests do not send a body
-- File uploads: `Content-Type` is omitted (browser sets `multipart/form-data` boundary automatically)
+File uploads (`options.fileList`) send a `FormData` body: files under `settings.fetch.fileKey` (default `'file'`), the JSON payload under `settings.fetch.bodyKey` (default `'value'`); `Content-Type` is stripped so the browser can set the multipart boundary. For JSON bodies, callers may set their own `Content-Type` via `headerList`. The `ui-request-id` header is always set by the library to the request's internal id and cannot be overridden. `settings.fetch.fetch` overrides the fetch implementation used for every request (default `globalThis.fetch`) — useful in environments without a global `fetch`, in tests, or to wrap the real one with instrumentation.
 
-### History Management
+### History
 
-History tracks `state.request.done` and `state.request.errors`. Clear via `historyClear: true` in request options (auto) or dispatching the `historyClear` action (manual). History is capped when `maxHistorySize` is set.
+The `history` plugin (`lib/plugins/history.ts`) records `doneList`/`errorList`/`lastResultIDList` keyed by api on `onSettled`. Each entry retains the full parsed `response` object, so the cap matters: `maxHistorySize` defaults to `20` entries per api, and `maxHistorySize: 0` (or `Infinity`) makes it unbounded. `lastResultIDList[api]` is left untouched by `ignoreStorage` requests (there is no change set to read ids from). Aborted requests are not recorded unless `ignoreAbort: false`. Clear it with `db.getPlugin('history').clear(api?)`.
 
-### Result ID List
+### Entity ids
 
-`lastResultIdList` tracks which IDs were returned per API per list. Use with `merge` strategy + `useLastResultIdList(api, listName)` to show only current results while preserving accumulated data.
-
-### Build Configuration
-
-**CRITICAL**: `vite.config.mjs` must mark `react`, `react-redux`, `@reduxjs/toolkit`, and `redux` as external. These are peer dependencies — bundling them causes "Invalid hook call" / "Cannot read properties of null (reading 'useContext')" errors.
+Entity ids are normalized through `toEntityID` (`lib/utils/entityID.ts`) wherever they appear in index buckets and change sets, so `'5'` and `5` are treated as the same id — including the ids `extractResultIDList` collects for the history plugin's `lastResultIDList`.
 
 ## Code Style
 
@@ -114,5 +105,6 @@ Enforced by ESLint:
 
 ## Naming Conventions
 
-- Use plural form for list-type variable names without trailing 's': `lastIdList` (not `lastIdLists`), `resultIdList` (not `resultIdLists`)
+- Use plural form for list-type variable names without trailing 's': `lastIDList` (not `lastIDLists`), `resultIDList` (not `resultIDLists`)
 - Storage list names should end with `List`: `productList`, `userList`, `categoryList`
+- Entity id fields and parameters use `ID` (not `Id`): `entityID`, `campaignID`, `lastResultIDList`

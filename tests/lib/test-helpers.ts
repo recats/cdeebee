@@ -1,95 +1,46 @@
 import { vi } from 'vitest';
-import { configureStore } from '@reduxjs/toolkit';
-import { factory } from '../../lib/reducer/index';
-import { type CdeebeeSettings } from '../../lib/reducer/types';
 
-// Mock fetch globally
-global.fetch = vi.fn();
-
-// Helper to create mock Response
-export const createMockResponse = (options: {
+export interface MockResponseInit {
   ok?: boolean;
   status?: number;
   statusText?: string;
-  contentType?: string;
   json?: () => Promise<unknown>;
   text?: () => Promise<string>;
   blob?: () => Promise<Blob>;
-}): Response => {
+}
+
+export const createMockResponse = (init: MockResponseInit = {}): Response => {
   const {
     ok = true,
     status = 200,
     statusText = 'OK',
-    contentType = 'application/json',
     json = async () => ({}),
     text = async () => '',
     blob = async () => new Blob(),
-  } = options;
-
-  return {
-    ok,
-    status,
-    statusText,
-    headers: {
-      get: (name: string) => {
-        if (name.toLowerCase() === 'content-type') {
-          return contentType;
-        }
-        return null;
-      },
-    },
-    json,
-    text,
-    blob,
-  } as unknown as Response;
+  } = init;
+  return { ok, status, statusText, json, text, blob, headers: new Headers() } as unknown as Response;
 };
 
-// Helper to create store with proper middleware configuration for tests
-export const createTestStore = <T = Record<string, unknown>>(
-  customSettings?: CdeebeeSettings<T>,
-  initialStorage?: T
-) => {
-  const slice = factory(customSettings || ({} as CdeebeeSettings<T>), initialStorage);
-  return configureStore({
-    reducer: {
-      cdeebee: slice.reducer as any,
-    },
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({
-        serializableCheck: {
-          ignoredPaths: ['cdeebee.settings.normalize'],
-        },
-      }),
-  });
+export const jsonResponse = (body: unknown, init: Omit<MockResponseInit, 'json'> = {}): Response => (
+  createMockResponse({ ...init, json: async () => body, text: async () => JSON.stringify(body) })
+);
+
+/** fetch mock returning responses in order; last one repeats. Records calls in `.mock.calls`. */
+export const mockFetch = (responseList: Array<Response | Error>) => {
+  let index = 0;
+  return vi.fn(async (_url: string, _init?: RequestInit) => {
+    const item = responseList[Math.min(index, responseList.length - 1)];
+    index += 1;
+    if (item instanceof Error) throw item;
+    return item;
+  }) as unknown as typeof fetch & { mock: { calls: Array<[string, RequestInit]> } };
 };
 
-// Helper to mock fetch with response
-export const mockFetch = (response: Response) => {
-  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(response);
+export const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
 };
 
-// Helper to mock fetch with multiple responses
-export const mockFetchMultiple = (responses: Response[]) => {
-  responses.forEach(response => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(response);
-  });
-};
-
-// Helper to mock fetch that always returns the same response
-export const mockFetchAlways = (response: Response) => {
-  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(response);
-};
-
-// Default settings for tests
-export const defaultTestSettings = <T = Record<string, unknown>>(
-  overrides?: Partial<CdeebeeSettings<T>>
-): CdeebeeSettings<T> => ({
-  modules: ['history', 'listener', 'storage', 'cancelation'],
-  fileKey: 'file',
-  bodyKey: 'value',
-  mergeWithData: {},
-  mergeWithHeaders: {},
-  listStrategy: {},
-  ...overrides,
-} as CdeebeeSettings<T>);
-
+export const tick = () => new Promise<void>(resolve => setTimeout(resolve, 0));

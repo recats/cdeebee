@@ -4,8 +4,8 @@ import { resolve } from 'path';
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'jsdom',
-    include: ['tests/**/*.test.ts'],
+    environment: 'node',
+    include: ['tests/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

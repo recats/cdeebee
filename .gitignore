@@ -37,3 +37,6 @@ flow-typed/
 yarn-error.log
 .next
 coverage
+
+.claude/worktrees/
+.superpowers/
