@@ -71,7 +71,7 @@ There is no deep-merge strategy; a partial update has to be assembled explicitly
 | `useLoading(apiList)` | any api in `apiList` being in flight |
 | `useIsLoading()` | any request at all being in flight |
 | `useStore(selector, equalityFn?)` | full state through `selector` (`equalityFn` defaults to `Object.is`); last resort — prefer a more specific hook |
-| `useRequestHistory(api)` / `useRequestErrorList(api)` / `useLastResultIDList(api, listName)` | the `history` plugin's state for `api`; throw if `history()` is not in `settings.pluginList` |
+| `useRequestHistory(api)` / `useRequestErrorList(api)` / `useLastResultIDList(api, listName)` / `useLastResponse(api)` | the `history` plugin's state for `api`; throw if `history()` is not in `settings.pluginList` |
 
 All hooks are built on `useSyncExternalStore`, so they are safe to use with concurrent React features.
 

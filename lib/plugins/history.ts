@@ -25,9 +25,7 @@ export interface CdeebeeHistoryState {
 }
 
 export interface CdeebeeHistoryOptions {
-  /** entries kept per api; defaults to 20. `0` or `Infinity` keeps every entry */
   maxHistorySize?: number;
-  /** skip recording requests that ended with `kind: 'abort'`; defaults to true */
   ignoreAbort?: boolean;
 }
 
@@ -38,6 +36,7 @@ export interface CdeebeeHistoryPlugin<S> extends CdeebeePlugin<S> {
   getState: () => CdeebeeHistoryState;
   subscribe: (listener: CdeebeeListener, apiList?: string[]) => () => void;
   clear: (api?: string) => void;
+  getLast: (api: string) => CdeebeeHistoryEntry | undefined;
 }
 
 const append = (
@@ -82,24 +81,34 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
     subscriptionManager.notify(ctx.api);
   };
 
+  const clear = (api?: string) => {
+    if (api === undefined) {
+      const apiList = new Set([...Object.keys(state.doneList), ...Object.keys(state.errorList)]);
+      state = { doneList: {}, errorList: {}, lastResultIDList: {} };
+      apiList.forEach(q => subscriptionManager.notify(q));
+      return;
+    }
+    if (!(api in state.doneList) && !(api in state.errorList) && !(api in state.lastResultIDList)) return;
+    state = {
+      doneList: omitKey(state.doneList, api),
+      errorList: omitKey(state.errorList, api),
+      lastResultIDList: omitKey(state.lastResultIDList, api),
+    };
+    subscriptionManager.notify(api);
+  };
+
   return {
     name: 'history',
+    onRequest: ctx => {
+      if (ctx.options.historyClear) clear(ctx.api);
+    },
     onSettled,
     getState: () => state,
-    subscribe: (listener, apiList) => subscriptionManager.subscribe(listener, apiList),
-    clear: api => {
-      if (api === undefined) {
-        const apiList = new Set([...Object.keys(state.doneList), ...Object.keys(state.errorList)]);
-        state = { doneList: {}, errorList: {}, lastResultIDList: {} };
-        apiList.forEach(q => subscriptionManager.notify(q));
-        return;
-      }
-      state = {
-        doneList: omitKey(state.doneList, api),
-        errorList: omitKey(state.errorList, api),
-        lastResultIDList: omitKey(state.lastResultIDList, api),
-      };
-      subscriptionManager.notify(api);
+    getLast: api => {
+      const entryList = state.doneList[api];
+      return entryList === undefined ? undefined : entryList[entryList.length - 1];
     },
+    subscribe: (listener, apiList) => subscriptionManager.subscribe(listener, apiList),
+    clear,
   };
 }

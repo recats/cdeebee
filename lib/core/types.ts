@@ -89,6 +89,8 @@ export interface CdeebeeRequestOptions<S, R = unknown, D = unknown> {
   normalize?: CdeebeeNormalize<S, R>;
   ignoreStorage?: boolean;
   signal?: AbortSignal;
+  historyClear?: boolean;
+  meta?: Record<string, unknown>;
 }
 
 export interface CdeebeeRequestContext<S> {
@@ -98,6 +100,7 @@ export interface CdeebeeRequestContext<S> {
   method: CdeebeeMethod;
   data: unknown;
   headerList: Record<string, string>;
+  meta: Record<string, unknown>;
   options: CdeebeeRequestOptions<S, unknown, unknown>;
   startedAt: number;
   attempt: number;

@@ -21,7 +21,6 @@ interface IndexSelectorCache<R> {
 
 type FieldName<S, K extends ListName<S>> = Extract<keyof EntityOf<S[K]>, string>;
 
-/** Returns `prev` when `next` is an array shallow-equal to it, so consumers keep the reference. */
 const keepIfEqual = <R>(prev: R | undefined, next: R): R => (
   prev !== undefined && Array.isArray(next) && shallowEqual(prev, next) ? prev : next
 );
@@ -167,6 +166,10 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getState().lastResultIDList[api]?.[listName] ?? EMPTY_LIST, [api, listName]))
   );
 
+  const useLastResponse = <R = unknown>(api: string): R | undefined => (
+    useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getLast(api)?.response as R | undefined, [api]))
+  );
+
   return {
     useEntity,
     useList,
@@ -179,6 +182,7 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     useRequestHistory,
     useRequestErrorList,
     useLastResultIDList,
+    useLastResponse,
   };
 }
 

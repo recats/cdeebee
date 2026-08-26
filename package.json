@@ -1,6 +1,6 @@
 {
   "name": "@recats/cdeebee",
-  "version": "4.0.0-beta.1",
+  "version": "4.0.0-beta.2",
   "description": "Standalone normalized data store with a typed request pipeline",
   "repository": "git@github.com:recats/cdeebee.git",
   "author": "recats",

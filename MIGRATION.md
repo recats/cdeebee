@@ -14,11 +14,11 @@ cdeebee 4.0 removes the Redux dependency entirely. `createCdeebee` now builds an
 | `dispatch(request({ api, body, onResult, ignore, listStrategy }))` | `await db.request({ api, data, ignoreStorage, strategyList })`; `onResult` → code after `await` / `catch` |
 | `request.rejected` payload `{ status, statusText, data }` | `CdeebeeRequestError { kind, status, response }` |
 | `slice.actions.set(valueList)` | `db.setEntity` / `db.commit`; `batchingUpdate` remains as a utility for your own state |
-| `slice.actions.historyClear(api)` / `historyClear: true` | `db.getPlugin('history').clear(api)` |
+| `slice.actions.historyClear(api)` / `historyClear: true` | `historyClear: true` request option (same semantics) or `db.getPlugin('history').clear(api)` |
 | `state.cdeebee.storage.xList` | `db.getState().storage.xList` / `useList('xList')` |
 | `state.cdeebee.request.active` | `db.getState().activeRequestList` / `useLoading(apiList)` |
 | `useStorageList(list)` / `useStorage()` | `useList(list)` / `useStore(s => s.storage)` |
-| `useRequestHistory` / `useRequestErrors` / `useLastResultIdList` | `useRequestHistory` / `useRequestErrorList` / `useLastResultIDList` (history plugin required) |
+| `useRequestHistory` / `useRequestErrors` / `useLastResultIdList` | `useRequestHistory` / `useRequestErrorList` / `useLastResultIDList` / `useLastResponse` (history plugin required) |
 | `useLastResultIdList(api, list): string[]` | `useLastResultIDList(api, list): EntityID[]` — ids keep their original type (`string \| number`), numeric-looking ones come back as numbers |
 | `requestManager.requestByApiUrl[api]` | gone — read the value from the resolved promise (`const response = await db.request(...)`) |
 | `rawResponse` (e.g. `RAW_GroupedStats` in storage) | read from the resolved promise; transient response data is never stored |

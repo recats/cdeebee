@@ -35,7 +35,7 @@ export const db = createCdeebee<Storage>({
   initialStorage: typeof window !== 'undefined' ? window.__PRELOADED_STATE__?.storage : undefined,
 });
 
-export const { useEntity, useList, useEntityList, useListSelector, useEntityListBy, useLoading, useIsLoading, useStore, useRequestHistory, useRequestErrorList, useLastResultIDList } = createCdeebeeHooks(db);
+export const { useEntity, useList, useEntityList, useListSelector, useEntityListBy, useLoading, useIsLoading, useStore, useRequestHistory, useRequestErrorList, useLastResultIDList, useLastResponse } = createCdeebeeHooks(db);
 ```
 
 ```ts
@@ -107,6 +107,8 @@ Storage can also be changed without a request, through the same commit path (so 
 | `normalize` | `(response, ctx) => ChangeSet` | Per-request normalize override; falls back to `settings.normalize`, then the built-in `defaultNormalize`. |
 | `ignoreStorage` | `boolean` | Skip normalizing and committing the response entirely; the request still resolves with the raw response. |
 | `signal` | `AbortSignal` | External abort signal, in addition to the one cdeebee manages internally. |
+| `historyClear` | `boolean` | Clear the `history` plugin's entries for this `api` before the request starts — the classic "reset the form's server error on resubmit". |
+| `meta` | `Record<string, unknown>` | Free-form data for your plugins, exposed as `ctx.meta` (defaults to `{}`), e.g. `meta: { silentError: true }`. |
 
 The library always sets an `ui-request-id` header to the request's internal id; it cannot be overridden by `headerList`. For JSON bodies, callers may set their own `Content-Type` via `headerList`.
 
@@ -160,6 +162,7 @@ All hooks are returned from `createCdeebeeHooks(db)` and only re-render a compon
 | `useRequestHistory(api)` | successful request history for `api` (requires the `history` plugin) |
 | `useRequestErrorList(api)` | failed request history for `api` (requires the `history` plugin) |
 | `useLastResultIDList(api, listName)` | the id list `listName` received from the last successful call to `api` (requires the `history` plugin) |
+| `useLastResponse<R>(api)` | the newest successful response for `api` (`undefined` before the first one); use it for the non-list parts of a response (`extension`, `rawResponse`) instead of keeping a copy in your own state (requires the `history` plugin) |
 
 `useStore` is a last resort — reach for it only when nothing above fits, since a selector over the whole state is easy to over-subscribe with. A common pattern for a parent/rows split:
 
@@ -186,7 +189,7 @@ onRequest → fetch (+ onRetry loop) → onResponse → commit → onCommit → 
          ↘ failure ─────────────────────────────────────→ onError → onSettled → reject
 ```
 
-`onRequest`/`onResponse` throwing (or `onRequest` returning `false`) aborts the request and rejects the promise. `onError`/`onSettled` failures are isolated: they are logged with `console.error` and never change the request's outcome. The abort signal is re-checked after every `onResponse` hook and right before the response is committed, so an abort that lands after the network call still completes is honored — the response is never stored. A `signal` that is already aborted when `db.request` is called rejects immediately, before any `onRequest` hook runs.
+`onRequest`/`onResponse` throwing (or `onRequest` returning `false`) aborts the request and rejects the promise. `onError`/`onSettled` failures are isolated: they are logged with `console.error` and never change the request's outcome. The abort signal is re-checked after every `onResponse` hook and right before the response is committed, so an abort that lands after the network call still completes is honored — the response is never stored. A `signal` that is already aborted when `db.request` is called rejects immediately, before any `onRequest` hook runs. Per-request data for plugins travels in `options.meta` and is read as `ctx.meta`.
 
 ```ts
 interface CdeebeePlugin<Storage> {
@@ -206,7 +209,7 @@ Built-ins, all importable from `@recats/cdeebee/core` (or `@recats/cdeebee`):
 
 | Plugin | Options | Behavior |
 |---|---|---|
-| `history(options?)` | `{ maxHistorySize?, ignoreAbort? }` | Records done/error entries and `lastResultIDList` per api; exposes `getState()`, `subscribe(listener, apiList?)`, `clear(api?)`. Required by `useRequestHistory`, `useRequestErrorList`, `useLastResultIDList`. Every entry retains the full parsed `response` object, so history is capped at `maxHistorySize` entries per api — `20` by default; pass `maxHistorySize: 0` for unbounded. Aborted requests are not recorded in `errorList` unless `ignoreAbort: false`. |
+| `history(options?)` | `{ maxHistorySize?, ignoreAbort? }` | Records done/error entries and `lastResultIDList` per api; exposes `getState()`, `getLast(api)`, `subscribe(listener, apiList?)`, `clear(api?)`; honors the `historyClear` request option. Required by `useRequestHistory`, `useRequestErrorList`, `useLastResultIDList`, `useLastResponse`. Every entry retains the full parsed `response` object, so history is capped at `maxHistorySize` entries per api — `20` by default; pass `maxHistorySize: 0` for unbounded. Aborted requests are not recorded in `errorList` unless `ignoreAbort: false`. |
 | `cancelation(options?)` | `{ apiList?, mode?: 'previous' \| 'latest' }` | Deduplicates concurrent calls to the same api: `'previous'` (default) aborts the in-flight call and lets the new one proceed; `'latest'` skips the new call while one is in flight. Restricted to `apiList` when given. |
 | `queryQueue(options?)` | `{ apiList? }` | Serializes matching requests so responses are committed in send order, even if they arrive out of order over the network. Restricted to `apiList` when given. |
 | `retry(options)` | `{ count, backoffMs?, when? }` | Retries a failed request up to `count` times (`when` defaults to network errors only); `backoffMs` is a fixed delay or `(attempt) => ms`. |
@@ -230,6 +233,7 @@ const toast = (apiList: string[]): CdeebeePlugin<Storage> => ({
   name: 'toast',
   onSettled: ctx => {
     if (!apiList.includes(ctx.api)) return;
+    if (ctx.meta.silentError) return;   // opt out per request: db.request({ api, data, meta: { silentError: true } })
     if (ctx.error) toastError(ErrorLocalize[(ctx.error.response as CleanServerResponse | undefined)?.responseStatus ?? '']?.text ?? 'Something went wrong');
     else toastSuccess('Changes saved');
   },
