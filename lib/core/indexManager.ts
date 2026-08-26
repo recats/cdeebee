@@ -81,7 +81,6 @@ export class IndexManager<S> {
           const entityID = toEntityID(String(entityIDList[i]));
           const prevEntity = prevList?.[entityID];
           const nextEntity = nextList?.[entityID];
-          // an unchanged indexed value keeps its slot, so bucket iteration order stays stable
           if (isRecord(prevEntity) && isRecord(nextEntity) && Object.is(prevEntity[fieldList[f]], nextEntity[fieldList[f]])) continue;
           if (isRecord(prevEntity)) this.remove(bucket, prevEntity[fieldList[f]], entityID);
           if (isRecord(nextEntity)) this.add(bucket, nextEntity[fieldList[f]], entityID);

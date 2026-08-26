@@ -41,7 +41,6 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
     state = { ...state, storage: nextStorage };
     indexManager.update(prevStorage, nextStorage, changedList);
     subscriptionManager.notify(changedList);
-    // local mutations notify synchronously so controlled inputs never lose their caret
     if (meta.source === 'set') subscriptionManager.flush();
     for (let i = 0; i < pluginList.length; i += 1) pluginList[i].onCommit?.(changeSet, meta, changedList);
     return changedList;

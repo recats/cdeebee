@@ -25,9 +25,7 @@ export interface CdeebeeHistoryState {
 }
 
 export interface CdeebeeHistoryOptions {
-  /** entries kept per api; defaults to 20. `0` or `Infinity` keeps every entry */
   maxHistorySize?: number;
-  /** skip recording requests that ended with `kind: 'abort'`; defaults to true */
   ignoreAbort?: boolean;
 }
 
@@ -38,7 +36,6 @@ export interface CdeebeeHistoryPlugin<S> extends CdeebeePlugin<S> {
   getState: () => CdeebeeHistoryState;
   subscribe: (listener: CdeebeeListener, apiList?: string[]) => () => void;
   clear: (api?: string) => void;
-  /** The newest successful entry for `api`, or `undefined`. */
   getLast: (api: string) => CdeebeeHistoryEntry | undefined;
 }
 

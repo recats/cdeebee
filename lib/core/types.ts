@@ -89,9 +89,7 @@ export interface CdeebeeRequestOptions<S, R = unknown, D = unknown> {
   normalize?: CdeebeeNormalize<S, R>;
   ignoreStorage?: boolean;
   signal?: AbortSignal;
-  /** Clear the `history` plugin's entries for this api before the request starts. */
   historyClear?: boolean;
-  /** Free-form data for plugins; exposed as `ctx.meta`. */
   meta?: Record<string, unknown>;
 }
 
