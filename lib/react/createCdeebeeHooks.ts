@@ -167,6 +167,11 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getState().lastResultIDList[api]?.[listName] ?? EMPTY_LIST, [api, listName]))
   );
 
+  /** The newest successful response for `api` (from the `history` plugin), or `undefined`. */
+  const useLastResponse = <R = unknown>(api: string): R | undefined => (
+    useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getLast(api)?.response as R | undefined, [api]))
+  );
+
   return {
     useEntity,
     useList,
@@ -179,6 +184,7 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     useRequestHistory,
     useRequestErrorList,
     useLastResultIDList,
+    useLastResponse,
   };
 }
 

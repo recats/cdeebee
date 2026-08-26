@@ -247,4 +247,16 @@ describe('runRequest', () => {
     expect(db.getState().storage.userList).toEqual({});
     expect(db.getState().activeRequestList).toEqual([]);
   });
+
+  it('options.meta is exposed to plugins as ctx.meta (empty object by default)', async () => {
+    const seen: unknown[] = [];
+    const db = make(mockFetch([jsonResponse({})]), { pluginList: [{
+      name: 'p',
+      onRequest: ctx => { seen.push(ctx.meta); },
+      onSettled: ctx => { seen.push(ctx.meta); },
+    }] });
+    await db.request({ api: '/x', meta: { silentError: true } });
+    await db.request({ api: '/y' });
+    expect(seen).toEqual([{ silentError: true }, { silentError: true }, {}, {}]);
+  });
 });

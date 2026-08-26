@@ -121,4 +121,30 @@ describe('history plugin', () => {
     expect(plugin.getState().lastResultIDList['/x']).toEqual({ userList: [1, 2] });
     expect(plugin.getState().doneList['/x']).toHaveLength(2);
   });
+
+  it('getLast returns the newest done entry or undefined', async () => {
+    const { db, plugin } = make(mockFetch([jsonResponse({ n: 1 }), jsonResponse({ n: 2 })]));
+    expect(plugin.getLast('/x')).toBeUndefined();
+    await db.request({ api: '/x' });
+    await db.request({ api: '/x' });
+    expect((plugin.getLast('/x')?.response as { n: number }).n).toBe(2);
+  });
+
+  it('historyClear request option clears the api before the request runs', async () => {
+    const { db, plugin } = make(mockFetch([jsonResponse(envelope([1])), jsonResponse({ n: 2 })]));
+    await db.request({ api: '/x' });
+    expect(plugin.getState().lastResultIDList['/x']).toEqual({ userList: [1] });
+    await db.request({ api: '/x', historyClear: true, ignoreStorage: true });
+    expect(plugin.getState().doneList['/x']).toHaveLength(1);
+    expect((plugin.getLast('/x')?.response as { n: number }).n).toBe(2);
+    expect(plugin.getState().lastResultIDList['/x']).toBeUndefined();
+  });
+
+  it('clear(api) on an unknown api does not notify', () => {
+    const { plugin } = make(mockFetch([jsonResponse({})]));
+    const listener = vi.fn();
+    plugin.subscribe(listener, ['/nope']);
+    plugin.clear('/nope');
+    expect(listener).not.toHaveBeenCalled();
+  });
 });

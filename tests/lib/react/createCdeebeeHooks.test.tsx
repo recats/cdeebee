@@ -231,4 +231,16 @@ describe('createCdeebeeHooks', () => {
     rerender(<Comp idList={['a', 'b']} />);
     expect(screen.getByTestId('t').textContent).toBe('a|b');
   });
+
+  it('useLastResponse returns the newest response for the api', async () => {
+    const fetch = mockFetch([jsonResponse({ n: 1 }), jsonResponse({ n: 2 })]);
+    const { db, hooks } = make({ fetch: { fetch }, pluginList: [history<S>()] });
+    const Comp = () => <span data-testid='r'>{String(hooks.useLastResponse<{ n: number }>('/x')?.n)}</span>;
+    render(<Comp />);
+    expect(screen.getByTestId('r').textContent).toBe('undefined');
+    await act(async () => { await db.request({ api: '/x' }); });
+    expect(screen.getByTestId('r').textContent).toBe('1');
+    await act(async () => { await db.request({ api: '/x' }); });
+    expect(screen.getByTestId('r').textContent).toBe('2');
+  });
 });

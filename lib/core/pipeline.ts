@@ -67,6 +67,7 @@ export async function runRequest<S, R, D>(
     method: options.method ?? 'POST',
     data: resolveData(settings.fetch, options.data),
     headerList: resolveHeaderList(settings.fetch, options.headerList),
+    meta: options.meta ?? {},
     options: options as CdeebeeRequestOptions<S, unknown, unknown>,
     startedAt: Date.now(),
     attempt: 0,
