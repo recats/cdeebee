@@ -133,11 +133,13 @@ interface CdeebeeRequestError extends Error {
 
 ```ts
 try {
-  const response = await db.request({ api: '/campaign/list', data });
-  setCampaignList(response.campaignList.data);
+  // storage.campaignList is updated by the request itself — nothing to copy by hand.
+  // Only non-list data (rawResponse, extension, ...) lives on the resolved response.
+  const response = await db.request<CleanServerResponse>({ api: '/campaign/stats', data });
+  setGroupedStats(response.rawResponse.groupedStats);
 } catch (error) {
   if (isAbortError(error)) return;
-  toastError('Failed to load campaigns');
+  toastError('Failed to load campaign stats');
 }
 ```
 

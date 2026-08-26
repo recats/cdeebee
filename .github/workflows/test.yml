@@ -11,7 +11,6 @@ on:
       - 'pnpm-lock.yaml'
       - 'vitest.config.ts'
       - 'tsconfig.json'
-      - 'tsconfig.lint.json'
       - 'eslint.config.mjs'
       - '.github/workflows/test.yml'
 
@@ -21,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
 
     steps:
       - name: Checkout code
