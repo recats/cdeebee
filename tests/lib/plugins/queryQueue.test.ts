@@ -19,7 +19,7 @@ const make = (fetch: typeof globalThis.fetch, pluginList = [queryQueue<S>()]) =>
 });
 
 describe('queryQueue plugin', () => {
-  it('without the plugin the later-arriving response wins', async () => {
+  it('without the plugin the later-sent response still wins: commits are ordered by send sequence, not arrival', async () => {
     const { fetch, deferredList } = controllableFetch();
     const db = make(fetch, []);
     const first = db.request({ api: '/x' });
@@ -28,7 +28,7 @@ describe('queryQueue plugin', () => {
     await second;
     deferredList[0].resolve(jsonResponse(envelope(1)));
     await first;
-    expect(db.getState().storage.userList[1].v).toBe(1);
+    expect(db.getState().storage.userList[1].v).toBe(2);
   });
 
   it('commits in send order even when responses arrive out of order', async () => {

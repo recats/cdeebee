@@ -28,13 +28,15 @@ export function defaultNormalize<S>(response: unknown, ctx: CdeebeeNormalizeCont
       console.warn(`[cdeebee] "${listName}" primaryKey mismatch: settings "${settingsPrimaryKey}", response "${value.primaryKey}"`);
     }
     const primaryKey = settingsPrimaryKey ?? value.primaryKey;
-    const strategy = ctx.strategyList[listName] ?? 'upsert';
+    const strategy = ctx.strategyList[listName] ?? 'patch';
 
     if (strategy === 'skip') continue;
     if (strategy === 'replaceList') {
       changeSet[listName] = { replaceList: keyBy(value.data, primaryKey) };
-    } else {
+    } else if (strategy === 'upsert') {
       changeSet[listName] = { upsertList: value.data };
+    } else {
+      changeSet[listName] = { patchList: value.data };
     }
   }
 
@@ -49,13 +51,14 @@ export function extractResultIDList<S>(
   const listNameList = Object.keys(changeSet) as ListName<S>[];
   for (let i = 0; i < listNameList.length; i += 1) {
     const listName = listNameList[i];
-    const change = changeSet[listName] as { upsertList?: CdeebeeEntity[]; replaceList?: Record<EntityID, CdeebeeEntity> } | undefined;
+    const change = changeSet[listName] as { upsertList?: CdeebeeEntity[]; patchList?: CdeebeeEntity[]; replaceList?: Record<EntityID, CdeebeeEntity> } | undefined;
     if (!change) continue;
     const primaryKey = (primaryKeyList as Record<string, string | undefined>)[listName];
     const entityIDList: EntityID[] = [];
-    if (change.upsertList && primaryKey) {
-      for (let j = 0; j < change.upsertList.length; j += 1) {
-        const entity = change.upsertList[j];
+    const writeList = [...(change.upsertList ?? []), ...(change.patchList ?? [])];
+    if (primaryKey) {
+      for (let j = 0; j < writeList.length; j += 1) {
+        const entity = writeList[j];
         const entityID = isRecord(entity) ? entity[primaryKey] : undefined;
         if (typeof entityID === 'string' || typeof entityID === 'number') entityIDList.push(toEntityID(String(entityID)));
       }

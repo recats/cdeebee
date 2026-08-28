@@ -27,12 +27,17 @@ describe('isListEnvelope', () => {
 describe('defaultNormalize', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('maps envelopes to upsertList by default and ignores non-list keys', () => {
+  it('maps envelopes to patchList by default and ignores non-list keys', () => {
     const changeSet = defaultNormalize<S>({
       responseStatus: 'Success',
       rawResponse: { x: 1 },
       userList: { data: [{ id: 1, name: 'a' }], primaryKey: 'id' },
     }, ctx());
+    expect(changeSet).toEqual({ userList: { patchList: [{ id: 1, name: 'a' }] } });
+  });
+
+  it('upsert strategy produces upsertList', () => {
+    const changeSet = defaultNormalize<S>({ userList: { data: [{ id: 1, name: 'a' }], primaryKey: 'id' } }, ctx({ userList: 'upsert' }));
     expect(changeSet).toEqual({ userList: { upsertList: [{ id: 1, name: 'a' }] } });
   });
 
@@ -61,7 +66,7 @@ describe('defaultNormalize', () => {
     const changeSet = defaultNormalize<S>({
       extraList: { data: [{ extraID: 5 }], primaryKey: 'extraID' },
     }, ctx());
-    expect(changeSet).toEqual({ extraList: { upsertList: [{ extraID: 5 }] } });
+    expect(changeSet).toEqual({ extraList: { patchList: [{ extraID: 5 }] } });
   });
 
   it('non-object response yields an empty change set', () => {

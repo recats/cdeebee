@@ -9,7 +9,7 @@ cdeebee 4.0 removes the Redux dependency entirely. `createCdeebee` now builds an
 | `factory(settings, storage)` + `combineSlices` + `configureStore` | `createCdeebee(settings)` — no Redux |
 | `settings.modules: ['history', 'listener', 'storage', 'cancelation', 'queryQueue']` | `pluginList: [history(), cancelation(), queryQueue()]`; listener and storage are always on |
 | `settings.mergeWithHeaders` / `mergeWithData` / `fileKey` / `bodyKey` | `settings.fetch.headerList` / `mergeWithData` / `fileKey` / `bodyKey` |
-| `settings.listStrategy` (`merge`/`replace`/`skip`) | `settings.strategyList` (`upsert`/`replaceList`/`skip`); `merge` → `upsert` (entity replaced whole, no deep merge) |
+| `settings.listStrategy` (`merge`/`replace`/`skip`) | `settings.strategyList` (`patch`/`upsert`/`replaceList`/`skip`); `merge` → `patch` for thin endpoints (missing keys and `[]` never overwrite), `upsert` for full/save endpoints — declare those in `settings.apiStrategyList` |
 | `settings.maxHistorySize` | `history({ maxHistorySize })` |
 | `dispatch(request({ api, body, onResult, ignore, listStrategy }))` | `await db.request({ api, data, ignoreStorage, strategyList })`; `onResult` → code after `await` / `catch` |
 | `request.rejected` payload `{ status, statusText, data }` | `CdeebeeRequestError { kind, status, response }` |
@@ -31,11 +31,11 @@ cdeebee 4.0 removes the Redux dependency entirely. `createCdeebee` now builds an
 
 | 3.x normalizer | 4.0 |
 |---|---|
-| `deepFullMerge` | `upsert` |
+| `deepFullMerge` | `patch` (default) — plus `settings.versionKeyList` for the freshness deep merge never had |
 | `deepDifferenceMerge` (`__entity`) | removed together with `__entity` |
 | `normalizeAndGetExtension` | `extension` read from the resolved response; `clientPosition` via a custom `normalize` |
 | `normalizeAndReplaceRawResponse` | `rawResponse.groupedStats` read from the resolved response |
-| `applyListPropertyFallback` | unnecessary — the entity is replaced whole |
+| `applyListPropertyFallback` | unnecessary — save endpoints are `upsert`, so a cleared (omitted) field disappears instead of lingering |
 
 ## Step by step
 
@@ -43,5 +43,5 @@ cdeebee 4.0 removes the Redux dependency entirely. `createCdeebee` now builds an
 2. **Replace `dispatch(request(...))` call sites** with `await db.request(...)`. Anything that previously ran inside `onResult` runs after the `await` (success) or in a `catch` block (failure); a rejected request now throws a `CdeebeeRequestError` instead of resolving with a rejected action.
 3. **Move Redux middleware into plugins.** Any middleware that inspected `cdeebee/request/*` action types becomes a plugin implementing `onRequest`/`onResponse`/`onError`/`onSettled`/`onCommit` — see the README's plugin examples (`apiVersion`, `toast`, `internalError`) for the shape.
 4. **Rename hooks** at call sites: `useStorageList` → `useList`, `useStorage` → `useStore(s => s.storage)`, `useRequestErrors` → `useRequestErrorList`, `useLastResultIdList` → `useLastResultIDList`. `createCdeebeeHooks` now takes the `db` instance instead of a state selector.
-5. **Delete `normalize` helpers that deep-merged.** `upsert` (the new default, replacing `merge`) replaces the whole entity instead of deep-merging it. If a call site relied on deep merge, write a custom `normalize` that spreads the previous entity from `ctx.storage` under the incoming one (see the README's "Strategies" section).
+5. **Delete `normalize` helpers that deep-merged.** `patch` (the default) keeps stored values for keys a response omits or sends as `[]`; `upsert` replaces the entity whole. List every full-fetch and save endpoint in `settings.apiStrategyList` as `upsert`, and set `settings.versionKeyList` for lists whose entities carry `updatedAt` (see the README's "Freshness and completeness" section).
 6. **Run the app with `devtools()` attached** and compare snapshots against the 3.x Redux DevTools trace for the same flows, to catch any strategy or ordering regression before removing the old store.
