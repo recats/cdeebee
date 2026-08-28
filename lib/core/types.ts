@@ -11,13 +11,17 @@ export type CdeebeeStorageShape<S> = { [K in keyof S]: Record<EntityID, object> 
 export type EntityOf<L> = L extends Record<EntityID, infer E> ? E : never;
 export type ListName<S> = Extract<keyof S, string>;
 
-export type CdeebeeStrategy = 'upsert' | 'replaceList' | 'skip';
+export type CdeebeeStrategy = 'patch' | 'upsert' | 'replaceList' | 'skip';
 export type CdeebeeStrategyList<S> = Partial<Record<ListName<S>, CdeebeeStrategy>>;
 export type CdeebeePrimaryKeyList<S> = { [K in ListName<S>]: Extract<keyof EntityOf<S[K]>, string> };
 export type CdeebeeIndexList<S> = Partial<{ [K in ListName<S>]: Extract<keyof EntityOf<S[K]>, string>[] }>;
+export type CdeebeeVersionKeyList<S> = Partial<{ [K in ListName<S>]: Extract<keyof EntityOf<S[K]>, string> }>;
+export type CdeebeeApiStrategyList<S> = Record<string, CdeebeeStrategyList<S>>;
 
 export interface CdeebeeListChange<E = CdeebeeEntity> {
   upsertList?: E[];
+  patchList?: E[];
+  setList?: E[];
   removeIDList?: EntityID[];
   replaceList?: Record<EntityID, E>;
 }
@@ -33,6 +37,13 @@ export interface CdeebeeCommitMeta {
   api?: string;
   requestID?: string;
   label?: string;
+  seq?: number;
+}
+
+export interface CdeebeeEntityMeta {
+  version?: number;
+  seq: number;
+  complete: boolean;
 }
 
 export interface CdeebeeDependency<S> {
@@ -95,6 +106,7 @@ export interface CdeebeeRequestOptions<S, R = unknown, D = unknown> {
 
 export interface CdeebeeRequestContext<S> {
   requestID: string;
+  seq: number;
   api: string;
   url: string;
   method: CdeebeeMethod;
@@ -128,6 +140,8 @@ export interface CdeebeeSettings<S> {
   fetch: CdeebeeFetchSettings;
   primaryKeyList: CdeebeePrimaryKeyList<S>;
   strategyList?: CdeebeeStrategyList<S>;
+  apiStrategyList?: CdeebeeApiStrategyList<S>;
+  versionKeyList?: CdeebeeVersionKeyList<S>;
   indexList?: CdeebeeIndexList<S>;
   pluginList?: CdeebeePlugin<S>[];
   initialStorage?: Partial<S>;
@@ -142,6 +156,7 @@ export interface CdeebeeInstance<S> {
   getState: () => CdeebeeState<S>;
   getSnapshot: () => CdeebeeSnapshot<S>;
   getPlugin: <P extends CdeebeePlugin<S>>(name: string) => P | undefined;
+  getEntityMeta: <K extends ListName<S>>(listName: K, entityID: EntityID) => CdeebeeEntityMeta | undefined;
   commit: (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta) => CdeebeeChangedList<S>[];
   setEntity: <K extends ListName<S>>(
     listName: K,

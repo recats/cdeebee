@@ -52,12 +52,15 @@ Two package entry points: `@recats/cdeebee` (`lib/index.ts`, everything) and `@r
 
 ### Strategies
 
-Resolved per list as `options.strategyList[list] ?? settings.strategyList[list] ?? 'upsert'`:
-- **`upsert`** (default): each response entity replaces the corresponding entity whole (no deep merge); entities not in the response are kept.
+Resolved per list as `options.strategyList[list] ?? settings.apiStrategyList[api][list] ?? settings.strategyList[list] ?? 'patch'`:
+- **`patch`** (default): incoming fields override, missing keys and `[]` are holes filled from the stored entity. For thin endpoints.
+- **`upsert`**: the entity is replaced whole. For full-fetch and save endpoints — declared in `settings.apiStrategyList`.
 - **`replaceList`**: the list becomes exactly the response's entities.
 - **`skip`**: the list is untouched.
 
-There is no deep-merge strategy; a partial update has to be assembled explicitly in a custom `normalize` (spread `ctx.storage.<list>[id]` under the incoming partial entity).
+### Freshness and completeness (`lib/core/commit.ts`)
+
+`applyChangeSet` keeps `Map<listName, Map<entityID, { version, seq, complete }>>` (owned by `createCdeebee`, mutated in place per commit). `version` comes from `settings.versionKeyList` (`readVersion`: numbers as-is, ISO strings via `Date.parse`); `seq` is the send-order sequence taken in `runRequest` (`internal.nextSeq()`) and stamped into `CdeebeeCommitMeta.seq`; local mutations take a fresh one in `commit`. `mergeEntity` is the single decision point — newer writes apply (`upsert` replaces, `patch` = `fill(incoming, stored)`), older writes are dropped when the entity is complete and otherwise `fill(stored, incoming)`. `fill` treats `undefined` and `[]` as holes. `setEntity` emits a `setList` — the entity is replaced whole (so a local edit can clear an array or unset a field) while `complete` is carried over unchanged, so a local edit never marks a thin entity complete. `replaceList` checks freshness per entity: a stale response neither overrides nor removes entities written by a later send. Tests in `tests/lib/core/merge.test.ts` assert order-independence pairwise.
 
 ### Hooks (`lib/react/createCdeebeeHooks.ts`)
 

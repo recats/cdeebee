@@ -110,7 +110,7 @@ describe('createCdeebee store', () => {
     const db = make({ pluginList: [{ name: 'p', onCommit }] });
     db.setEntity('postList', 3, {});
     expect(onCommit).toHaveBeenCalledWith(
-      { postList: { upsertList: [{ postID: 3 }] } },
+      { postList: { setList: [{ postID: 3 }] } },
       { source: 'set', label: 'setEntity:postList' },
       [{ listName: 'postList', entityIDList: [3] }],
     );

@@ -62,6 +62,7 @@ export async function runRequest<S, R, D>(
 
   const ctx: CdeebeeRequestContext<S> = {
     requestID,
+    seq: internal.nextSeq(),
     api: options.api,
     url: buildUrl(settings.fetch.baseUrl, options.api),
     method: options.method ?? 'POST',
@@ -103,7 +104,7 @@ export async function runRequest<S, R, D>(
 
     if (!options.ignoreStorage) {
       const normalize = (options.normalize ?? settings.normalize ?? defaultNormalize) as CdeebeeNormalize<S, unknown>;
-      const strategyList = { ...(settings.strategyList ?? {}), ...(options.strategyList ?? {}) } as CdeebeeStrategyList<S>;
+      const strategyList = { ...(settings.strategyList ?? {}), ...(settings.apiStrategyList?.[ctx.api] ?? {}), ...(options.strategyList ?? {}) } as CdeebeeStrategyList<S>;
       ctx.changeSet = normalize(ctx.response, {
         storage: db.getState().storage,
         primaryKeyList: settings.primaryKeyList,
@@ -111,7 +112,7 @@ export async function runRequest<S, R, D>(
         api: ctx.api,
         requestID,
       });
-      db.commit(ctx.changeSet, { source: 'request', api: ctx.api, requestID, label: `request:${ctx.api}` });
+      db.commit(ctx.changeSet, { source: 'request', api: ctx.api, requestID, seq: ctx.seq, label: `request:${ctx.api}` });
     }
 
     await settle();
