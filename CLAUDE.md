@@ -16,7 +16,12 @@ pnpm lint:all           # Run both linters
 pnpm test               # Run tests in watch mode with Vitest
 pnpm test:run           # Run tests once
 pnpm test:coverage      # Run tests with coverage report
+pnpm bench              # Run benchmarks (tests/bench/*.bench.ts, tinybench via vitest bench)
+pnpm bench:compare      # Same, printing the delta against bench/baseline.json
+pnpm bench:save         # Rewrite bench/baseline.json — only after an intended perf change
 ```
+
+Performance is guarded twice: `tests/lib/perf.test.ts` asserts listener counts and coarse time budgets (order-of-magnitude only, so CI stays stable), and `tests/bench/store.bench.ts` measures the commit paths on 10k entities. Before merging anything that touches `lib/core`, run `pnpm bench:compare` and look at the mean deltas; a real regression shows as a consistent slowdown across runs, not a single noisy sample.
 
 Run a single test file:
 ```bash

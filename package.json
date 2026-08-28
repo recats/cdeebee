@@ -13,7 +13,10 @@
     "prepublishOnly": "pnpm build",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "bench": "vitest bench --run",
+    "bench:save": "vitest bench --run --outputJson bench/baseline.json",
+    "bench:compare": "vitest bench --run --compare bench/baseline.json"
   },
   "keywords": [
     "react",

@@ -38,3 +38,32 @@ describe('perf smoke: 10k entities', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe('perf budget: 10k entities (coarse, catches order-of-magnitude regressions only)', () => {
+  interface Row { rowID: number; groupID: number; name: string; updatedAt: string; tagList: string[] }
+  interface RS { rowList: Record<number, Row> }
+  const at = (n: number) => new Date(1_700_000_000_000 + n * 1000).toISOString();
+  const rowList = Array.from({ length: 10_000 }, (_, i) => ({ rowID: i + 1, groupID: i % 100, name: `n${i}`, updatedAt: at(0), tagList: ['a'] }));
+  const thinList = rowList.map(row => ({ ...row, name: `t${row.rowID}`, tagList: [] as string[] }));
+  const measure = (fn: () => void) => { const t0 = performance.now(); fn(); return performance.now() - t0; };
+  const budgetMs = { commit: 250, setEntity: 10 };
+
+  it('upsert, patch and replaceList of 10k rows each stay under budget', () => {
+    const db = createCdeebee<RS>({ fetch: {}, primaryKeyList: { rowList: 'rowID' }, versionKeyList: { rowList: 'updatedAt' }, indexList: { rowList: ['groupID'] } });
+    for (let i = 1; i <= 1000; i += 1) db.subscribe(() => {}, [{ listName: 'rowList', entityID: i }]);
+    const record: Record<number, Row> = {};
+    for (const row of rowList) record[row.rowID] = row;
+
+    expect(measure(() => db.commit({ rowList: { upsertList: rowList } }, { source: 'request', seq: 1 }))).toBeLessThan(budgetMs.commit);
+    expect(measure(() => db.commit({ rowList: { patchList: thinList } }, { source: 'request', seq: 2 }))).toBeLessThan(budgetMs.commit);
+    expect(measure(() => db.commit({ rowList: { replaceList: record } }, { source: 'request', seq: 3 }))).toBeLessThan(budgetMs.commit);
+    expect(measure(() => db.commit({ rowList: { upsertList: rowList } }, { source: 'request', seq: 1 }))).toBeLessThan(budgetMs.commit);
+  });
+
+  it('a single setEntity with 1000 entity listeners stays under budget', () => {
+    const db = createCdeebee<RS>({ fetch: {}, primaryKeyList: { rowList: 'rowID' }, indexList: { rowList: ['groupID'] } });
+    db.commit({ rowList: { upsertList: rowList } }, { source: 'request', seq: 1 });
+    for (let i = 1; i <= 1000; i += 1) db.subscribe(() => {}, [{ listName: 'rowList', entityID: i }]);
+    expect(measure(() => db.setEntity('rowList', 500, { name: 'edited' }))).toBeLessThan(budgetMs.setEntity);
+  });
+});
