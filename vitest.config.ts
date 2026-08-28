@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.{ts,tsx}'],
+    benchmark: {
+      include: ['tests/**/*.bench.ts'],
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -15,7 +18,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, './lib'),
+      '@': resolve(import.meta.dirname, './lib'),
     },
   },
 });
