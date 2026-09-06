@@ -313,3 +313,39 @@ describe('replaceList honors freshness per entity', () => {
     expect(storage.sellerList[1].name).toBe('new');
   });
 });
+
+describe('deletion boundaries survive re-adding an entity', () => {
+  it.each(['clear', 'remove'] as const)('%s rejects pre-deletion fields after subsequent writes', kind => {
+    const opts = options();
+    let storage: S = { sellerList: {} };
+    const commit = (seq: number, change: CdeebeeChangeSet<S>) => {
+      storage = applyChangeSet(storage, change, primaryKeyList, { ...opts, seq }).storage;
+    };
+    commit(2, { sellerList: kind === 'clear' ? { replaceList: {} } : { removeIDList: [1] } });
+    commit(3, { sellerList: { patchList: [thin('new')] } });
+    commit(4, { sellerList: { setList: [thin('edited')] } });
+    const before = storage;
+    commit(1, { sellerList: { upsertList: [full('old')] } });
+    expect(storage).toBe(before);
+    expect(storage.sellerList[1]).toEqual(thin('edited'));
+    expect(opts.metaList.get('sellerList')?.get(1)?.complete).toBe(false);
+    // A response sent after deletion may still fill a newer partial entity.
+    commit(3, { sellerList: { upsertList: [full('valid')] } });
+    expect(storage.sellerList[1]).toEqual(full('edited'));
+  });
+
+  it.each(['clear', 'remove'] as const)('%s also rejects older requests carrying a higher server version', kind => {
+    const opts = options(true);
+    let storage: S = { sellerList: {} };
+    const commit = (seq: number, change: CdeebeeChangeSet<S>) => {
+      storage = applyChangeSet(storage, change, primaryKeyList, { ...opts, seq }).storage;
+    };
+    commit(2, { sellerList: kind === 'clear' ? { replaceList: {} } : { removeIDList: [1] } });
+    commit(3, { sellerList: { upsertList: [thin('new', '2026-01-01')] } });
+    commit(4, { sellerList: { patchList: [thin('edited', '2026-01-02')] } });
+    const before = storage;
+    commit(1, { sellerList: { replaceList: { 1: full('old', '2026-01-09') } } });
+    commit(1, { sellerList: { patchList: [full('old', '2026-01-09')] } });
+    expect(storage).toBe(before);
+  });
+});

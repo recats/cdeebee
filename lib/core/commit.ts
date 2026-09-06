@@ -15,7 +15,12 @@ interface ListChange {
   replaceList?: Record<EntityID, CdeebeeEntity>;
 }
 
-export type EntityMetaList = Map<EntityID, CdeebeeEntityMeta>;
+interface EntityMeta extends CdeebeeEntityMeta {
+  /** Last removal, retained when an entity is re-added. */
+  removedSeq?: number;
+}
+
+export type EntityMetaList = Map<EntityID, EntityMeta>;
 
 export interface ApplyChangeSetOptions<S> {
   metaList: Map<string, EntityMetaList>;
@@ -80,32 +85,35 @@ const tombstone = (seq: number): CdeebeeEntityMeta => ({ seq, complete: false, d
 
 interface EntityWrite {
   entity: CdeebeeEntity;
-  meta: CdeebeeEntityMeta;
+  meta: EntityMeta;
 }
 
 export function mergeEntity(
   prevEntity: CdeebeeEntity | undefined,
-  prevMeta: CdeebeeEntityMeta | undefined,
+  prevMeta: EntityMeta | undefined,
   nextEntity: CdeebeeEntity,
   mode: WriteMode,
   version: number | undefined,
   seq: number,
   listSeq?: number,
 ): EntityWrite | undefined {
+  const removedSeq = prevMeta?.deleted ? prevMeta.seq : prevMeta?.removedSeq;
+  if ((listSeq !== undefined && seq < listSeq) || (removedSeq !== undefined && seq < removedSeq)) return undefined;
+  const removalMeta = removedSeq === undefined ? {} : { removedSeq };
   if (prevEntity === undefined) {
     if (isStale(prevMeta, listSeq, seq)) return undefined;
-    return { entity: nextEntity, meta: { version, seq, complete: mode === 'upsert' } };
+    return { entity: nextEntity, meta: { ...removalMeta, version, seq, complete: mode === 'upsert' } };
   }
   const sameVersion = prevMeta?.version !== undefined && version !== undefined && version === prevMeta.version;
 
   if (prevMeta === undefined || compareFreshness(prevMeta, version, seq) === 'newer') {
     if (mode === 'upsert' || mode === 'set') {
       const complete = mode === 'upsert' ? true : (prevMeta?.complete ?? false);
-      return { entity: nextEntity, meta: { version: version ?? prevMeta?.version, seq, complete } };
+      return { entity: nextEntity, meta: { ...removalMeta, version: version ?? prevMeta?.version, seq, complete } };
     }
     return {
       entity: fill(nextEntity, prevEntity),
-      meta: { version: version ?? prevMeta?.version, seq, complete: sameVersion ? (prevMeta?.complete ?? false) : false },
+      meta: { ...removalMeta, version: version ?? prevMeta?.version, seq, complete: sameVersion ? (prevMeta?.complete ?? false) : false },
     };
   }
 
@@ -135,7 +143,7 @@ function applyListChange<S>(
   if (change.replaceList) {
     listSeq = Math.max(listSeq ?? seq, seq);
     options.listSeqMap.set(listName, listSeq);
-    // A reset sent before a later one may still refresh entities it carries, but must not delete anything.
+    // A reset sent before a later one must neither refresh nor delete entities.
     const staleReset = seq < listSeq;
     const nextList: CdeebeeList = {};
     let changed = false;
@@ -146,13 +154,18 @@ function applyListChange<S>(
       const nextEntity = change.replaceList[key];
       const prevEntity = prevList[key];
       const prevMeta = meta.get(metaID);
-      if (prevEntity === undefined && isStale(prevMeta, listSeq, seq)) continue;
+      const removedSeq = prevMeta?.deleted ? prevMeta.seq : prevMeta?.removedSeq;
+      if (staleReset || (removedSeq !== undefined && seq < removedSeq)
+        || (prevEntity === undefined && isStale(prevMeta, listSeq, seq))) {
+        if (prevEntity !== undefined) nextList[key] = prevEntity;
+        continue;
+      }
       const version = readVersion(nextEntity, versionKey);
       if (prevEntity !== undefined && compareFreshness(prevMeta, version, seq) === 'older') {
         nextList[key] = prevEntity;
         continue;
       }
-      meta.set(metaID, { version, seq, complete: true });
+      meta.set(metaID, { ...(removedSeq === undefined ? {} : { removedSeq }), version, seq, complete: true });
       if (prevEntity !== undefined && shallowEqual(prevEntity, nextEntity)) {
         nextList[key] = prevEntity;
       } else {

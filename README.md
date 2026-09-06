@@ -111,7 +111,7 @@ Storage can also be changed without a request, through the same commit path (so 
 
 - `db.setEntity(listName, entityID, patch)` — a plain object `patch` is shallow-merged over the previous entity; a `(prevEntity) => nextEntity` updater function replaces the entity with its return value. Either way, cdeebee always sets the primary key field on the result to `entityID`, so an updater does not need to (and cannot accidentally omit or override) it.
 - `db.removeEntityList(listName, entityIDList)` — removes entities by id.
-- `db.clearList(listName)` — empties a list. Deletions retain sequence tombstones, and list resets (`clearList` / `replaceList`) retain a sequence boundary, so earlier requests cannot restore removed entities (including IDs absent when the list was cleared). A later write can add them again. A list reset drops the tombstones it makes redundant, so only removals sent after the last reset keep one.
+- `db.clearList(listName)` — empties a list. Deletions retain sequence tombstones, and list resets (`clearList` / `replaceList`) retain a sequence boundary, so earlier requests cannot restore removed entities (including IDs absent when the list was cleared). A later write can add them again, but responses sent before the deletion/reset cannot fill or overwrite their fields, even if they carry a higher server version. A list reset drops the tombstones it makes redundant, so only removals sent after the last reset keep one.
 - `db.replaceList(listName, entityRecord)` — replaces a whole list with a keyed record.
 - `db.commit(changeSet, meta)` — the low-level primitive all of the above call; use it directly to touch several lists atomically in one `{ listName: { upsertList, removeIDList, replaceList } }` change set.
 
