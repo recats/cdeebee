@@ -1,3 +1,4 @@
+import { toEntityID } from '../utils/entityID';
 import { applyChangeSet, type EntityMetaList } from './commit';
 import { IndexManager } from './indexManager';
 import { runRequest } from './pipeline';
@@ -26,10 +27,11 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
   const storage = {} as CdeebeeStorage;
   const listNameList = Object.keys(primaryKeyList) as ListName<S>[];
   for (let i = 0; i < listNameList.length; i += 1) {
-    storage[listNameList[i]] = (settings.initialStorage as CdeebeeStorage | undefined)?.[listNameList[i]] ?? {};
+    storage[listNameList[i]] = settings.initialStorage?.[listNameList[i]] ?? {};
   }
   let state: CdeebeeState<S> = { storage: storage as S, activeRequestList: [] };
   const metaList = new Map<string, EntityMetaList>();
+  const listSeqMap = new Map<string, number>();
   let seqCounter = 0;
   const nextSeq = () => { seqCounter += 1; return seqCounter; };
 
@@ -41,7 +43,8 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
   const commit = (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta) => {
     const prevStorage = state.storage;
     const seq = meta.seq ?? nextSeq();
-    const { storage: nextStorage, changedList } = applyChangeSet(prevStorage, changeSet, primaryKeyList, { metaList, seq, versionKeyList: settings.versionKeyList });
+    if (seq > seqCounter) seqCounter = seq; // later local writes must outrank a caller-supplied seq
+    const { storage: nextStorage, changedList } = applyChangeSet(prevStorage, changeSet, primaryKeyList, { metaList, listSeqMap, seq, versionKeyList: settings.versionKeyList });
     if (nextStorage === prevStorage) return changedList;
     state = { ...state, storage: nextStorage };
     indexManager.update(prevStorage, nextStorage, changedList);
@@ -58,7 +61,7 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
       requestSubscriptionManager.notify(api);
     },
     removeActiveRequest(api, requestID) {
-      const nextList = state.activeRequestList.filter(q => !(q.api === api && q.requestID === requestID));
+      const nextList = state.activeRequestList.filter(request => !(request.api === api && request.requestID === requestID));
       if (nextList.length === state.activeRequestList.length) return;
       state = { ...state, activeRequestList: nextList };
       requestSubscriptionManager.notify(api);
@@ -77,12 +80,17 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
       }
       return { state, pluginStateList };
     },
-    getPlugin: <P extends CdeebeePlugin<S>>(name: string) => pluginList.find(q => q.name === name) as P | undefined,
-    getEntityMeta: (listName, entityID) => metaList.get(listName)?.get(entityID),
+    getPlugin: <P extends CdeebeePlugin<S>>(name: string) => pluginList.find(plugin => plugin.name === name) as P | undefined,
+    getEntityMeta: (listName, entityID) => {
+      const meta = metaList.get(listName)?.get(toEntityID(String(entityID)));
+      if (meta === undefined || meta.deleted) return undefined;
+      const { version, seq, complete } = meta;
+      return { version, seq, complete };
+    },
     commit,
     setEntity: (listName, entityID, patch) => {
       const primaryKey = primaryKeyList[listName] as string;
-      const prevEntity = (state.storage[listName] as unknown as Record<EntityID, EntityOf<S[typeof listName]>> | undefined)?.[entityID];
+      const prevEntity = (state.storage[listName] as unknown as Record<EntityID, EntityOf<S[typeof listName]> | undefined>)[entityID];
       const nextEntity = {
         ...(typeof patch === 'function' ? patch(prevEntity) : { ...(prevEntity ?? {}), ...patch }),
         [primaryKey]: entityID,

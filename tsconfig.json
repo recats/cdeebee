@@ -11,5 +11,5 @@
     "skipLibCheck": true
   },
   "include": ["lib/**/*", "tests/**/*", "tests/**/*.tsx", "vitest.config.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "tests/package/fixtures"]
 }

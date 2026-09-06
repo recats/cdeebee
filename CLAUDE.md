@@ -11,10 +11,11 @@ cdeebee is a standalone normalized data store with a typed request pipeline. It 
 ```bash
 pnpm build              # Build library using Vite
 pnpm lint               # Lint lib/ and tests/ with ESLint
-pnpm lint:ts            # Type-check lib/ and tests/ with TypeScript (no emit)
+pnpm lint:ts            # Type-check lib/ and tests/ (no emit); tests/package/fixtures are checked by test:package
 pnpm lint:all           # Run both linters
 pnpm test               # Run tests in watch mode with Vitest
 pnpm test:run           # Run tests once
+pnpm test:package       # Build, pack, check ESM/CJS entry points, and compile strict TypeScript consumers
 pnpm test:coverage      # Run tests with coverage report
 pnpm bench              # Run benchmarks (tests/bench/*.bench.ts, tinybench via vitest bench)
 pnpm bench:compare      # Same, printing the delta against bench/baseline.json
@@ -28,7 +29,7 @@ Run a single test file:
 pnpm test tests/lib/core/commit.test.ts
 ```
 
-Test files are in `tests/lib/` mirroring the `lib/` structure. `vitest.config.ts` sets `environment: 'node'` by default — core, plugin, and utils tests run without a DOM. A React test needs its own `// @vitest-environment jsdom` directive at the top of the file and must use a `.tsx` extension.
+Test files are in `tests/lib/` mirroring the `lib/` structure; `tests/package/` holds the packed-package smoke test (`smoke.mjs` plus the strict TypeScript consumer fixtures it compiles); `tests/bench/` holds the benchmarks and `baseline.test.ts`, which guards `bench/baseline.json` against machine-specific paths. `vitest.config.ts` sets `environment: 'node'` by default — core, plugin, and utils tests run without a DOM. A React test needs its own `// @vitest-environment jsdom` directive at the top of the file and must use a `.tsx` extension.
 
 ## Architecture
 
@@ -65,7 +66,31 @@ Resolved per list as `options.strategyList[list] ?? settings.apiStrategyList[api
 
 ### Freshness and completeness (`lib/core/commit.ts`)
 
-`applyChangeSet` keeps `Map<listName, Map<entityID, { version, seq, complete }>>` (owned by `createCdeebee`, mutated in place per commit). `version` comes from `settings.versionKeyList` (`readVersion`: numbers as-is, ISO strings via `Date.parse`); `seq` is the send-order sequence taken in `runRequest` (`internal.nextSeq()`) and stamped into `CdeebeeCommitMeta.seq`; local mutations take a fresh one in `commit`. `mergeEntity` is the single decision point — newer writes apply (`upsert` replaces, `patch` = `fill(incoming, stored)`), older writes are dropped when the entity is complete and otherwise `fill(stored, incoming)`. `fill` treats `undefined` and `[]` as holes. `setEntity` emits a `setList` — the entity is replaced whole (so a local edit can clear an array or unset a field) while `complete` is carried over unchanged, so a local edit never marks a thin entity complete. `replaceList` checks freshness per entity: a stale response neither overrides nor removes entities written by a later send. Tests in `tests/lib/core/merge.test.ts` assert order-independence pairwise.
+Per stored entity `applyChangeSet` keeps an internal `EntityMeta` (owned by `createCdeebee`, mutated in place per commit):
+
+- `version` — the server's version, read through `settings.versionKeyList` (`readVersion`: numbers as-is, ISO strings via `Date.parse`).
+- `seq` — the highest send sequence that confirmed the entity exists. Gates removals.
+- `writeSeq` — the send sequence of the data currently stored. Breaks ties between equal or unknown versions.
+- `complete` — set by `upsert` / `replaceList` at the current version; a complete entity drops older writes instead of filling holes.
+- `deleted` — tombstone written by `removeIDList`; `removedSeq` — the last removal boundary, retained when the entity is re-added.
+
+`db.getEntityMeta` returns a detached `{ version, seq, complete }` and `undefined` for tombstones. A per-list `listSeqMap` records the sequence of the last `replaceList` / `clearList`; it is a required option so tests exercise the same rules as the store. Sequences come from `internal.nextSeq()`: `runRequest` takes one at send time and stamps it into `CdeebeeCommitMeta.seq`, local mutations take a fresh one in `commit`, and a caller-supplied `meta.seq` above the counter advances it.
+
+Decision order for one write, sent at `seq`:
+
+1. `seq < removedSeq` — dropped. A response sent before the entity's removal cannot fill or overwrite it, even with a newer version.
+2. Entity absent — `isStale(prevMeta, listSeq, seq)`: dropped when sent before the tombstone or the list's last reset, otherwise written as new (`complete` only for `upsert`) with the list boundary carried as `removedSeq`. Equal sequence passes, so the parts of one commit apply in order.
+3. Entity stored — `mergeEntity`: versions compare first, `writeSeq` only when versions are equal or unknown. Newer: `upsert` / `set` replace whole, `patch` = `fill(incoming, stored)`. Older: dropped when complete, otherwise `fill(stored, incoming)`. Either way `seq` becomes `max(seq, stored)`: even a write that lost by version confirms the entity existed at its send. `fill` treats `undefined` and `[]` as holes.
+
+Per operation:
+
+- `setEntity` emits `setList`: the entity is replaced whole at a fresh sequence (a local edit can clear an array or unset a field) while `complete` is carried over, so a local edit never marks a thin entity complete.
+- `replaceList`: stored entities merge through `mergeEntity` in `upsert` mode exactly like `upsertList`; absent ids follow rule 2 with the *previous* list boundary as `removedSeq` (a replacement that carries an entity is not its removal). Entities missing from the replacement are deleted unless `isStale`, so a reset sent before a later reset never deletes. The new `listSeq` prunes every tombstone at or below it, which bounds tombstones by removals sent after the last reset.
+- `removeIDList`: skipped when `isStale` (development logs a `console.warn` if the entity is stored). Otherwise a tombstone `{ seq, writeSeq: seq, complete: false, deleted: true }`, also for ids not in the list, so an earlier-sent fetch cannot re-add them.
+
+Accepted limitations: tombstones on lists that never reset live for the store lifetime (request completion is not a safe GC boundary, `db.commit` accepts any `seq`); a removal carries no version, so with reversed server processing the outcome depends on whether the removal applied before the version-newer response arrived.
+
+Tests: `tests/lib/core/merge.test.ts` pins each rule pairwise; `tests/lib/core/fuzz.test.ts` shuffles random commit sequences (composite commits, monotonic server versions) into random arrival orders and checks they agree with each other and, in send order, with a naive store. Reversed server processing is covered by merge and queryQueue tests, not by the fuzz.
 
 ### Hooks (`lib/react/createCdeebeeHooks.ts`)
 
@@ -74,7 +99,7 @@ Resolved per list as `options.strategyList[list] ?? settings.apiStrategyList[api
 | `useEntity(listName, entityID)` | that one entity |
 | `useList(listName)` | any change to the list |
 | `useEntityList(listName, entityIDList)` | any of the listed entities |
-| `useListSelector(listName, selector, depList?)` | the list, re-running `selector`; keeps the previous array reference when the result is shallow-equal |
+| `useListSelector(listName, selector, depList?)` | the list or `depList`, re-running `selector`; keeps the previous array reference when the result is shallow-equal. Props the selector closes over belong in `depList`, like `useMemo` |
 | `useEntityListBy(listName, fieldName, value)` | the list, via an `IndexManager` index; throws if `(listName, fieldName)` is not in `settings.indexList` |
 | `useLoading(apiList)` | any api in `apiList` being in flight |
 | `useIsLoading()` | any request at all being in flight |
@@ -87,7 +112,7 @@ All hooks are built on `useSyncExternalStore`, so they are safe to use with conc
 
 ### Build note
 
-`react` is the only external dependency in `vite.config.mjs` (`rollupOptions.external`). `lib/core.ts` (and everything it transitively imports) must never import React — `lib/index.ts` is the only file allowed to. Verify after a build with `grep -c "from \"react\"\|require(\"react\")" dist/core.js dist/core.cjs`, which must both print `0`.
+`react` is the only external dependency in `vite.config.mjs` (`rollupOptions.external`). `lib/core.ts` (and everything it transitively imports) must never import React — `lib/index.ts` is the only file allowed to. `pnpm test:package` guards this: it packs the build and loads the core entry with no `react` in `node_modules`.
 
 ### FormData / headers
 

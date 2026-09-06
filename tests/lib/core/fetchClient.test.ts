@@ -1,3 +1,4 @@
+import { createCdeebee } from '../../../lib/core/createCdeebee';
 import { describe, it, expect } from 'vitest';
 import { buildUrl, resolveHeaderList, resolveData, buildRequestInit, executeFetch, type FetchContext } from '../../../lib/core/fetchClient';
 import { CdeebeeRequestError } from '../../../lib/core/requestError';
@@ -105,13 +106,13 @@ describe('executeFetch', () => {
     expect(error.response).toEqual({ error: 'bad' });
   });
   it('http error with unparsable body keeps response undefined', async () => {
-    const fetch = mockFetch([createMockResponse({ ok: false, status: 502, json: async () => { throw new Error('x'); } })]);
+    const fetch = mockFetch([createMockResponse({ ok: false, status: 502, text: async () => { throw new Error('x'); } })]);
     const error = await executeFetch(baseCtx(), { fetch }).catch(e => e);
     expect(error.kind).toBe('http');
     expect(error.response).toBeUndefined();
   });
   it('parse error on ok response', async () => {
-    const fetch = mockFetch([createMockResponse({ json: async () => { throw new SyntaxError('bad json'); } })]);
+    const fetch = mockFetch([createMockResponse({ text: async () => 'bad json' })]);
     const error = await executeFetch(baseCtx(), { fetch }).catch(e => e);
     expect(error.kind).toBe('parse');
   });
@@ -124,7 +125,7 @@ describe('executeFetch', () => {
     expect(error.kind).toBe('abort');
   });
   it('abort while parsing a non-ok body is reported as abort, not http', async () => {
-    const fetch = mockFetch([createMockResponse({ ok: false, status: 500, json: async () => { throw new DOMException('aborted', 'AbortError'); } })]);
+    const fetch = mockFetch([createMockResponse({ ok: false, status: 500, text: async () => { throw new DOMException('aborted', 'AbortError'); } })]);
     const error = await executeFetch(baseCtx(), { fetch }).catch(e => e);
     expect(error.kind).toBe('abort');
   });
@@ -136,5 +137,48 @@ describe('executeFetch', () => {
     } finally {
       globalThis.fetch = original;
     }
+  });
+});
+
+describe('response body handling', () => {
+  type S = { userList: Record<number, { userID: number; v: number }> };
+  const settings = { fetch: {}, primaryKeyList: { userList: 'userID' as const } };
+
+  it('successful 204 response should resolve', async () => {
+    const db = createCdeebee<S>({ ...settings, fetch: { fetch: async () => new Response(null, { status: 204 }) } });
+    await expect(db.request({ api: '/delete', method: 'DELETE' })).resolves.toBeUndefined();
+  });
+
+  it('malformed successful JSON still rejects', async () => {
+    const db = createCdeebee<S>({ ...settings, fetch: { fetch: async () => new Response('broken', { status: 200 }) } });
+    await expect(db.request({ api: '/x' })).rejects.toMatchObject({ kind: 'parse' });
+  });
+
+  it.each([204, 205])('no-content status %s leaves storage unchanged and clears loading', async status => {
+    const db = createCdeebee<S>({ ...settings, fetch: { fetch: async () => new Response(null, { status }) } });
+    db.setEntity('userList', 1, { v: 1 });
+    const storage = db.getState().storage;
+    await expect(db.request({ api: '/x' })).resolves.toBeUndefined();
+    expect(db.getState().storage).toBe(storage);
+    expect(db.getState().activeRequestList).toEqual([]);
+  });
+
+  it('an empty body reaches a custom normalize as undefined, so a DELETE → 204 can still commit', async () => {
+    const db = createCdeebee<S>({ ...settings, fetch: { fetch: async () => new Response(null, { status: 204 }) } });
+    db.setEntity('userList', 5, { v: 1 });
+    await db.request({ api: '/user/delete', normalize: () => ({ userList: { removeIDList: [5] } }) });
+    expect(db.getState().storage.userList[5]).toBeUndefined();
+  });
+
+  it.each(['\n', ' ', '\r\n'])('a whitespace-only body %j is empty, not malformed', async body => {
+    const db = createCdeebee<S>({ ...settings, fetch: { fetch: async () => new Response(body, { status: 200 }) } });
+    await expect(db.request({ api: '/x' })).resolves.toBeUndefined();
+  });
+
+  it('text and blob responses keep their natural empty values on 204', async () => {
+    const db = createCdeebee<S>({ ...settings, fetch: { fetch: async () => new Response(null, { status: 204 }) } });
+    await expect(db.request<string>({ api: '/x', responseType: 'text' })).resolves.toBe('');
+    const blob = await db.request<Blob>({ api: '/x', responseType: 'blob' });
+    expect(blob.size).toBe(0);
   });
 });

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useSyncExternalStore } from 'react';
 import { shallowEqual } from '../utils/shallowEqual';
 import type { CdeebeeHistoryEntry, CdeebeeHistoryPlugin } from '../plugins/history';
-import type { CdeebeeInstance, CdeebeeList, CdeebeeState, CdeebeeStorageShape, EntityID, EntityOf, ListName } from '../core/types';
+import type { CdeebeeInstance, CdeebeeList, CdeebeeState, CdeebeeStorageShape, EntityID, EntityOf, EntityFieldName, ListName } from '../core/types';
 
 const EMPTY_LIST: never[] = [];
 const noopSubscribe = () => () => {};
@@ -19,7 +19,12 @@ interface IndexSelectorCache<R> {
   result: R;
 }
 
-type FieldName<S, K extends ListName<S>> = Extract<keyof EntityOf<S[K]>, string>;
+interface StoreSelectorCache<S, R> {
+  state: CdeebeeState<S>;
+  selector: (state: CdeebeeState<S>) => R;
+  equalityFn: (a: R, b: R) => boolean;
+  result: R;
+}
 
 const keepIfEqual = <R>(prev: R | undefined, next: R): R => (
   prev !== undefined && Array.isArray(next) && shallowEqual(prev, next) ? prev : next
@@ -85,8 +90,8 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   };
 
-  const useEntityListBy = <K extends ListName<S>>(listName: K, fieldName: FieldName<S, K>, value: unknown): EntityOf<S[K]>[] => {
-    if (!(db.settings.indexList?.[listName] as string[] | undefined)?.includes(fieldName)) {
+  const useEntityListBy = <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>, value: unknown): EntityOf<S[K]>[] => {
+    if (!db.settings.indexList?.[listName]?.includes(fieldName)) {
       throw new Error(`[cdeebee] no index for ${listName}.${fieldName} — add it to settings.indexList`);
     }
     const cacheRef = useRef<IndexSelectorCache<EntityOf<S[K]>[]>>(undefined);
@@ -110,7 +115,7 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
   const useLoading = (apiList: string[]): boolean => {
     const key = apiList.join('\0');
     const subscribe = useCallback((listener: () => void) => db.subscribeRequest(listener, apiList), [key]);
-    const getSnapshot = useCallback(() => db.getState().activeRequestList.some(q => apiList.includes(q.api)), [key]);
+    const getSnapshot = useCallback(() => db.getState().activeRequestList.some(request => apiList.includes(request.api)), [key]);
     return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   };
 
@@ -121,21 +126,20 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
   };
 
   const useStore = <R>(selector: (state: CdeebeeState<S>) => R, equalityFn: (a: R, b: R) => boolean = Object.is): R => {
-    const selectorRef = useRef(selector);
-    selectorRef.current = selector;
-    const cacheRef = useRef<{ state: CdeebeeState<S>; result: R } | undefined>(undefined);
     const subscribe = useCallback((listener: () => void) => {
       const unsubscribeStorage = db.subscribe(listener);
       const unsubscribeRequest = db.subscribeRequest(listener);
       return () => { unsubscribeStorage(); unsubscribeRequest(); };
     }, []);
+    const cacheRef = useRef<StoreSelectorCache<S, R>>(undefined);
+    // A new selector identity re-runs the selection, but the previous result survives so equalityFn can keep its reference.
     const getSnapshot = () => {
       const state = db.getState();
       const cache = cacheRef.current;
-      if (cache && cache.state === state) return cache.result;
-      const next = selectorRef.current(state);
+      if (cache && cache.state === state && cache.selector === selector && cache.equalityFn === equalityFn) return cache.result;
+      const next = selector(state);
       const result = cache && equalityFn(cache.result, next) ? cache.result : next;
-      cacheRef.current = { state, result };
+      cacheRef.current = { state, selector, equalityFn, result };
       return result;
     };
     return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
@@ -162,9 +166,15 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getState().errorList[api] ?? EMPTY_LIST, [api]))
   );
 
-  const useLastResultIDList = <K extends ListName<S>>(api: string, listName: K): EntityID[] => (
-    useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getState().lastResultIDList[api]?.[listName] ?? EMPTY_LIST, [api, listName]))
-  );
+  const useLastResultIDList = <K extends ListName<S>>(api: string, listName: K): EntityID[] => {
+    const cacheRef = useRef<EntityID[]>(undefined);
+    return useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => {
+      const next = plugin.getState().lastResultIDList[api]?.[listName] ?? EMPTY_LIST;
+      const result = keepIfEqual(cacheRef.current, next);
+      cacheRef.current = result;
+      return result;
+    }, [api, listName]));
+  };
 
   const useLastResponse = <R = unknown>(api: string): R | undefined => (
     useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getLast(api)?.response as R | undefined, [api]))

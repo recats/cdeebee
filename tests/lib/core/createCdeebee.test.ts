@@ -117,3 +117,118 @@ describe('createCdeebee store', () => {
   });
 
 });
+
+describe('deletion and list reset ordering', () => {
+  type S = { userList: Record<number, { userID: number; v: number }> };
+  const settings = { fetch: {}, primaryKeyList: { userList: 'userID' as const } };
+
+  it('old response must not resurrect locally deleted entity', () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    db.removeEntityList('userList', [1]);
+    db.commit({ userList: { upsertList: [{ userID: 1, v: 0 }] } }, { source: 'request', seq: 1 });
+    expect(db.getState().storage.userList[1]).toBeUndefined();
+  });
+
+  it.each(['upsertList', 'patchList', 'setList', 'replaceList'] as const)('list reset blocks unknown entities from an older %s response', mode => {
+    const db = createCdeebee<S>(settings);
+    db.clearList('userList');
+    const entity = { userID: 9, v: 1 };
+    db.commit({ userList: { [mode]: mode === 'replaceList' ? { 9: entity } : [entity] } }, { source: 'request', seq: 0 });
+    expect(db.getState().storage.userList).toEqual({});
+    db.setEntity('userList', 9, { v: 2 });
+    expect(db.getState().storage.userList[9].v).toBe(2);
+  });
+
+  it('stale deletion cannot remove a newer entity and warns in development', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    db.commit({ userList: { removeIDList: [1] } }, { source: 'request', seq: 0 });
+    expect(db.getState().storage.userList[1].v).toBe(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('skipped removal of "userList" 1');
+    db.commit({ userList: { removeIDList: [999] } }, { source: 'request', seq: 0 });
+    expect(warn).toHaveBeenCalledTimes(1); // an absent id is not worth a warning
+    warn.mockRestore();
+  });
+
+  it('a caller-supplied seq advances the internal counter, so later local writes still win', () => {
+    const db = createCdeebee<S>(settings);
+    db.commit({ userList: { replaceList: { 1: { userID: 1, v: 1 } } } }, { source: 'request', seq: 1000 });
+    db.removeEntityList('userList', [1]);
+    expect(db.getState().storage.userList[1]).toBeUndefined();
+    db.setEntity('userList', 2, { v: 2 });
+    expect(db.getState().storage.userList[2].v).toBe(2);
+  });
+
+  it('getEntityMeta hides tombstones: a removed entity has no meta, like one never seen', () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    expect(db.getEntityMeta('userList', 1)).toBeDefined();
+    db.removeEntityList('userList', [1]);
+    expect(db.getEntityMeta('userList', 1)).toBeUndefined();
+    db.commit({ userList: { upsertList: [{ userID: 1, v: 0 }] } }, { source: 'request', seq: 1 });
+    expect(db.getState().storage.userList[1]).toBeUndefined();
+  });
+
+  it('replaceList deletion blocks stale replacement and allows fresh re-add', () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    db.replaceList('userList', {});
+    db.commit({ userList: { replaceList: { 1: { userID: 1, v: 0 } } } }, { source: 'request', seq: 1 });
+    expect(db.getState().storage.userList).toEqual({});
+    db.setEntity('userList', 1, { v: 3 });
+    expect(db.getState().storage.userList[1].v).toBe(3);
+    expect(db.getEntityMeta('userList', 1)?.complete).toBe(false);
+  });
+});
+
+describe('public entity metadata', () => {
+  it.each(['remove', 'clear'] as const)('hides the %s boundary and returns a detached value', kind => {
+    const db = make();
+    db.setEntity('userList', 1, { name: 'old', orgID: 1 });
+    if (kind === 'remove') db.removeEntityList('userList', [1]);
+    else db.clearList('userList');
+    db.setEntity('userList', 1, { name: 'new', orgID: 2 });
+    const meta = db.getEntityMeta('userList', 1)!;
+    expect(meta).toEqual({ version: undefined, seq: 3, complete: false });
+    expect(Object.keys(meta).sort()).toEqual(['complete', 'seq', 'version']);
+    meta.seq = 0;
+    meta.complete = true;
+    expect(db.getEntityMeta('userList', 1)).toEqual({ version: undefined, seq: 3, complete: false });
+    db.commit({ userList: { upsertList: [{ userID: 1, name: 'stale', orgID: 9 }] } }, { source: 'request', seq: 1 });
+    expect(db.getState().storage.userList[1].name).toBe('new');
+  });
+});
+
+describe('metadata ID normalization', () => {
+  it('numeric and canonical string IDs refer to the same metadata', () => {
+    const db = make();
+    db.setEntity('userList', 1, { name: 'one', orgID: 1 });
+    expect(db.getEntityMeta('userList', '1')).toEqual(db.getEntityMeta('userList', 1));
+    expect(db.getEntityMeta('userList', '01')).toBeUndefined();
+    db.removeEntityList('userList', ['1']);
+    expect(db.getEntityMeta('userList', 1)).toBeUndefined();
+    expect(db.getEntityMeta('userList', '1')).toBeUndefined();
+  });
+});
+
+describe('optimistic deletion sequence contract', () => {
+  it('removing before sending a request allows its deletion confirmation', async () => {
+    const db = make({ fetch: { fetch: async () => new Response('{}') } });
+    db.setEntity('userList', 1, { name: 'one', orgID: 1 });
+    db.removeEntityList('userList', [1]);
+    await db.request({ api: '/delete', normalize: () => ({ userList: { removeIDList: [1] } }) });
+    expect(db.getState().storage.userList[1]).toBeUndefined();
+  });
+
+  it('a local write after sending deletion protects the newer entity', async () => {
+    const db = make({ fetch: { fetch: async () => new Response('{}') } });
+    db.setEntity('userList', 1, { name: 'one', orgID: 1 });
+    const request = db.request({ api: '/delete', normalize: () => ({ userList: { removeIDList: [1] } }) });
+    db.setEntity('userList', 1, { name: 'local edit' });
+    await request;
+    expect(db.getState().storage.userList[1].name).toBe('local edit');
+  });
+});

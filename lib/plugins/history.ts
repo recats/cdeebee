@@ -43,10 +43,10 @@ const append = (
   record: Record<string, CdeebeeHistoryEntry[]>,
   api: string,
   entry: CdeebeeHistoryEntry,
-  max: number | undefined,
+  maxHistorySize: number,
 ): Record<string, CdeebeeHistoryEntry[]> => {
   let entryList = [...(record[api] ?? []), entry];
-  if (max && Number.isFinite(max) && entryList.length > max) entryList = entryList.slice(-max);
+  if (maxHistorySize && Number.isFinite(maxHistorySize) && entryList.length > maxHistorySize) entryList = entryList.slice(-maxHistorySize);
   return { ...record, [api]: entryList };
 };
 
@@ -69,9 +69,10 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
       const { kind, message, status, response } = ctx.error;
       state = { ...state, errorList: append(state.errorList, ctx.api, { ...base, error: { kind, message, status, response } }, maxHistorySize) };
     } else {
-      const lastResultIDList = ctx.changeSet === undefined
+      const resultIDList = ctx.changeSet === undefined ? undefined : extractResultIDList(ctx.changeSet, ctx.db.settings.primaryKeyList);
+      const lastResultIDList = resultIDList === undefined || Object.keys(resultIDList).length === 0
         ? state.lastResultIDList
-        : { ...state.lastResultIDList, [ctx.api]: extractResultIDList(ctx.changeSet, ctx.db.settings.primaryKeyList) };
+        : { ...state.lastResultIDList, [ctx.api]: resultIDList };
       state = {
         ...state,
         doneList: append(state.doneList, ctx.api, { ...base, response: ctx.response }, maxHistorySize),
@@ -85,7 +86,7 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
     if (api === undefined) {
       const apiList = new Set([...Object.keys(state.doneList), ...Object.keys(state.errorList)]);
       state = { doneList: {}, errorList: {}, lastResultIDList: {} };
-      apiList.forEach(q => subscriptionManager.notify(q));
+      apiList.forEach(api => subscriptionManager.notify(api));
       return;
     }
     if (!(api in state.doneList) && !(api in state.errorList) && !(api in state.lastResultIDList)) return;

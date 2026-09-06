@@ -1,6 +1,6 @@
 {
   "name": "@recats/cdeebee",
-  "version": "4.0.0-beta.3",
+  "version": "4.0.0-beta.4",
   "description": "Standalone normalized data store with a typed request pipeline",
   "repository": "git@github.com:recats/cdeebee.git",
   "author": "recats",
@@ -15,8 +15,9 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "bench": "vitest bench --run",
-    "bench:save": "vitest bench --run --outputJson bench/baseline.json",
-    "bench:compare": "vitest bench --run --compare bench/baseline.json"
+    "bench:save": "vitest bench --run --outputJson bench/baseline.json && node bench/relativize.mjs",
+    "bench:compare": "vitest bench --run --compare bench/baseline.json",
+    "test:package": "pnpm build && node tests/package/smoke.mjs"
   },
   "keywords": [
     "react",
@@ -67,6 +68,7 @@
     "@testing-library/react": "^16.3.2",
     "@types/node": "^26.3.0",
     "@types/react": "^19.2.18",
+    "@types/react-dom": "^19",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.9.1",
