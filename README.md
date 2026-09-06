@@ -121,8 +121,6 @@ For bulk edits, pass all updated entities in one `db.commit({ listName: { setLis
 
 For optimistic deletion, call `db.removeEntityList(listName, ids)` before sending the delete request. A local `setEntity` made after sending that request has a newer sequence and can cause its removal response to be rejected; keep pending/deleting UI flags outside the entity store. Automatic rollback is not provided.
 
-
-
 ## Request options
 
 `db.request<Response, Data>(options)`:

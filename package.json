@@ -15,7 +15,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "bench": "vitest bench --run",
-    "bench:save": "vitest bench --run --outputJson bench/baseline.json",
+    "bench:save": "vitest bench --run --outputJson bench/baseline.json && node bench/relativize.mjs",
     "bench:compare": "vitest bench --run --compare bench/baseline.json",
     "test:package": "pnpm build && node tests/package/smoke.mjs"
   },

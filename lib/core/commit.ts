@@ -115,12 +115,14 @@ export function mergeEntity(
     };
   }
 
-  if (prevMeta.complete) return undefined;
+  // Even a write that loses by version was sent at `seq`, so it confirms the entity exists as of that send.
+  const confirmedSeq = Math.max(prevMeta.seq, seq);
+  if (prevMeta.complete) return confirmedSeq === prevMeta.seq ? undefined : { entity: prevEntity, meta: { ...prevMeta, seq: confirmedSeq } };
   const filled = fill(prevEntity, nextEntity);
   const versionKnown = prevMeta.version !== undefined && version !== undefined;
   const complete = mode === 'upsert' && (!versionKnown || sameVersion);
-  if (filled === prevEntity && complete === prevMeta.complete) return undefined;
-  return { entity: filled, meta: { ...prevMeta, complete } };
+  if (filled === prevEntity && complete === prevMeta.complete && confirmedSeq === prevMeta.seq) return undefined;
+  return { entity: filled, meta: { ...prevMeta, seq: confirmedSeq, complete } };
 }
 
 function applyListChange<S>(

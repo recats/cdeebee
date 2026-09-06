@@ -398,6 +398,28 @@ describe('sequence confirmations survive newer server versions', () => {
     }
   });
 
+  it('a write that loses by version still confirms the entity at its sequence', () => {
+    // sent at 10, the write says the entity exists as of 10 even though its version lost; a removal sent at 5 must not delete it
+    const confirmed = { seq: 3, change: { itemList: { replaceList: { 1: full('newer', '2026-01-02') } } } };
+    const lost = { seq: 10, change: { itemList: { upsertList: [full('older', '2026-01-01')] } } };
+    const removal = { seq: 5, change: { itemList: { removeIDList: [1] } } };
+    const result = run([confirmed, lost, removal], true);
+    expect(result.storage.itemList[1]?.name).toBe('newer');
+    expect(result.meta?.seq).toBe(10);
+  });
+
+  it('removal without a version between reversed-version writes: outcome depends only on whether the removal applied', () => {
+    type Step = { seq: number; change: CdeebeeChangeSet<S> };
+    const up: Step = { seq: 10, change: { itemList: { upsertList: [full('v1', '2026-01-01')] } } };
+    const rep: Step = { seq: 3, change: { itemList: { replaceList: { 1: full('v2', '2026-01-02') } } } };
+    const rm: Step = { seq: 5, change: { itemList: { removeIDList: [1] } } };
+    const name = (steps: Step[]) => run(steps, true).storage.itemList[1]?.name;
+    // the removal arrives after a later-sent confirmation: skipped, the version-newer write stands
+    expect([[up, rep, rm], [up, rm, rep], [rep, up, rm]].map(name)).toEqual(['v2', 'v2', 'v2']);
+    // the removal applied first: the re-add at 10 wins and the pre-removal v2 cannot overwrite it
+    expect([[rep, rm, up], [rm, up, rep], [rm, rep, up]].map(name)).toEqual(['v1', 'v1', 'v1']);
+  });
+
   it('a version key with missing versions does not change filling a retained partial entity', () => {
     const steps = [
       { seq: 6, change: { itemList: { patchList: [thin('current')] } } },

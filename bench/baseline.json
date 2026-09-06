@@ -1,7 +1,7 @@
 {
   "files": [
     {
-      "filepath": "/home/senelway/Projects/recats/cdeebee/tests/bench/isolated.bench.ts",
+      "filepath": "tests/bench/isolated.bench.ts",
       "groups": [
         {
           "fullName": "tests/bench/isolated.bench.ts > isolated commits, 10k numeric IDs",
@@ -216,7 +216,7 @@
       ]
     },
     {
-      "filepath": "/home/senelway/Projects/recats/cdeebee/tests/bench/store.bench.ts",
+      "filepath": "tests/bench/store.bench.ts",
       "groups": [
         {
           "fullName": "tests/bench/store.bench.ts > commit, 10k entities",
