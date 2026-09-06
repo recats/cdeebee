@@ -7,7 +7,7 @@ export interface CdeebeeQueryQueueOptions<S = any> {
   key?: (ctx: CdeebeeRequestContext<S>) => string;
 }
 
-interface Ticket {
+interface QueueTicket {
   previous: Promise<void>;
   release: () => void;
 }
@@ -25,7 +25,7 @@ const waitForPrevious = (previous: Promise<void>, signal: AbortSignal): Promise<
 
 export function queryQueue<S>(options: CdeebeeQueryQueueOptions<S> = {}): CdeebeePlugin<S> {
   const tailMap = new Map<string, Promise<void>>();
-  const ticketMap = new Map<string, Ticket>();
+  const ticketMap = new Map<string, QueueTicket>();
   const applies = (api: string) => !options.apiList || options.apiList.includes(api);
 
   return {

@@ -74,13 +74,13 @@ Each list is merged into storage according to a strategy, resolved as `options.s
 | `replaceList` | The whole list is replaced with only the entities in the response — except entities the store wrote at a later send or newer version, which are kept as they are (see Freshness). |
 | `skip` | The list is left untouched. |
 
-The split is by endpoint, not by list: most endpoints return an entity in a *thin* shape (a stats endpoint listing sellers without their relation lists, a verify endpoint listing what the user can see), and a few return it *full* (get-with-relations, save). Declare the full ones once in `settings.apiStrategyList`; everything else patches by default and can never wipe a field it did not compute:
+The split is by endpoint, not by list: most endpoints return an entity in a *thin* shape (a stats endpoint listing items without their relation lists, a verify endpoint listing what the user can see), and a few return it *full* (get-with-relations, save). Declare the full ones once in `settings.apiStrategyList`; everything else patches by default and can never wipe a field it did not compute:
 
 ```ts
 createCdeebee<Storage>({
   apiStrategyList: {
-    '/seller/list': { sellerList: 'upsert' },
-    '/seller/save': { sellerList: 'upsert' },
+    '/item/list': { itemList: 'upsert' },
+    '/item/save': { itemList: 'upsert' },
   },
 });
 ```
@@ -91,7 +91,7 @@ Save and full-fetch endpoints **must** be `upsert`: with `patch`, a field the se
 
 Two responses can carry the same entity and disagree — because one is thin and the other full, or because the server changed between them. cdeebee keeps two facts per stored entity and resolves every write with them, so the result does not depend on the order responses arrive:
 
-- **version** — the server's own version of the entity, read through `settings.versionKeyList` (`{ sellerList: 'updatedAt' }`; numbers as-is, ISO timestamps parsed to ms). When absent, the **send order** of the request stands in: the response to a later-issued request wins.
+- **version** — the server's own version of the entity, read through `settings.versionKeyList` (`{ itemList: 'updatedAt' }`; numbers as-is, ISO timestamps parsed to ms). When absent, the **send order** of the request stands in: the response to a later-issued request wins.
 - **complete** — set once an `upsert`/`replaceList` write landed at the current version; from then on an older write is dropped instead of merged.
 
 | incoming write | stored entity | result |
@@ -101,9 +101,11 @@ Two responses can carry the same entity and disagree — because one is thin and
 | older | `complete` | dropped |
 | older | incomplete | stored fields win, incoming fills the holes; `complete` if it was an `upsert` at the same version |
 
-`db.getEntityMeta(listName, entityID)` exposes `{ version, seq, complete }` for debugging and tests; a removed entity has no meta, exactly like one never seen (its tombstone stays internal). Local mutations (`setEntity`) replace the entity whole at a fresh sequence (so an edit can clear an array or unset a field) while keeping its completeness flag, so a slow response to an earlier request cannot overwrite what the user just typed. `replaceList` is checked per entity too: a stale list response neither overrides nor removes entities written by a later send.
+`db.getEntityMeta(listName, entityID)` returns a detached `{ version, seq, complete }` value for debugging and tests; internal removal boundaries are not exposed; a removed entity has no meta, exactly like one never seen (its tombstone stays internal). Local mutations (`setEntity`) replace the entity whole at a fresh sequence (so an edit can clear an array or unset a field) while keeping its completeness flag, so a slow response to an earlier request cannot overwrite what the user just typed. `replaceList` is checked per entity too: a stale list response neither overrides nor removes entities written by a later send.
 
 Without `versionKeyList`, send order is the only ordering signal; it cannot detect when the server processes requests in a different order. `queryQueue` sends requests concurrently and orders response processing within each queue. It does not serialize server execution; await each `db.request()` before sending the next when that ordering is required.
+
+TypeScript checks that `primaryKeyList` and `versionKeyList` select string or number fields (including optional version fields). Array, object, and boolean fields cannot be used as IDs or server versions.
 
 ## Local mutations
 
@@ -111,7 +113,7 @@ Storage can also be changed without a request, through the same commit path (so 
 
 - `db.setEntity(listName, entityID, patch)` — a plain object `patch` is shallow-merged over the previous entity; a `(prevEntity) => nextEntity` updater function replaces the entity with its return value. Either way, cdeebee always sets the primary key field on the result to `entityID`, so an updater does not need to (and cannot accidentally omit or override) it.
 - `db.removeEntityList(listName, entityIDList)` — removes entities by id.
-- `db.clearList(listName)` — empties a list. Deletions retain sequence tombstones, and list resets (`clearList` / `replaceList`) retain a sequence boundary, so earlier requests cannot restore removed entities (including IDs absent when the list was cleared). A later write can add them again, but responses sent before the deletion/reset cannot fill or overwrite their fields, even if they carry a higher server version. A list reset drops the tombstones it makes redundant, so only removals sent after the last reset keep one.
+- `db.clearList(listName)` — empties a list. Deletions retain sequence tombstones, and list resets (`clearList` / `replaceList`) retain a sequence boundary, so earlier requests cannot restore removed entities (including IDs absent when the list was cleared). A later write can add them again, but responses sent before their removal cannot fill or overwrite their fields, even if they carry a higher server version. An entity retained by `replaceList` was not removed: its server version still takes precedence over send order. A list reset drops the tombstones it makes redundant, so only removals sent after the last reset keep one.
 - `db.replaceList(listName, entityRecord)` — replaces a whole list with a keyed record.
 - `db.commit(changeSet, meta)` — the low-level primitive all of the above call; use it directly to touch several lists atomically in one `{ listName: { upsertList, removeIDList, replaceList } }` change set.
 

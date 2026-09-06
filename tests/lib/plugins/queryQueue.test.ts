@@ -162,3 +162,32 @@ describe('queryQueue with cancelation', () => {
     expect(db.getState().storage.userList[1].v).toBe(3);
   });
 });
+
+describe('save processed after list on the server', () => {
+  interface Item { itemID: number; updatedAt: string; name: string }
+  interface ItemStorage { itemList: Record<number, Item> }
+  it.each(['none', 'per-api', 'shared'] as const)('keeps the saved version with %s queue', async queue => {
+    const save = deferred<Response>();
+    const list = deferred<Response>();
+    const db = createCdeebee<ItemStorage>({
+      fetch: { fetch: (async (url: string) => url === '/save' ? save.promise : list.promise) as typeof fetch },
+      primaryKeyList: { itemList: 'itemID' },
+      versionKeyList: { itemList: 'updatedAt' },
+      apiStrategyList: { '/save': { itemList: 'replaceList' }, '/list': { itemList: 'replaceList' } },
+      pluginList: queue === 'none' ? [] : [queryQueue<ItemStorage>(queue === 'per-api' ? { key: ctx => ctx.api } : {})],
+    });
+    const response = (name: string, updatedAt: string) => ({ itemList: { primaryKey: 'itemID', data: [{ itemID: 1, name, updatedAt }] } });
+    const saved = response('saved', '2026-01-01T10:01:00Z');
+    const saving = db.request({ api: '/save' });
+    const listing = db.request({ api: '/list' });
+    await tick();
+    list.resolve(jsonResponse(response('listed', '2026-01-01T10:00:00Z')));
+    if (queue !== 'shared') {
+      await listing;
+      expect(db.getState().storage.itemList[1].name).toBe('listed');
+    }
+    save.resolve(jsonResponse(saved));
+    await Promise.all([saving, listing]);
+    expect(db.getState().storage.itemList[1]).toEqual(saved.itemList.data[0]);
+  });
+});

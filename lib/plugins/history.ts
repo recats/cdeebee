@@ -43,10 +43,10 @@ const append = (
   record: Record<string, CdeebeeHistoryEntry[]>,
   api: string,
   entry: CdeebeeHistoryEntry,
-  max: number | undefined,
+  maxHistorySize: number,
 ): Record<string, CdeebeeHistoryEntry[]> => {
   let entryList = [...(record[api] ?? []), entry];
-  if (max && Number.isFinite(max) && entryList.length > max) entryList = entryList.slice(-max);
+  if (maxHistorySize && Number.isFinite(maxHistorySize) && entryList.length > maxHistorySize) entryList = entryList.slice(-maxHistorySize);
   return { ...record, [api]: entryList };
 };
 
@@ -86,7 +86,7 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
     if (api === undefined) {
       const apiList = new Set([...Object.keys(state.doneList), ...Object.keys(state.errorList)]);
       state = { doneList: {}, errorList: {}, lastResultIDList: {} };
-      apiList.forEach(q => subscriptionManager.notify(q));
+      apiList.forEach(api => subscriptionManager.notify(api));
       return;
     }
     if (!(api in state.doneList) && !(api in state.errorList) && !(api in state.lastResultIDList)) return;

@@ -2,12 +2,12 @@ import { isRecord } from '../utils/isRecord';
 import { toEntityID } from '../utils/entityID';
 import type { CdeebeeChangedList, CdeebeeIndexList, CdeebeeList, CdeebeeStorage, EntityID, ListName } from './types';
 
-type Bucket = Map<unknown, Set<EntityID>>;
-const EMPTY: ReadonlySet<EntityID> = new Set();
+type IndexBucket = Map<unknown, Set<EntityID>>;
+const EMPTY_ENTITY_ID_SET: ReadonlySet<EntityID> = new Set();
 
 export class IndexManager<S> {
   private fieldListByList = new Map<ListName<S>, string[]>();
-  private bucketMap = new Map<string, Bucket>();
+  private bucketMap = new Map<string, IndexBucket>();
 
   constructor(indexList: CdeebeeIndexList<S> | undefined) {
     if (!indexList) return;
@@ -22,20 +22,20 @@ export class IndexManager<S> {
     return `${listName} ${fieldName}`;
   }
 
-  private bucket(listName: ListName<S>, fieldName: string): Bucket {
+  private bucket(listName: ListName<S>, fieldName: string): IndexBucket {
     const key = this.key(listName, fieldName);
     let bucket = this.bucketMap.get(key);
     if (!bucket) { bucket = new Map(); this.bucketMap.set(key, bucket); }
     return bucket;
   }
 
-  private add(bucket: Bucket, value: unknown, entityID: EntityID): void {
+  private add(bucket: IndexBucket, value: unknown, entityID: EntityID): void {
     let set = bucket.get(value);
     if (!set) { set = new Set(); bucket.set(value, set); }
     set.add(entityID);
   }
 
-  private remove(bucket: Bucket, value: unknown, entityID: EntityID): void {
+  private remove(bucket: IndexBucket, value: unknown, entityID: EntityID): void {
     const set = bucket.get(value);
     if (!set) return;
     set.delete(entityID);
@@ -46,7 +46,7 @@ export class IndexManager<S> {
     const fieldList = this.fieldListByList.get(listName);
     if (!fieldList) return;
     for (let f = 0; f < fieldList.length; f += 1) {
-      const bucket: Bucket = new Map();
+      const bucket: IndexBucket = new Map();
       this.bucketMap.set(this.key(listName, fieldList[f]), bucket);
       if (!list) continue;
       const keyList = Object.keys(list);
@@ -90,6 +90,6 @@ export class IndexManager<S> {
   }
 
   get(listName: ListName<S>, fieldName: string, value: unknown): ReadonlySet<EntityID> {
-    return this.bucketMap.get(this.key(listName, fieldName))?.get(value) ?? EMPTY;
+    return this.bucketMap.get(this.key(listName, fieldName))?.get(value) ?? EMPTY_ENTITY_ID_SET;
   }
 }

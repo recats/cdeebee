@@ -29,9 +29,9 @@ const shuffle = <T>(list: T[]): T[] => {
 };
 
 /**
- * A server's version for an entity never goes backwards between requests sent later, but two
- * requests may observe the same version. A response carrying an older version than a request sent
- * earlier is contradictory data; no merge rule can make that order-independent, so it is not modeled.
+ * This generator restricts versions to send order to test composition under that assumption.
+ * Servers may also process requests in reverse order; merge.test.ts and plugins/queryQueue.test.ts
+ * cover that valid case explicitly.
  */
 const versionAt = (seq: number) => Math.floor(seq / 2);
 

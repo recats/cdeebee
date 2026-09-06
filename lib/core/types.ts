@@ -10,12 +10,18 @@ export type CdeebeeStorageShape<S> = { [K in keyof S]: Record<EntityID, object> 
 
 export type EntityOf<L> = L extends Record<EntityID, infer E> ? E : never;
 export type ListName<S> = Extract<keyof S, string>;
+export type EntityFieldName<S, K extends ListName<S>> = Extract<keyof EntityOf<S[K]>, string>;
 
 export type CdeebeeStrategy = 'patch' | 'upsert' | 'replaceList' | 'skip';
 export type CdeebeeStrategyList<S> = Partial<Record<ListName<S>, CdeebeeStrategy>>;
-export type CdeebeePrimaryKeyList<S> = { [K in ListName<S>]: Extract<keyof EntityOf<S[K]>, string> };
-export type CdeebeeIndexList<S> = Partial<{ [K in ListName<S>]: Extract<keyof EntityOf<S[K]>, string>[] }>;
-export type CdeebeeVersionKeyList<S> = Partial<{ [K in ListName<S>]: Extract<keyof EntityOf<S[K]>, string> }>;
+/** Fields whose defined values are supported as IDs or server versions. */
+type StringOrNumberFieldName<E> = Extract<{
+  [K in keyof E]-?: [NonNullable<E[K]>] extends [never] ? never : NonNullable<E[K]> extends string | number ? K : never
+}[keyof E], string>;
+
+export type CdeebeePrimaryKeyList<S> = { [K in ListName<S>]: StringOrNumberFieldName<EntityOf<S[K]>> };
+export type CdeebeeIndexList<S> = Partial<{ [K in ListName<S>]: EntityFieldName<S, K>[] }>;
+export type CdeebeeVersionKeyList<S> = Partial<{ [K in ListName<S>]: StringOrNumberFieldName<EntityOf<S[K]>> }>;
 export type CdeebeeApiStrategyList<S> = Record<string, CdeebeeStrategyList<S>>;
 
 export interface CdeebeeListChange<E = CdeebeeEntity> {
@@ -169,7 +175,7 @@ export interface CdeebeeInstance<S> {
   replaceList: <K extends ListName<S>>(listName: K, entityRecord: Record<EntityID, EntityOf<S[K]>>) => void;
   subscribe: (listener: CdeebeeListener, dependencyList?: CdeebeeDependency<S>[]) => () => void;
   subscribeRequest: (listener: CdeebeeListener, apiList?: string[]) => () => void;
-  getIndex: <K extends ListName<S>>(listName: K, fieldName: Extract<keyof EntityOf<S[K]>, string>, value: unknown) => ReadonlySet<EntityID>;
+  getIndex: <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>, value: unknown) => ReadonlySet<EntityID>;
   request: <R = unknown, D = unknown>(options: CdeebeeRequestOptions<S, R, D>) => Promise<R>;
   flush: () => void;
 }

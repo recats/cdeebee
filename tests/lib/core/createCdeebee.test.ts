@@ -177,3 +177,21 @@ describe('deletion and list reset ordering', () => {
     expect(db.getEntityMeta('userList', 1)?.complete).toBe(false);
   });
 });
+
+describe('public entity metadata', () => {
+  it.each(['remove', 'clear'] as const)('hides the %s boundary and returns a detached value', kind => {
+    const db = make();
+    db.setEntity('userList', 1, { name: 'old', orgID: 1 });
+    if (kind === 'remove') db.removeEntityList('userList', [1]);
+    else db.clearList('userList');
+    db.setEntity('userList', 1, { name: 'new', orgID: 2 });
+    const meta = db.getEntityMeta('userList', 1)!;
+    expect(meta).toEqual({ version: undefined, seq: 3, complete: false });
+    expect(Object.keys(meta).sort()).toEqual(['complete', 'seq', 'version']);
+    meta.seq = 0;
+    meta.complete = true;
+    expect(db.getEntityMeta('userList', 1)).toEqual({ version: undefined, seq: 3, complete: false });
+    db.commit({ userList: { upsertList: [{ userID: 1, name: 'stale', orgID: 9 }] } }, { source: 'request', seq: 1 });
+    expect(db.getState().storage.userList[1].name).toBe('new');
+  });
+});

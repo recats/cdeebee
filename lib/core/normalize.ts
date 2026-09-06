@@ -2,7 +2,7 @@ import { isRecord } from '../utils/isRecord';
 import { keyBy } from '../utils/keyBy';
 import { isDev } from '../utils/env';
 import { toEntityID } from '../utils/entityID';
-import type { CdeebeeChangeSet, CdeebeeEntity, CdeebeeNormalizeContext, CdeebeePrimaryKeyList, EntityID, ListName } from './types';
+import type { CdeebeeChangeSet, CdeebeeEntity, CdeebeeListChange, CdeebeeNormalizeContext, CdeebeePrimaryKeyList, EntityID, ListName } from './types';
 
 export interface CdeebeeListEnvelope {
   data: CdeebeeEntity[];
@@ -14,7 +14,7 @@ export function isListEnvelope(value: unknown): value is CdeebeeListEnvelope {
 }
 
 export function defaultNormalize<S>(response: unknown, ctx: CdeebeeNormalizeContext<S>): CdeebeeChangeSet<S> {
-  const changeSet: Record<string, unknown> = {};
+  const changeSet: Record<string, CdeebeeListChange> = {};
   if (!isRecord(response)) return changeSet as CdeebeeChangeSet<S>;
 
   const keyList = Object.keys(response);
@@ -23,7 +23,7 @@ export function defaultNormalize<S>(response: unknown, ctx: CdeebeeNormalizeCont
     const value = response[listName];
     if (!isListEnvelope(value)) continue;
 
-    const settingsPrimaryKey = (ctx.primaryKeyList as Record<string, string | undefined>)[listName];
+    const settingsPrimaryKey = ctx.primaryKeyList[listName];
     if (settingsPrimaryKey !== undefined && settingsPrimaryKey !== value.primaryKey && isDev()) {
       console.warn(`[cdeebee] "${listName}" primaryKey mismatch: settings "${settingsPrimaryKey}", response "${value.primaryKey}"`);
     }
@@ -51,9 +51,9 @@ export function extractResultIDList<S>(
   const listNameList = Object.keys(changeSet) as ListName<S>[];
   for (let i = 0; i < listNameList.length; i += 1) {
     const listName = listNameList[i];
-    const change = changeSet[listName] as { upsertList?: CdeebeeEntity[]; patchList?: CdeebeeEntity[]; replaceList?: Record<EntityID, CdeebeeEntity> } | undefined;
+    const change = changeSet[listName] as CdeebeeListChange | undefined;
     if (!change) continue;
-    const primaryKey = (primaryKeyList as Record<string, string | undefined>)[listName];
+    const primaryKey = primaryKeyList[listName];
     const entityIDList: EntityID[] = [];
     const writeList = [...(change.upsertList ?? []), ...(change.patchList ?? [])];
     if (primaryKey) {
