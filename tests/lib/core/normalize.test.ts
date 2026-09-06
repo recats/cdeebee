@@ -76,6 +76,13 @@ describe('defaultNormalize', () => {
 });
 
 describe('extractResultIDList', () => {
+  it('preserves explicitly empty lists alongside populated lists', () => {
+    expect(extractResultIDList<S>({
+      userList: { patchList: [] },
+      postList: { upsertList: [{ id: 7 }] },
+    }, { userList: 'id', postList: 'id' })).toEqual({ userList: [], postList: [7] });
+  });
+
   it('collects ids from upsertList and replaceList', () => {
     const result = extractResultIDList<S>({
       userList: { upsertList: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }] },

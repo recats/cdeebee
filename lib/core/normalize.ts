@@ -69,7 +69,10 @@ export function extractResultIDList<S>(
         entityIDList.push(toEntityID(keyList[j]));
       }
     }
-    if (entityIDList.length > 0) result[listName] = entityIDList;
+    // An explicitly empty result clears history IDs; an absent result leaves them unchanged.
+    if (change.upsertList !== undefined || change.patchList !== undefined || change.replaceList !== undefined) {
+      result[listName] = entityIDList;
+    }
   }
   return result;
 }
