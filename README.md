@@ -101,11 +101,11 @@ Two responses can carry the same entity and disagree — because one is thin and
 | older | `complete` | dropped |
 | older | incomplete | stored fields win, incoming fills the holes; `complete` if it was an `upsert` at the same version |
 
-`db.getEntityMeta(listName, entityID)` returns a detached `{ version, seq, complete }` value for debugging and tests; internal removal boundaries are not exposed; a removed entity has no meta, exactly like one never seen (its tombstone stays internal). Local mutations (`setEntity`) replace the entity whole at a fresh sequence (so an edit can clear an array or unset a field) while keeping its completeness flag, so a slow response to an earlier request cannot overwrite what the user just typed. `replaceList` is checked per entity too: a stale list response neither overrides nor removes entities written by a later send.
+`db.getEntityMeta(listName, entityID)` returns a detached `{ version, seq, complete }` value for debugging and tests; `seq` is the highest send sequence confirming existence, used to reject stale removals. Equal-version writes are ordered by the selected data’s own send sequence. Internal write sequences and removal boundaries are not exposed; a removed entity has no meta, exactly like one never seen (its tombstone stays internal). Local mutations (`setEntity`) replace the entity whole at a fresh sequence (so an edit can clear an array or unset a field) while keeping its completeness flag, so a slow response to an earlier request cannot overwrite what the user just typed. `replaceList` is checked per entity too: a stale list response neither overrides nor removes entities written by a later send.
 
 Without `versionKeyList`, send order is the only ordering signal; it cannot detect when the server processes requests in a different order. `queryQueue` sends requests concurrently and orders response processing within each queue. It does not serialize server execution; await each `db.request()` before sending the next when that ordering is required.
 
-TypeScript checks that `primaryKeyList` and `versionKeyList` select string or number fields (including optional version fields). Array, object, and boolean fields cannot be used as IDs or server versions. This is a type-level breaking change: entities with a broad `[key: string]: unknown` index signature must be represented by a closed DTO type for key inference.
+TypeScript checks that `primaryKeyList` and `versionKeyList` select string or number fields (including optional version fields; `unknown` and `any` fields are accepted). Array, object, and boolean fields cannot be used as IDs or server versions. Entities with a broad `[key: string]: unknown` index signature are accepted, but their key names cannot be checked precisely. Prefer closed DTO types for strict key inference; IDs are still validated as strings or numbers at runtime.
 
 ## Local mutations
 
@@ -119,7 +119,7 @@ Storage can also be changed without a request, through the same commit path (so 
 
 For bulk edits, pass all updated entities in one `db.commit({ listName: { setList: entities } }, { source: 'set' })`. `setList` replaces each entity whole; include its primary key and any fields to retain. One commit copies each affected list once and flushes subscribers once, avoiding repeated list copies from a loop of `setEntity` calls. This matters especially for large lists keyed by UUIDs.
 
-For optimistic deletion, call `db.removeEntityList(listName, ids)` before sending the delete request. A local `setEntity` made after sending that request has a newer sequence and can cause its removal response to be rejected; keep pending/deleting UI flags outside the entity store. Automatic rollback is not provided.
+For optimistic deletion, call `db.removeEntityList(listName, entityIDList)` before sending the delete request. A local `setEntity` made after sending that request has a newer sequence and can cause its removal response to be rejected; keep pending/deleting UI flags outside the entity store. Automatic rollback is not provided. The same applies to a list fetch sent after the delete and answered first under any write strategy, including `replaceList`. A successful delete response can then be skipped, leaving the row in storage. An empty `patch`/`upsert` response does not remove it; a later `replaceList` omitting the row, `clearList`, or explicit local removal can remove it. In development a skipped removal of a stored entity logs a `console.warn`. Await the delete before sending the follow-up list fetch; serialize conflicting save/delete requests too. Response ordering through `queryQueue()` alone does not serialize server execution.
 
 ## Request options
 
@@ -184,7 +184,7 @@ All hooks are returned from `createCdeebeeHooks(db)` and only re-render a compon
 | `useEntity(listName, entityID)` | that one entity |
 | `useList(listName)` | any change to the list |
 | `useEntityList(listName, entityIDList)` | any of the listed entities |
-| `useListSelector(listName, selector, depList?)` | the list, re-running `selector`; keeps the previous array reference when the derived array is shallow-equal |
+| `useListSelector(listName, selector, depList?)` | the list, re-running `selector`; keeps the previous array reference when the derived array is shallow-equal. `selector` is re-run only when the list or `depList` changes, so list every prop or closure value it reads in `depList` (like `useMemo`); for one entity by id use `useEntity` instead |
 | `useEntityListBy(listName, fieldName, value)` | the list, reading through an index configured in `settings.indexList`; `fieldName` is typed to the entity's own keys and it throws if that `(listName, fieldName)` pair was not indexed. Order is index insertion order (first seen), stable across edits that do not change the indexed field; not sorted |
 | `useLoading(apiList)` | whether any api in `apiList` is currently in flight |
 | `useIsLoading()` | whether any request at all is currently in flight |

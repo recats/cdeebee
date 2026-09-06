@@ -57,7 +57,7 @@ describe('mergeEntity', () => {
     expect(mergeEntity(undefined, undefined, full('a'), 'upsert', undefined, 1)?.meta.complete).toBe(true);
   });
   it('older write against a complete entity is dropped', () => {
-    expect(mergeEntity(full('a'), { seq: 5, complete: true }, full('old'), 'upsert', undefined, 4)).toBeUndefined();
+    expect(mergeEntity(full('a'), { seq: 5, writeSeq: 5, complete: true }, full('old'), 'upsert', undefined, 4)).toBeUndefined();
   });
 });
 
@@ -149,7 +149,7 @@ describe('meta bookkeeping', () => {
     storage = applyChangeSet(storage, { itemList: { replaceList: { 1: thin('A') } } }, primaryKeyList, { ...opts, seq: 2 }).storage;
     const meta = opts.metaList.get('itemList')!;
     expect(storage.itemList).toEqual({ 1: thin('A') });
-    expect(meta.get(1)).toEqual({ version: undefined, seq: 2, complete: true });
+    expect(meta.get(1)).toEqual({ version: undefined, seq: 2, writeSeq: 2, complete: true });
     expect(meta.get(2)).toBeUndefined();
     expect(opts.listSeqMap.get('itemList')).toBe(2);
   });
@@ -159,7 +159,7 @@ describe('meta bookkeeping', () => {
     let storage: S = { itemList: {} };
     storage = applyChangeSet(storage, { itemList: { upsertList: [full('A')] } }, primaryKeyList, { ...opts, seq: 1 }).storage;
     applyChangeSet(storage, { itemList: { removeIDList: [1] } }, primaryKeyList, { ...opts, seq: 2 });
-    expect(opts.metaList.get('itemList')!.get(1)).toEqual({ seq: 2, complete: false, deleted: true });
+    expect(opts.metaList.get('itemList')!.get(1)).toEqual({ seq: 2, writeSeq: 2, complete: false, deleted: true });
   });
 
   it('a list reset prunes the tombstones it makes redundant and keeps the newer ones', () => {
@@ -264,6 +264,19 @@ describe('setList: local edits replace the entity whole', () => {
 });
 
 describe('replaceList honors freshness per entity', () => {
+  it('an older full replacement fills a thin stored entity exactly like upsertList would', () => {
+    const late = (change: CdeebeeChangeSet<S>) => run([
+      { seq: 5, change: { itemList: { patchList: [thin('T')] } } },
+      { seq: 4, change },
+    ]);
+    const viaUpsert = late({ itemList: { upsertList: [full('T')] } });
+    const viaReplace = late({ itemList: { replaceList: { 1: full('T') } } });
+    expect(viaReplace.storage.itemList[1]).toEqual(viaUpsert.storage.itemList[1]);
+    expect(viaReplace.storage.itemList[1]).toEqual(full('T'));
+    expect(viaReplace.meta?.complete).toBe(true);
+    expect(viaReplace.meta?.writeSeq).toBe(5);
+  });
+
   it('a stale replaceList neither overrides nor removes entities written later', () => {
     const opts = options();
     let storage: S = { itemList: {} };
@@ -386,6 +399,26 @@ describe('server versions after a list reset that retains the entity', () => {
 });
 
 describe('sequence confirmations survive newer server versions', () => {
+  it.each(['upsertList', 'patchList', 'setList', 'replaceList'] as const)('%s keeps equal-version ordering separate from existence confirmation', mode => {
+    const write = (seq: number, entity: Item) => ({
+      seq,
+      change: { itemList: mode === 'replaceList' ? { replaceList: { 1: entity } } : { [mode]: [entity] } },
+    });
+    const olderVersion = write(10, full('v1', '2026-01-01'));
+    const earlier = write(3, full('v2-early', '2026-01-02'));
+    const later = write(7, full('v2-late', '2026-01-02'));
+    for (const steps of [
+      [olderVersion, earlier, later], [olderVersion, later, earlier],
+      [earlier, olderVersion, later], [earlier, later, olderVersion],
+      [later, olderVersion, earlier], [later, earlier, olderVersion],
+    ]) {
+      const result = run([...steps, { seq: 5, change: { itemList: { removeIDList: [1] } } }], true);
+      expect(result.storage.itemList[1]).toEqual(full('v2-late', '2026-01-02'));
+      expect(result.meta?.seq).toBe(10);
+      expect(result.meta?.writeSeq).toBe(7);
+    }
+  });
+
   it.each(['upsertList', 'patchList', 'setList', 'replaceList'] as const)('%s cannot lower the sequence used to gate deletions', mode => {
     const newer = full('newer', '2026-01-02');
     const confirmed = { seq: 10, change: { itemList: { upsertList: [full('older', '2026-01-01')] } } };
@@ -398,10 +431,11 @@ describe('sequence confirmations survive newer server versions', () => {
     }
   });
 
-  it('a write that loses by version still confirms the entity at its sequence', () => {
+  it.each(['upsertList', 'patchList', 'setList', 'replaceList'] as const)('%s that loses by version still confirms the entity at its sequence', mode => {
     // sent at 10, the write says the entity exists as of 10 even though its version lost; a removal sent at 5 must not delete it
     const confirmed = { seq: 3, change: { itemList: { replaceList: { 1: full('newer', '2026-01-02') } } } };
-    const lost = { seq: 10, change: { itemList: { upsertList: [full('older', '2026-01-01')] } } };
+    const older = full('older', '2026-01-01');
+    const lost = { seq: 10, change: { itemList: mode === 'replaceList' ? { replaceList: { 1: older } } : { [mode]: [older] } } };
     const removal = { seq: 5, change: { itemList: { removeIDList: [1] } } };
     const result = run([confirmed, lost, removal], true);
     expect(result.storage.itemList[1]?.name).toBe('newer');

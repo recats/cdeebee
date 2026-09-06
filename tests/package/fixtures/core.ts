@@ -22,6 +22,8 @@ interface TypedStorage {
 createCdeebee<TypedStorage>({
   fetch: {}, primaryKeyList: { itemList: 'itemID' }, versionKeyList: { itemList: 'updatedAt' },
 });
+interface LooseStorage { rowList: Record<string, { rowID: unknown; name: string }> }
+createCdeebee<LooseStorage>({ fetch: {}, primaryKeyList: { rowList: 'rowID' } }); // `unknown` id fields are accepted
 createCdeebee<TypedStorage>({
   fetch: {},
   // @ts-expect-error arrays cannot identify entities

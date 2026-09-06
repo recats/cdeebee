@@ -14,9 +14,9 @@ export type EntityFieldName<S, K extends ListName<S>> = Extract<keyof EntityOf<S
 
 export type CdeebeeStrategy = 'patch' | 'upsert' | 'replaceList' | 'skip';
 export type CdeebeeStrategyList<S> = Partial<Record<ListName<S>, CdeebeeStrategy>>;
-/** Fields whose defined values are supported as IDs or server versions. */
+/** Fields whose defined values are supported as IDs or server versions; `unknown` and `any` fields are accepted as-is. */
 type StringOrNumberFieldName<E> = Extract<{
-  [K in keyof E]-?: [NonNullable<E[K]>] extends [never] ? never : NonNullable<E[K]> extends string | number ? K : never
+  [K in keyof E]-?: unknown extends E[K] ? K : [NonNullable<E[K]>] extends [never] ? never : NonNullable<E[K]> extends string | number ? K : never
 }[keyof E], string>;
 
 export type CdeebeePrimaryKeyList<S> = { [K in ListName<S>]: StringOrNumberFieldName<EntityOf<S[K]>> };
@@ -48,9 +48,9 @@ export interface CdeebeeCommitMeta {
 
 export interface CdeebeeEntityMeta {
   version?: number;
+  /** Highest send sequence confirming existence, used to reject stale removals. */
   seq: number;
   complete: boolean;
-  deleted?: boolean;
 }
 
 export interface CdeebeeDependency<S> {

@@ -140,11 +140,17 @@ describe('deletion and list reset ordering', () => {
     expect(db.getState().storage.userList[9].v).toBe(2);
   });
 
-  it('stale deletion cannot remove a newer entity', () => {
+  it('stale deletion cannot remove a newer entity and warns in development', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const db = createCdeebee<S>(settings);
     db.setEntity('userList', 1, { v: 1 });
     db.commit({ userList: { removeIDList: [1] } }, { source: 'request', seq: 0 });
     expect(db.getState().storage.userList[1].v).toBe(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('skipped removal of "userList" 1');
+    db.commit({ userList: { removeIDList: [999] } }, { source: 'request', seq: 0 });
+    expect(warn).toHaveBeenCalledTimes(1); // an absent id is not worth a warning
+    warn.mockRestore();
   });
 
   it('a caller-supplied seq advances the internal counter, so later local writes still win', () => {

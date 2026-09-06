@@ -8,6 +8,10 @@ import type {
 } from './types';
 
 interface EntityMeta extends CdeebeeEntityMeta {
+  /** Send sequence of the selected data; `seq` separately tracks existence confirmation. */
+  writeSeq: number;
+  /** Tombstone: the entity was removed at `seq`. Never exposed through `getEntityMeta`. */
+  deleted?: boolean;
   /** Last removal, retained when an entity is re-added. */
   removedSeq?: number;
 }
@@ -60,12 +64,12 @@ export function fill(base: CdeebeeEntity, donor: CdeebeeEntity): CdeebeeEntity {
   return result;
 }
 
-const compareFreshness = (prevMeta: CdeebeeEntityMeta | undefined, version: number | undefined, seq: number): Freshness => {
+const compareFreshness = (prevMeta: EntityMeta | undefined, version: number | undefined, seq: number): Freshness => {
   if (prevMeta === undefined) return 'newer';
   if (prevMeta.version !== undefined && version !== undefined && version !== prevMeta.version) {
     return version > prevMeta.version ? 'newer' : 'older';
   }
-  return seq >= prevMeta.seq ? 'newer' : 'older';
+  return seq >= prevMeta.writeSeq ? 'newer' : 'older';
 };
 
 /** gate for writes that find no stored entity, and for removals. Equal sequence passes, so the parts of one commit apply in order. */
@@ -73,10 +77,10 @@ const isStale = (prevMeta: CdeebeeEntityMeta | undefined, listSeq: number | unde
   (prevMeta !== undefined && seq < prevMeta.seq) || (listSeq !== undefined && seq < listSeq)
 );
 
-const tombstone = (seq: number): CdeebeeEntityMeta => ({ seq, complete: false, deleted: true });
+const tombstone = (seq: number): EntityMeta => ({ seq, writeSeq: seq, complete: false, deleted: true });
 
-const writeMeta = (version: number | undefined, seq: number, complete: boolean, removedSeq: number | undefined): EntityMeta => {
-  const meta: EntityMeta = { version, seq, complete };
+const writeMeta = (version: number | undefined, seq: number, writeSeq: number, complete: boolean, removedSeq: number | undefined): EntityMeta => {
+  const meta: EntityMeta = { version, seq, writeSeq, complete };
   if (removedSeq !== undefined) meta.removedSeq = removedSeq;
   return meta;
 };
@@ -99,7 +103,7 @@ export function mergeEntity(
   if (removedSeq !== undefined && seq < removedSeq) return undefined;
   if (prevEntity === undefined) {
     if (listSeq !== undefined && seq < listSeq) return undefined;
-    return { entity: nextEntity, meta: writeMeta(version, seq, mode === 'upsert', listSeq === undefined ? removedSeq : Math.max(removedSeq ?? listSeq, listSeq)) };
+    return { entity: nextEntity, meta: writeMeta(version, seq, seq, mode === 'upsert', listSeq === undefined ? removedSeq : Math.max(removedSeq ?? listSeq, listSeq)) };
   }
   const sameVersion = prevMeta?.version !== undefined && version !== undefined && version === prevMeta.version;
 
@@ -107,11 +111,11 @@ export function mergeEntity(
     const confirmedSeq = Math.max(prevMeta?.seq ?? seq, seq);
     if (mode === 'upsert' || mode === 'set') {
       const complete = mode === 'upsert' ? true : (prevMeta?.complete ?? false);
-      return { entity: nextEntity, meta: writeMeta(version ?? prevMeta?.version, confirmedSeq, complete, removedSeq) };
+      return { entity: nextEntity, meta: writeMeta(version ?? prevMeta?.version, confirmedSeq, seq, complete, removedSeq) };
     }
     return {
       entity: fill(nextEntity, prevEntity),
-      meta: writeMeta(version ?? prevMeta?.version, confirmedSeq, sameVersion ? (prevMeta?.complete ?? false) : false, removedSeq),
+      meta: writeMeta(version ?? prevMeta?.version, confirmedSeq, seq, sameVersion ? (prevMeta?.complete ?? false) : false, removedSeq),
     };
   }
 
@@ -153,25 +157,28 @@ function applyListChange<S>(
       const nextEntity = change.replaceList[key];
       const prevEntity = prevList[key];
       const prevMeta = meta.get(metaID);
-      const removedSeq = prevMeta?.deleted ? prevMeta.seq : prevMeta?.removedSeq;
-      if ((removedSeq !== undefined && seq < removedSeq)
-        || (prevEntity === undefined && isStale(prevMeta, listSeq, seq))) {
-        if (prevEntity !== undefined) nextList[key] = prevEntity;
-        continue;
-      }
       const version = readVersion(nextEntity, versionKey);
-      if (prevEntity !== undefined && compareFreshness(prevMeta, version, seq) === 'older') {
-        nextList[key] = prevEntity;
-        continue;
-      }
-      meta.set(metaID, writeMeta(version, Math.max(prevMeta?.seq ?? seq, seq), true, prevEntity === undefined && previousListSeq !== undefined ? Math.max(removedSeq ?? previousListSeq, previousListSeq) : removedSeq));
-      if (prevEntity !== undefined && shallowEqual(prevEntity, nextEntity)) {
-        nextList[key] = prevEntity;
-      } else {
-        nextList[key] = nextEntity;
+      if (prevEntity !== undefined) {
+        // A stored entity merges exactly as it would through upsertList: version first, holes filled when it lost.
+        const write = mergeEntity(prevEntity, prevMeta, nextEntity, 'upsert', version, seq, listSeq);
+        if (write === undefined || shallowEqual(prevEntity, write.entity)) {
+          if (write !== undefined) meta.set(metaID, write.meta);
+          nextList[key] = prevEntity;
+          continue;
+        }
+        meta.set(metaID, write.meta);
+        nextList[key] = write.entity;
         entityIDList.push(metaID);
         changed = true;
+        continue;
       }
+      if (isStale(prevMeta, listSeq, seq)) continue;
+      // Re-added after an earlier reset: that reset stays its removal boundary; this replacement does not.
+      const removedSeq = prevMeta?.deleted ? prevMeta.seq : prevMeta?.removedSeq;
+      meta.set(metaID, writeMeta(version, seq, seq, true, previousListSeq === undefined ? removedSeq : Math.max(removedSeq ?? previousListSeq, previousListSeq)));
+      nextList[key] = nextEntity;
+      entityIDList.push(metaID);
+      changed = true;
     }
     const prevKeyList = Object.keys(prevList);
     for (let i = 0; i < prevKeyList.length; i += 1) {
@@ -223,7 +230,10 @@ function applyListChange<S>(
       const entityID = change.removeIDList[i];
       const metaID = toEntityID(String(entityID));
       const prevMeta = meta.get(metaID);
-      if (isStale(prevMeta, listSeq, seq)) continue;
+      if (isStale(prevMeta, listSeq, seq)) {
+        if (isDev() && entityID in list) console.warn(`[cdeebee] skipped removal of "${listName}" ${String(entityID)}: a later send confirmed the entity (removal seq ${seq})`);
+        continue;
+      }
       // Absent ids are tombstoned too: an earlier-sent fetch must not re-add what this removal deleted.
       if (!prevMeta?.deleted || prevMeta.seq < seq) meta.set(metaID, tombstone(seq));
       if (!(entityID in list)) continue;
