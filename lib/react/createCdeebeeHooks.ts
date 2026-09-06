@@ -166,9 +166,15 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getState().errorList[api] ?? EMPTY_LIST, [api]))
   );
 
-  const useLastResultIDList = <K extends ListName<S>>(api: string, listName: K): EntityID[] => (
-    useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getState().lastResultIDList[api]?.[listName] ?? EMPTY_LIST, [api, listName]))
-  );
+  const useLastResultIDList = <K extends ListName<S>>(api: string, listName: K): EntityID[] => {
+    const cacheRef = useRef<EntityID[]>(undefined);
+    return useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => {
+      const next = plugin.getState().lastResultIDList[api]?.[listName] ?? EMPTY_LIST;
+      const result = keepIfEqual(cacheRef.current, next);
+      cacheRef.current = result;
+      return result;
+    }, [api, listName]));
+  };
 
   const useLastResponse = <R = unknown>(api: string): R | undefined => (
     useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getLast(api)?.response as R | undefined, [api]))

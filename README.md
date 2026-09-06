@@ -105,7 +105,7 @@ Two responses can carry the same entity and disagree — because one is thin and
 
 Without `versionKeyList`, send order is the only ordering signal; it cannot detect when the server processes requests in a different order. `queryQueue` sends requests concurrently and orders response processing within each queue. It does not serialize server execution; await each `db.request()` before sending the next when that ordering is required.
 
-TypeScript checks that `primaryKeyList` and `versionKeyList` select string or number fields (including optional version fields). Array, object, and boolean fields cannot be used as IDs or server versions.
+TypeScript checks that `primaryKeyList` and `versionKeyList` select string or number fields (including optional version fields). Array, object, and boolean fields cannot be used as IDs or server versions. This is a type-level breaking change: entities with a broad `[key: string]: unknown` index signature must be represented by a closed DTO type for key inference.
 
 ## Local mutations
 
@@ -118,6 +118,9 @@ Storage can also be changed without a request, through the same commit path (so 
 - `db.commit(changeSet, meta)` — the low-level primitive all of the above call; use it directly to touch several lists atomically in one `{ listName: { upsertList, removeIDList, replaceList } }` change set.
 
 For bulk edits, pass all updated entities in one `db.commit({ listName: { setList: entities } }, { source: 'set' })`. `setList` replaces each entity whole; include its primary key and any fields to retain. One commit copies each affected list once and flushes subscribers once, avoiding repeated list copies from a loop of `setEntity` calls. This matters especially for large lists keyed by UUIDs.
+
+For optimistic deletion, call `db.removeEntityList(listName, ids)` before sending the delete request. A local `setEntity` made after sending that request has a newer sequence and can cause its removal response to be rejected; keep pending/deleting UI flags outside the entity store. Automatic rollback is not provided.
+
 
 
 ## Request options
@@ -190,10 +193,10 @@ All hooks are returned from `createCdeebeeHooks(db)` and only re-render a compon
 | `useStore(selector, equalityFn?)` | the whole state (storage + `activeRequestList`), through `selector`; `equalityFn` defaults to `Object.is` |
 | `useRequestHistory(api)` | successful request history for `api` (requires the `history` plugin) |
 | `useRequestErrorList(api)` | failed request history for `api` (requires the `history` plugin) |
-| `useLastResultIDList(api, listName)` | the id list `listName` received from the last successful call to `api` (requires the `history` plugin) |
+| `useLastResultIDList(api, listName)` | the IDs for `listName` from the latest successful normalized response containing lists; explicitly empty lists clear IDs, responses without lists retain them (requires the `history` plugin) |
 | `useLastResponse<R>(api)` | the newest successful response for `api` (`undefined` before the first one); use it for the non-list parts of a response (`extension`, `rawResponse`) instead of keeping a copy in your own state (requires the `history` plugin) |
 
-`useStore` is a last resort — reach for it only when nothing above fits, since a selector over the whole state is easy to over-subscribe with. An inline selector re-runs on every render of its component; when it derives a new object or array, pass `shallowEqual` (exported from the package) or another `equalityFn` so the previous reference is kept and `useEffect` / `React.memo` dependencies stay stable. A common pattern for a parent/rows split:
+`useStore` is a last resort — reach for it only when nothing above fits, since a selector over the whole state is easy to over-subscribe with. An inline selector re-runs on every render of its component; when it derives a new object or array, pass `shallowEqual` (exported from the package) or another `equalityFn` so the previous reference is kept and `useEffect` / `React.memo` dependencies stay stable. `equalityFn` must fully define equivalence of the selected values, including across selector/prop changes. Comparing only array length is insufficient when contents matter. A common pattern for a parent/rows split:
 
 ```tsx
 function CampaignTable() {
@@ -245,6 +248,8 @@ Built-ins, all importable from `@recats/cdeebee/core` (or `@recats/cdeebee`):
 | `devtools(options?)` | `{ name? }` | Connects to the Redux DevTools browser extension if present and streams every commit and settled request as an action. Use one `devtools()` instance per store. |
 
 Plugin order is the order of `pluginList` for every hook. List `queryQueue` first — an async `onSettled` in an earlier plugin delays the queue release, and with it every request waiting behind the current one.
+
+History records the response's proposed normalized change set, not only changes accepted by freshness checks. Consequently, `lastResultIDList` can contain IDs no longer present in storage (for example, after clearing a list while a request is in flight). Consumers must handle missing entities; `useEntityList` omits them. Responses without list envelopes preserve the previous result IDs, while `getLast()` and `useLastResponse()` still reflect the actual latest successful response.
 
 Use independent queue keys when unrelated responses should not block each other:
 

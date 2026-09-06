@@ -1,3 +1,4 @@
+import { toEntityID } from '../utils/entityID';
 import { applyChangeSet, type EntityMetaList } from './commit';
 import { IndexManager } from './indexManager';
 import { runRequest } from './pipeline';
@@ -81,7 +82,7 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
     },
     getPlugin: <P extends CdeebeePlugin<S>>(name: string) => pluginList.find(plugin => plugin.name === name) as P | undefined,
     getEntityMeta: (listName, entityID) => {
-      const meta = metaList.get(listName)?.get(entityID);
+      const meta = metaList.get(listName)?.get(toEntityID(String(entityID)));
       if (meta === undefined || meta.deleted) return undefined;
       const { version, seq, complete } = meta;
       return { version, seq, complete };

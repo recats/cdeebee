@@ -195,3 +195,34 @@ describe('public entity metadata', () => {
     expect(db.getState().storage.userList[1].name).toBe('new');
   });
 });
+
+describe('metadata ID normalization', () => {
+  it('numeric and canonical string IDs refer to the same metadata', () => {
+    const db = make();
+    db.setEntity('userList', 1, { name: 'one', orgID: 1 });
+    expect(db.getEntityMeta('userList', '1')).toEqual(db.getEntityMeta('userList', 1));
+    expect(db.getEntityMeta('userList', '01')).toBeUndefined();
+    db.removeEntityList('userList', ['1']);
+    expect(db.getEntityMeta('userList', 1)).toBeUndefined();
+    expect(db.getEntityMeta('userList', '1')).toBeUndefined();
+  });
+});
+
+describe('optimistic deletion sequence contract', () => {
+  it('removing before sending a request allows its deletion confirmation', async () => {
+    const db = make({ fetch: { fetch: async () => new Response('{}') } });
+    db.setEntity('userList', 1, { name: 'one', orgID: 1 });
+    db.removeEntityList('userList', [1]);
+    await db.request({ api: '/delete', normalize: () => ({ userList: { removeIDList: [1] } }) });
+    expect(db.getState().storage.userList[1]).toBeUndefined();
+  });
+
+  it('a local write after sending deletion protects the newer entity', async () => {
+    const db = make({ fetch: { fetch: async () => new Response('{}') } });
+    db.setEntity('userList', 1, { name: 'one', orgID: 1 });
+    const request = db.request({ api: '/delete', normalize: () => ({ userList: { removeIDList: [1] } }) });
+    db.setEntity('userList', 1, { name: 'local edit' });
+    await request;
+    expect(db.getState().storage.userList[1].name).toBe('local edit');
+  });
+});

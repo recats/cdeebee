@@ -350,8 +350,8 @@ describe('deletion boundaries survive re-adding an entity', () => {
   });
 });
 
-describe('list reset fast path', () => {
-  it('skips an entire stale composite change but still updates other lists', () => {
+describe('list reset boundaries', () => {
+  it('rejects stale changes to a complete entity but still updates other lists', () => {
     interface Store { itemList: Record<number, Item>; otherList: Record<number, Item> }
     const opts: ApplyChangeSetOptions<Store> = { metaList: new Map(), listSeqMap: new Map(), seq: 5 };
     const keys = { itemList: 'itemID', otherList: 'itemID' } as const;
@@ -382,5 +382,31 @@ describe('server versions after a list reset that retains the entity', () => {
       const { storage } = run(reverse ? steps.reverse() : steps, true);
       expect(storage.itemList[1]).toEqual(saved);
     }
+  });
+});
+
+describe('sequence confirmations survive newer server versions', () => {
+  it.each(['upsertList', 'patchList', 'setList', 'replaceList'] as const)('%s cannot lower the sequence used to gate deletions', mode => {
+    const newer = full('newer', '2026-01-02');
+    const confirmed = { seq: 10, change: { itemList: { upsertList: [full('older', '2026-01-01')] } } };
+    const versionWrite = { seq: 3, change: { itemList: mode === 'replaceList' ? { replaceList: { 1: newer } } : { [mode]: [newer] } } };
+    const removal = { seq: 5, change: { itemList: { removeIDList: [1] } } };
+    for (const steps of [[confirmed, versionWrite, removal], [confirmed, removal, versionWrite]]) {
+      const result = run(steps, true);
+      expect(result.storage.itemList[1]).toEqual(newer);
+      expect(result.meta?.seq).toBe(10);
+    }
+  });
+
+  it('a version key with missing versions does not change filling a retained partial entity', () => {
+    const steps = [
+      { seq: 6, change: { itemList: { patchList: [thin('current')] } } },
+      { seq: 5, change: { itemList: { replaceList: {} } } },
+      { seq: 4, change: { itemList: { upsertList: [full('old')] } } },
+    ];
+    const plain = run(steps);
+    const versioned = run(steps, true);
+    expect(plain.storage).toEqual(versioned.storage);
+    expect(plain.storage.itemList[1].note).toBe('n');
   });
 });
