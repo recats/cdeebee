@@ -3,7 +3,7 @@ import type { CdeebeePlugin, CdeebeeRequestContext } from '../core/types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `unknown` would reject a bare `CdeebeeQueryQueueOptions` value passed to `queryQueue<Storage>()`
 export interface CdeebeeQueryQueueOptions<S = any> {
   apiList?: string[];
-  /** groups requests into independent queues; must not throw — it runs inside `onRequest` */
+  /** Groups requests into independent queues. Runs inside `onRequest`, so it must not throw. */
   key?: (ctx: CdeebeeRequestContext<S>) => string;
 }
 

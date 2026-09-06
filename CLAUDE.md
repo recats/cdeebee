@@ -11,7 +11,7 @@ cdeebee is a standalone normalized data store with a typed request pipeline. It 
 ```bash
 pnpm build              # Build library using Vite
 pnpm lint               # Lint lib/ and tests/ with ESLint
-pnpm lint:ts            # Type-check lib/ and tests/ with TypeScript (no emit); tests/package/fixtures are checked by test:package instead
+pnpm lint:ts            # Type-check lib/ and tests/ (no emit); tests/package/fixtures are checked by test:package
 pnpm lint:all           # Run both linters
 pnpm test               # Run tests in watch mode with Vitest
 pnpm test:run           # Run tests once
@@ -66,11 +66,31 @@ Resolved per list as `options.strategyList[list] ?? settings.apiStrategyList[api
 
 ### Freshness and completeness (`lib/core/commit.ts`)
 
-`applyChangeSet` keeps `Map<listName, Map<entityID, { version, seq, complete, deleted? }>>` plus a per-list `listSeqMap` (both owned by `createCdeebee`, mutated in place per commit; `listSeqMap` is required so tests exercise the same rules as the store). `version` comes from `settings.versionKeyList` (`readVersion`: numbers as-is, ISO strings via `Date.parse`); `seq` is the send-order sequence taken in `runRequest` (`internal.nextSeq()`) and stamped into `CdeebeeCommitMeta.seq`; local mutations take a fresh one in `commit`. Two gates decide every write:
-- `isStale(prevMeta, listSeq, seq)` is the sequence-only gate for writes that find no stored entity and for removals: dropped when sent before the entity's tombstone or before the list's last reset. Equal sequence passes, so `replaceList` + `upsertList` in one commit apply in order.
-- `mergeEntity` decides for a stored entity — newer writes apply (`upsert` replaces, `patch` = `fill(incoming, stored)`), older writes are dropped when the entity is complete and otherwise `fill(stored, incoming)`. `fill` treats `undefined` and `[]` as holes.
+Per stored entity `applyChangeSet` keeps an internal `EntityMeta` (owned by `createCdeebee`, mutated in place per commit):
 
-`setEntity` emits a `setList` — the entity is replaced whole (so a local edit can clear an array or unset a field) while `complete` is carried over unchanged, so a local edit never marks a thin entity complete. `replaceList` checks freshness per entity: a stored entity merges through `mergeEntity` in `upsert` mode exactly like `upsertList` (version first, holes filled when the replacement lost), so a stale response neither overrides nor removes entities written by a later send. `removeIDList` writes a tombstone `{ seq, complete: false, deleted: true }` (also for ids not in the list, so an earlier-sent fetch cannot re-add them; `db.getEntityMeta` hides tombstones and returns `undefined`); `replaceList` / `clearList` record the list sequence boundary instead and prune every tombstone at or below it, so tombstone count is bounded by removals sent after the last reset. A reset sent before a later one may refresh retained entities by server version, but never deletes entities. Later writes can re-add entities; internal entity metadata retains `removedSeq` from the tombstone across subsequent writes. The retained removal boundary is checked before versions. The list boundary gates absent entities; when an absent entity is re-added, the preceding list boundary is retained as `removedSeq`. A replacement carrying an entity does not assign its own sequence as that entity’s removal boundary. Existing entities compare server versions first. There is no whole-list stale fast path: a retained incomplete entity may still accept hole filling without server versions. Every write to a stored entity, whether it wins or loses by version, raises the stored sequence to the maximum of the two: a response sent at `seq` confirms the entity exists as of that send, so it cannot lower the removal gate. A removal carries no version, so with reversed server processing (a later-sent request returning an older version) the outcome depends on whether the removal applied before the version-newer response arrived; a skipped removal leaves no boundary. This is contradictory data and is accepted. A caller-supplied `CdeebeeCommitMeta.seq` above the internal counter advances it, so later local mutations still outrank it. Request completion is not a garbage-collection boundary: callers can pass an older sequence to the public `db.commit()` at any time. Tests in `tests/lib/core/merge.test.ts` assert order-independence pairwise; `tests/lib/core/fuzz.test.ts` checks the rules compose — random commit sequences (composite commits, monotonic server versions) shuffled into random arrival orders must agree with each other and, in send order, with a naive store. The fuzz generator models monotonic server versions only; reversed server processing is valid and covered separately by merge and queryQueue tests.
+- `version` — the server's version, read through `settings.versionKeyList` (`readVersion`: numbers as-is, ISO strings via `Date.parse`).
+- `seq` — the highest send sequence that confirmed the entity exists. Gates removals.
+- `writeSeq` — the send sequence of the data currently stored. Breaks ties between equal or unknown versions.
+- `complete` — set by `upsert` / `replaceList` at the current version; a complete entity drops older writes instead of filling holes.
+- `deleted` — tombstone written by `removeIDList`; `removedSeq` — the last removal boundary, retained when the entity is re-added.
+
+`db.getEntityMeta` returns a detached `{ version, seq, complete }` and `undefined` for tombstones. A per-list `listSeqMap` records the sequence of the last `replaceList` / `clearList`; it is a required option so tests exercise the same rules as the store. Sequences come from `internal.nextSeq()`: `runRequest` takes one at send time and stamps it into `CdeebeeCommitMeta.seq`, local mutations take a fresh one in `commit`, and a caller-supplied `meta.seq` above the counter advances it.
+
+Decision order for one write, sent at `seq`:
+
+1. `seq < removedSeq` — dropped. A response sent before the entity's removal cannot fill or overwrite it, even with a newer version.
+2. Entity absent — `isStale(prevMeta, listSeq, seq)`: dropped when sent before the tombstone or the list's last reset, otherwise written as new (`complete` only for `upsert`) with the list boundary carried as `removedSeq`. Equal sequence passes, so the parts of one commit apply in order.
+3. Entity stored — `mergeEntity`: versions compare first, `writeSeq` only when versions are equal or unknown. Newer: `upsert` / `set` replace whole, `patch` = `fill(incoming, stored)`. Older: dropped when complete, otherwise `fill(stored, incoming)`. Either way `seq` becomes `max(seq, stored)`: even a write that lost by version confirms the entity existed at its send. `fill` treats `undefined` and `[]` as holes.
+
+Per operation:
+
+- `setEntity` emits `setList`: the entity is replaced whole at a fresh sequence (a local edit can clear an array or unset a field) while `complete` is carried over, so a local edit never marks a thin entity complete.
+- `replaceList`: stored entities merge through `mergeEntity` in `upsert` mode exactly like `upsertList`; absent ids follow rule 2 with the *previous* list boundary as `removedSeq` (a replacement that carries an entity is not its removal). Entities missing from the replacement are deleted unless `isStale`, so a reset sent before a later reset never deletes. The new `listSeq` prunes every tombstone at or below it, which bounds tombstones by removals sent after the last reset.
+- `removeIDList`: skipped when `isStale` (development logs a `console.warn` if the entity is stored). Otherwise a tombstone `{ seq, writeSeq: seq, complete: false, deleted: true }`, also for ids not in the list, so an earlier-sent fetch cannot re-add them.
+
+Accepted limitations: tombstones on lists that never reset live for the store lifetime (request completion is not a safe GC boundary, `db.commit` accepts any `seq`); a removal carries no version, so with reversed server processing the outcome depends on whether the removal applied before the version-newer response arrived.
+
+Tests: `tests/lib/core/merge.test.ts` pins each rule pairwise; `tests/lib/core/fuzz.test.ts` shuffles random commit sequences (composite commits, monotonic server versions) into random arrival orders and checks they agree with each other and, in send order, with a naive store. Reversed server processing is covered by merge and queryQueue tests, not by the fuzz.
 
 ### Hooks (`lib/react/createCdeebeeHooks.ts`)
 
@@ -79,7 +99,7 @@ Resolved per list as `options.strategyList[list] ?? settings.apiStrategyList[api
 | `useEntity(listName, entityID)` | that one entity |
 | `useList(listName)` | any change to the list |
 | `useEntityList(listName, entityIDList)` | any of the listed entities |
-| `useListSelector(listName, selector, depList?)` | the list or `depList`, re-running `selector`; keeps the previous array reference when the result is shallow-equal. Props the selector closes over must be in `depList` |
+| `useListSelector(listName, selector, depList?)` | the list or `depList`, re-running `selector`; keeps the previous array reference when the result is shallow-equal. Props the selector closes over belong in `depList`, like `useMemo` |
 | `useEntityListBy(listName, fieldName, value)` | the list, via an `IndexManager` index; throws if `(listName, fieldName)` is not in `settings.indexList` |
 | `useLoading(apiList)` | any api in `apiList` being in flight |
 | `useIsLoading()` | any request at all being in flight |

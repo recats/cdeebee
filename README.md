@@ -48,7 +48,7 @@ navigate(campaignLink.edit(response.campaignList.data[0].campaignID));
 
 ### Custom fetch
 
-`settings.fetch.fetch` injects the fetch implementation used for every request — it defaults to `globalThis.fetch`. Pass your own to run in an environment without a global `fetch`, to point tests at a stub without touching the global, or to wrap the real `fetch` with instrumentation (timing, logging, auth refresh). A stub must return a `Response`-like object with `ok`, `status` and `text()` (plus `blob()` for blob requests) — JSON bodies are read through `text()` so an empty body can be told apart from a malformed one:
+`settings.fetch.fetch` injects the fetch implementation used for every request — it defaults to `globalThis.fetch`. Pass your own to run in an environment without a global `fetch`, to point tests at a stub without touching the global, or to wrap the real `fetch` with instrumentation (timing, logging, auth refresh). A stub must return a `Response`-like object with `ok`, `status` and `text()` (and `blob()` for blob requests): JSON is read through `text()` so an empty body is distinguishable from a malformed one.
 
 ```ts
 createCdeebee<Storage>({
@@ -101,11 +101,11 @@ Two responses can carry the same entity and disagree — because one is thin and
 | older | `complete` | dropped |
 | older | incomplete | stored fields win, incoming fills the holes; `complete` if it was an `upsert` at the same version |
 
-`db.getEntityMeta(listName, entityID)` returns a detached `{ version, seq, complete }` value for debugging and tests; `seq` is the highest send sequence confirming existence, used to reject stale removals. Equal-version writes are ordered by the selected data’s own send sequence. Internal write sequences and removal boundaries are not exposed; a removed entity has no meta, exactly like one never seen (its tombstone stays internal). Local mutations (`setEntity`) replace the entity whole at a fresh sequence (so an edit can clear an array or unset a field) while keeping its completeness flag, so a slow response to an earlier request cannot overwrite what the user just typed. `replaceList` is checked per entity too: a stale list response neither overrides nor removes entities written by a later send.
+`db.getEntityMeta(listName, entityID)` returns a detached `{ version, seq, complete }` for debugging and tests. `seq` is the latest send that confirmed the entity exists; write ordering and removal boundaries stay internal, and a removed entity has no meta, like one never seen. Local mutations (`setEntity`) replace the entity whole at a fresh sequence (an edit can clear an array or unset a field) and keep its completeness flag, so a slow response to an earlier request cannot overwrite what the user just typed. `replaceList` is checked per entity the same way: a stale list response neither overrides nor removes entities written by a later send.
 
 Without `versionKeyList`, send order is the only ordering signal; it cannot detect when the server processes requests in a different order. `queryQueue` sends requests concurrently and orders response processing within each queue. It does not serialize server execution; await each `db.request()` before sending the next when that ordering is required.
 
-TypeScript checks that `primaryKeyList` and `versionKeyList` select string or number fields (including optional version fields; `unknown` and `any` fields are accepted). Array, object, and boolean fields cannot be used as IDs or server versions. Entities with a broad `[key: string]: unknown` index signature are accepted, but their key names cannot be checked precisely. Prefer closed DTO types for strict key inference; IDs are still validated as strings or numbers at runtime.
+`primaryKeyList` and `versionKeyList` only accept string or number fields (optional allowed; `unknown` and `any` pass). Arrays, objects and booleans are rejected at compile time. Entities with a `[key: string]: unknown` index signature lose precise key checking — prefer closed DTO types.
 
 ## Local mutations
 
@@ -113,13 +113,17 @@ Storage can also be changed without a request, through the same commit path (so 
 
 - `db.setEntity(listName, entityID, patch)` — a plain object `patch` is shallow-merged over the previous entity; a `(prevEntity) => nextEntity` updater function replaces the entity with its return value. Either way, cdeebee always sets the primary key field on the result to `entityID`, so an updater does not need to (and cannot accidentally omit or override) it.
 - `db.removeEntityList(listName, entityIDList)` — removes entities by id.
-- `db.clearList(listName)` — empties a list. Deletions retain sequence tombstones, and list resets (`clearList` / `replaceList`) retain a sequence boundary, so earlier requests cannot restore removed entities (including IDs absent when the list was cleared). A later write can add them again, but responses sent before their removal cannot fill or overwrite their fields, even if they carry a higher server version. An entity retained by `replaceList` was not removed: its server version still takes precedence over send order. A list reset drops the tombstones it makes redundant, so only removals sent after the last reset keep one.
+- `db.clearList(listName)` — empties a list.
 - `db.replaceList(listName, entityRecord)` — replaces a whole list with a keyed record.
 - `db.commit(changeSet, meta)` — the low-level primitive all of the above call; use it directly to touch several lists atomically in one `{ listName: { upsertList, removeIDList, replaceList } }` change set.
 
-For bulk edits, pass all updated entities in one `db.commit({ listName: { setList: entities } }, { source: 'set' })`. `setList` replaces each entity whole; include its primary key and any fields to retain. One commit copies each affected list once and flushes subscribers once, avoiding repeated list copies from a loop of `setEntity` calls. This matters especially for large lists keyed by UUIDs.
+### Deletions and resets
 
-For optimistic deletion, call `db.removeEntityList(listName, entityIDList)` before sending the delete request. A local `setEntity` made after sending that request has a newer sequence and can cause its removal response to be rejected; keep pending/deleting UI flags outside the entity store. Automatic rollback is not provided. The same applies to a list fetch sent after the delete and answered first under any write strategy, including `replaceList`. A successful delete response can then be skipped, leaving the row in storage. An empty `patch`/`upsert` response does not remove it; a later `replaceList` omitting the row, `clearList`, or explicit local removal can remove it. In development a skipped removal of a stored entity logs a `console.warn`. Await the delete before sending the follow-up list fetch; serialize conflicting save/delete requests too. Response ordering through `queryQueue()` alone does not serialize server execution.
+A removal leaves a sequence tombstone and a reset (`clearList` / `replaceList`) leaves a list boundary, so a response to an earlier-sent request cannot bring removed entities back — including ids that were absent at the reset. A later write can re-add an entity, but responses sent before its removal still cannot fill or overwrite it, even with a newer server version. An entity that a `replaceList` kept was never removed: its server version keeps precedence over send order. A reset drops the tombstones it makes redundant, so only removals sent after the last reset keep one.
+
+**Optimistic deletion:** call `db.removeEntityList` *before* sending the delete request and keep pending/deleting flags outside the store. Anything that confirms the entity at a later send — a local `setEntity`, or a list fetch sent after the delete but answered first — turns the delete response into a no-op (development logs a `console.warn`); only a `replaceList` omitting the row, a `clearList` or a local removal evicts it afterwards. Await the delete before the follow-up list fetch: `queryQueue` orders response processing, not server execution. There is no automatic rollback.
+
+**Bulk edits:** pass all updated entities in one `db.commit({ listName: { setList: entityList } }, { source: 'set' })`. `setList` replaces each entity whole, so include the primary key and every field to keep. One commit copies each affected list once and notifies once; a loop of `setEntity` calls copies the list on every call, which matters on large lists keyed by UUIDs.
 
 ## Request options
 
@@ -184,7 +188,7 @@ All hooks are returned from `createCdeebeeHooks(db)` and only re-render a compon
 | `useEntity(listName, entityID)` | that one entity |
 | `useList(listName)` | any change to the list |
 | `useEntityList(listName, entityIDList)` | any of the listed entities |
-| `useListSelector(listName, selector, depList?)` | the list, re-running `selector`; keeps the previous array reference when the derived array is shallow-equal. `selector` is re-run only when the list or `depList` changes, so list every prop or closure value it reads in `depList` (like `useMemo`); for one entity by id use `useEntity` instead |
+| `useListSelector(listName, selector, depList?)` | the list or `depList`, re-running `selector`; keeps the previous array reference when the result is shallow-equal. `selector` runs again only when the list or `depList` changes, so list every prop it closes over, like `useMemo`; for one entity by id use `useEntity` |
 | `useEntityListBy(listName, fieldName, value)` | the list, reading through an index configured in `settings.indexList`; `fieldName` is typed to the entity's own keys and it throws if that `(listName, fieldName)` pair was not indexed. Order is index insertion order (first seen), stable across edits that do not change the indexed field; not sorted |
 | `useLoading(apiList)` | whether any api in `apiList` is currently in flight |
 | `useIsLoading()` | whether any request at all is currently in flight |
@@ -194,7 +198,7 @@ All hooks are returned from `createCdeebeeHooks(db)` and only re-render a compon
 | `useLastResultIDList(api, listName)` | the IDs for `listName` from the latest successful normalized response containing lists; explicitly empty lists clear IDs, responses without lists retain them (requires the `history` plugin) |
 | `useLastResponse<R>(api)` | the newest successful response for `api` (`undefined` before the first one); use it for the non-list parts of a response (`extension`, `rawResponse`) instead of keeping a copy in your own state (requires the `history` plugin) |
 
-`useStore` is a last resort — reach for it only when nothing above fits, since a selector over the whole state is easy to over-subscribe with. An inline selector re-runs on every render of its component; when it derives a new object or array, pass `shallowEqual` (exported from the package) or another `equalityFn` so the previous reference is kept and `useEffect` / `React.memo` dependencies stay stable. `equalityFn` must fully define equivalence of the selected values, including across selector/prop changes. Comparing only array length is insufficient when contents matter. A common pattern for a parent/rows split:
+`useStore` is a last resort — a selector over the whole state is easy to over-subscribe with. An inline selector runs on every render; when it derives an object or array, pass `shallowEqual` (exported from the package) or another `equalityFn` so the reference stays stable for `useEffect` / `React.memo`. `equalityFn` must fully define equivalence: it is applied across renders and prop changes, so comparing only a length is not enough. A common parent/rows split:
 
 ```tsx
 function CampaignTable() {
@@ -245,9 +249,9 @@ Built-ins, all importable from `@recats/cdeebee/core` (or `@recats/cdeebee`):
 | `retry(options)` | `{ count, backoffMs?, when? }` | Retries a failed request up to `count` times (`when` defaults to network errors only); `backoffMs` is a fixed delay or `(attempt) => ms`. |
 | `devtools(options?)` | `{ name? }` | Connects to the Redux DevTools browser extension if present and streams every commit and settled request as an action. Use one `devtools()` instance per store. |
 
-Plugin order is the order of `pluginList` for every hook. List `queryQueue` first — an async `onSettled` in an earlier plugin delays the queue release, and with it every request waiting behind the current one.
+`history` records the normalized change set as proposed, not what freshness checks kept, so `lastResultIDList` can name ids no longer in storage (a list cleared while a request was in flight); `useEntityList` omits them. Responses without list envelopes keep the previous ids, while `getLast()` / `useLastResponse()` always reflect the latest successful response.
 
-History records the response's proposed normalized change set, not only changes accepted by freshness checks. Consequently, `lastResultIDList` can contain IDs no longer present in storage (for example, after clearing a list while a request is in flight). Consumers must handle missing entities; `useEntityList` omits them. Responses without list envelopes preserve the previous result IDs, while `getLast()` and `useLastResponse()` still reflect the actual latest successful response.
+Plugin order is the order of `pluginList` for every hook. List `queryQueue` first — an async `onSettled` in an earlier plugin delays the queue release, and with it every request waiting behind the current one.
 
 Use independent queue keys when unrelated responses should not block each other:
 

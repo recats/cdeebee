@@ -67,8 +67,9 @@ export function buildRequestInit(ctx: FetchContext, settings: CdeebeeFetchSettin
 async function parseBody(response: Response, responseType: 'json' | 'text' | 'blob'): Promise<unknown> {
   if (responseType === 'text') return response.text();
   if (responseType === 'blob') return response.blob();
+  // An empty body (204/205, or a 200 with nothing to say) is not a parse error.
   const text = await response.text();
-  return text.trim() === '' ? undefined : JSON.parse(text); // an empty body (204/205, or a 200 with nothing to say) is not a parse error
+  return text.trim() === '' ? undefined : JSON.parse(text);
 }
 
 export async function executeFetch(ctx: FetchContext, settings: CdeebeeFetchSettings): Promise<{ response: unknown; status: number }> {

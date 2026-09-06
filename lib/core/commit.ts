@@ -20,7 +20,7 @@ export type EntityMetaList = Map<EntityID, EntityMeta>;
 
 export interface ApplyChangeSetOptions<S> {
   metaList: Map<string, EntityMetaList>;
-  /** per-list sequence of the last `replaceList` / `clearList` */
+  /** Per-list sequence of the last `replaceList` / `clearList`. */
   listSeqMap: Map<string, number>;
   seq: number;
   versionKeyList?: CdeebeeVersionKeyList<S>;
@@ -72,7 +72,7 @@ const compareFreshness = (prevMeta: EntityMeta | undefined, version: number | un
   return seq >= prevMeta.writeSeq ? 'newer' : 'older';
 };
 
-/** gate for writes that find no stored entity, and for removals. Equal sequence passes, so the parts of one commit apply in order. */
+/** Gate for writes that find no stored entity, and for removals. Equal sequence passes, so the parts of one commit apply in order. */
 const isStale = (prevMeta: CdeebeeEntityMeta | undefined, listSeq: number | undefined, seq: number): boolean => (
   (prevMeta !== undefined && seq < prevMeta.seq) || (listSeq !== undefined && seq < listSeq)
 );
@@ -193,7 +193,7 @@ function applyListChange<S>(
       entityIDList.push(metaID);
       changed = true;
     }
-    // listSeq now rejects everything these tombstones did.
+    // The new listSeq rejects everything these tombstones did.
     const boundary = listSeq;
     meta.forEach((entityMeta, metaID) => {
       if (entityMeta.deleted && entityMeta.seq <= boundary) meta.delete(metaID);
