@@ -117,3 +117,63 @@ describe('createCdeebee store', () => {
   });
 
 });
+
+describe('deletion and list reset ordering', () => {
+  type S = { userList: Record<number, { userID: number; v: number }> };
+  const settings = { fetch: {}, primaryKeyList: { userList: 'userID' as const } };
+
+  it('old response must not resurrect locally deleted entity', () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    db.removeEntityList('userList', [1]);
+    db.commit({ userList: { upsertList: [{ userID: 1, v: 0 }] } }, { source: 'request', seq: 1 });
+    expect(db.getState().storage.userList[1]).toBeUndefined();
+  });
+
+  it.each(['upsertList', 'patchList', 'setList', 'replaceList'] as const)('list reset blocks unknown entities from an older %s response', mode => {
+    const db = createCdeebee<S>(settings);
+    db.clearList('userList');
+    const entity = { userID: 9, v: 1 };
+    db.commit({ userList: { [mode]: mode === 'replaceList' ? { 9: entity } : [entity] } }, { source: 'request', seq: 0 });
+    expect(db.getState().storage.userList).toEqual({});
+    db.setEntity('userList', 9, { v: 2 });
+    expect(db.getState().storage.userList[9].v).toBe(2);
+  });
+
+  it('stale deletion cannot remove a newer entity', () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    db.commit({ userList: { removeIDList: [1] } }, { source: 'request', seq: 0 });
+    expect(db.getState().storage.userList[1].v).toBe(1);
+  });
+
+  it('a caller-supplied seq advances the internal counter, so later local writes still win', () => {
+    const db = createCdeebee<S>(settings);
+    db.commit({ userList: { replaceList: { 1: { userID: 1, v: 1 } } } }, { source: 'request', seq: 1000 });
+    db.removeEntityList('userList', [1]);
+    expect(db.getState().storage.userList[1]).toBeUndefined();
+    db.setEntity('userList', 2, { v: 2 });
+    expect(db.getState().storage.userList[2].v).toBe(2);
+  });
+
+  it('getEntityMeta hides tombstones: a removed entity has no meta, like one never seen', () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    expect(db.getEntityMeta('userList', 1)).toBeDefined();
+    db.removeEntityList('userList', [1]);
+    expect(db.getEntityMeta('userList', 1)).toBeUndefined();
+    db.commit({ userList: { upsertList: [{ userID: 1, v: 0 }] } }, { source: 'request', seq: 1 });
+    expect(db.getState().storage.userList[1]).toBeUndefined();
+  });
+
+  it('replaceList deletion blocks stale replacement and allows fresh re-add', () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    db.replaceList('userList', {});
+    db.commit({ userList: { replaceList: { 1: { userID: 1, v: 0 } } } }, { source: 'request', seq: 1 });
+    expect(db.getState().storage.userList).toEqual({});
+    db.setEntity('userList', 1, { v: 3 });
+    expect(db.getState().storage.userList[1].v).toBe(3);
+    expect(db.getEntityMeta('userList', 1)?.complete).toBe(false);
+  });
+});

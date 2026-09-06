@@ -11,10 +11,11 @@ cdeebee is a standalone normalized data store with a typed request pipeline. It 
 ```bash
 pnpm build              # Build library using Vite
 pnpm lint               # Lint lib/ and tests/ with ESLint
-pnpm lint:ts            # Type-check lib/ and tests/ with TypeScript (no emit)
+pnpm lint:ts            # Type-check lib/ and tests/ with TypeScript (no emit); tests/package/fixtures are checked by test:package instead
 pnpm lint:all           # Run both linters
 pnpm test               # Run tests in watch mode with Vitest
 pnpm test:run           # Run tests once
+pnpm test:package       # Build, pack, check ESM/CJS entry points, and compile strict TypeScript consumers
 pnpm test:coverage      # Run tests with coverage report
 pnpm bench              # Run benchmarks (tests/bench/*.bench.ts, tinybench via vitest bench)
 pnpm bench:compare      # Same, printing the delta against bench/baseline.json
@@ -28,7 +29,7 @@ Run a single test file:
 pnpm test tests/lib/core/commit.test.ts
 ```
 
-Test files are in `tests/lib/` mirroring the `lib/` structure. `vitest.config.ts` sets `environment: 'node'` by default — core, plugin, and utils tests run without a DOM. A React test needs its own `// @vitest-environment jsdom` directive at the top of the file and must use a `.tsx` extension.
+Test files are in `tests/lib/` mirroring the `lib/` structure; `tests/package/` holds the packed-package smoke test (`smoke.mjs` plus the strict TypeScript consumer fixtures it compiles). `vitest.config.ts` sets `environment: 'node'` by default — core, plugin, and utils tests run without a DOM. A React test needs its own `// @vitest-environment jsdom` directive at the top of the file and must use a `.tsx` extension.
 
 ## Architecture
 
@@ -65,7 +66,11 @@ Resolved per list as `options.strategyList[list] ?? settings.apiStrategyList[api
 
 ### Freshness and completeness (`lib/core/commit.ts`)
 
-`applyChangeSet` keeps `Map<listName, Map<entityID, { version, seq, complete }>>` (owned by `createCdeebee`, mutated in place per commit). `version` comes from `settings.versionKeyList` (`readVersion`: numbers as-is, ISO strings via `Date.parse`); `seq` is the send-order sequence taken in `runRequest` (`internal.nextSeq()`) and stamped into `CdeebeeCommitMeta.seq`; local mutations take a fresh one in `commit`. `mergeEntity` is the single decision point — newer writes apply (`upsert` replaces, `patch` = `fill(incoming, stored)`), older writes are dropped when the entity is complete and otherwise `fill(stored, incoming)`. `fill` treats `undefined` and `[]` as holes. `setEntity` emits a `setList` — the entity is replaced whole (so a local edit can clear an array or unset a field) while `complete` is carried over unchanged, so a local edit never marks a thin entity complete. `replaceList` checks freshness per entity: a stale response neither overrides nor removes entities written by a later send. Tests in `tests/lib/core/merge.test.ts` assert order-independence pairwise.
+`applyChangeSet` keeps `Map<listName, Map<entityID, { version, seq, complete, deleted? }>>` plus a per-list `listSeqMap` (both owned by `createCdeebee`, mutated in place per commit; `listSeqMap` is required so tests exercise the same rules as the store). `version` comes from `settings.versionKeyList` (`readVersion`: numbers as-is, ISO strings via `Date.parse`); `seq` is the send-order sequence taken in `runRequest` (`internal.nextSeq()`) and stamped into `CdeebeeCommitMeta.seq`; local mutations take a fresh one in `commit`. Two gates decide every write:
+- `isStale(prevMeta, listSeq, seq)` is the sequence-only gate for writes that find no stored entity and for removals: dropped when sent before the entity's tombstone or before the list's last reset. Equal sequence passes, so `replaceList` + `upsertList` in one commit apply in order.
+- `mergeEntity` decides for a stored entity — newer writes apply (`upsert` replaces, `patch` = `fill(incoming, stored)`), older writes are dropped when the entity is complete and otherwise `fill(stored, incoming)`. `fill` treats `undefined` and `[]` as holes.
+
+`setEntity` emits a `setList` — the entity is replaced whole (so a local edit can clear an array or unset a field) while `complete` is carried over unchanged, so a local edit never marks a thin entity complete. `replaceList` checks freshness per entity: a stale response neither overrides nor removes entities written by a later send. `removeIDList` writes a tombstone `{ seq, complete: false, deleted: true }` (also for ids not in the list, so an earlier-sent fetch cannot re-add them; `db.getEntityMeta` hides tombstones and returns `undefined`); `replaceList` / `clearList` record the list sequence boundary instead and prune every tombstone at or below it, so tombstone count is bounded by removals sent after the last reset. A reset sent before a later one may refresh entities it carries but never deletes. Later writes can re-add entities. A caller-supplied `CdeebeeCommitMeta.seq` above the internal counter advances it, so later local mutations still outrank it. Request completion is not a garbage-collection boundary: callers can pass an older sequence to the public `db.commit()` at any time. Tests in `tests/lib/core/merge.test.ts` assert order-independence pairwise; `tests/lib/core/fuzz.test.ts` checks the rules compose — random commit sequences (composite commits, monotonic server versions) shuffled into random arrival orders must agree with each other and, in send order, with a naive store. A response carrying an older version than a request sent earlier is contradictory data and is deliberately not modeled.
 
 ### Hooks (`lib/react/createCdeebeeHooks.ts`)
 
@@ -87,7 +92,7 @@ All hooks are built on `useSyncExternalStore`, so they are safe to use with conc
 
 ### Build note
 
-`react` is the only external dependency in `vite.config.mjs` (`rollupOptions.external`). `lib/core.ts` (and everything it transitively imports) must never import React — `lib/index.ts` is the only file allowed to. Verify after a build with `grep -c "from \"react\"\|require(\"react\")" dist/core.js dist/core.cjs`, which must both print `0`.
+`react` is the only external dependency in `vite.config.mjs` (`rollupOptions.external`). `lib/core.ts` (and everything it transitively imports) must never import React — `lib/index.ts` is the only file allowed to. `pnpm test:package` guards this: it packs the build and loads the core entry with no `react` in `node_modules`.
 
 ### FormData / headers
 

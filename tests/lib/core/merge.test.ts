@@ -11,6 +11,7 @@ const thin = (name: string, updatedAt?: string): Seller => ({ sellerID: 1, name,
 
 const options = (versioned = false): ApplyChangeSetOptions<S> => ({
   metaList: new Map(),
+  listSeqMap: new Map(),
   seq: 0,
   versionKeyList: versioned ? { sellerList: 'updatedAt' } : undefined,
 });
@@ -141,7 +142,7 @@ describe('freshness: server version beats send order', () => {
 });
 
 describe('meta bookkeeping', () => {
-  it('replaceList marks every entity complete and forgets removed ones', () => {
+  it('replaceList marks every entity complete and forgets the removed ones (the list boundary covers them)', () => {
     const opts = options();
     let storage: S = { sellerList: { 1: full('A'), 2: { ...full('B'), sellerID: 2 } } };
     storage = applyChangeSet(storage, { sellerList: { upsertList: [full('A')] } }, primaryKeyList, { ...opts, seq: 1 }).storage;
@@ -150,14 +151,70 @@ describe('meta bookkeeping', () => {
     expect(storage.sellerList).toEqual({ 1: thin('A') });
     expect(meta.get(1)).toEqual({ version: undefined, seq: 2, complete: true });
     expect(meta.get(2)).toBeUndefined();
+    expect(opts.listSeqMap.get('sellerList')).toBe(2);
   });
 
-  it('removeIDList forgets meta so a re-added entity starts fresh', () => {
+  it('a tombstone reads as incomplete and deleted, never as fully loaded', () => {
+    const opts = options();
+    let storage: S = { sellerList: {} };
+    storage = applyChangeSet(storage, { sellerList: { upsertList: [full('A')] } }, primaryKeyList, { ...opts, seq: 1 }).storage;
+    applyChangeSet(storage, { sellerList: { removeIDList: [1] } }, primaryKeyList, { ...opts, seq: 2 });
+    expect(opts.metaList.get('sellerList')!.get(1)).toEqual({ seq: 2, complete: false, deleted: true });
+  });
+
+  it('a list reset prunes the tombstones it makes redundant and keeps the newer ones', () => {
+    const opts = options();
+    let storage: S = { sellerList: {} };
+    storage = applyChangeSet(storage, { sellerList: { removeIDList: [1] } }, primaryKeyList, { ...opts, seq: 1 }).storage;
+    storage = applyChangeSet(storage, { sellerList: { removeIDList: [2] } }, primaryKeyList, { ...opts, seq: 5 }).storage;
+    storage = applyChangeSet(storage, { sellerList: { replaceList: {} } }, primaryKeyList, { ...opts, seq: 3 }).storage;
+    const meta = opts.metaList.get('sellerList')!;
+    expect(meta.has(1)).toBe(false);
+    expect(meta.get(2)?.deleted).toBe(true);
+    // a removal at the reset's own sequence is covered by the boundary too
+    applyChangeSet(storage, { sellerList: { removeIDList: [3] } }, primaryKeyList, { ...opts, seq: 5 });
+    applyChangeSet(storage, { sellerList: { replaceList: {} } }, primaryKeyList, { ...opts, seq: 5 });
+    expect(meta.has(3)).toBe(false);
+    storage = applyChangeSet(storage, { sellerList: { upsertList: [full('late')] } }, primaryKeyList, { ...opts, seq: 2 }).storage;
+    expect(storage.sellerList[1]).toBeUndefined();
+    storage = applyChangeSet(storage, { sellerList: { upsertList: [{ ...full('late'), sellerID: 2 }] } }, primaryKeyList, { ...opts, seq: 4 }).storage;
+    expect(storage.sellerList[2]).toBeUndefined();
+  });
+
+  it('a removal at the same sequence as a tombstone does not re-allocate it', () => {
+    const opts = options();
+    let storage: S = { sellerList: {} };
+    storage = applyChangeSet(storage, { sellerList: { removeIDList: [1] } }, primaryKeyList, { ...opts, seq: 3 }).storage;
+    const first = opts.metaList.get('sellerList')!.get(1);
+    applyChangeSet(storage, { sellerList: { removeIDList: [1] } }, primaryKeyList, { ...opts, seq: 3 });
+    expect(opts.metaList.get('sellerList')!.get(1)).toBe(first);
+  });
+
+  it('one commit may replace a list and re-add an entity the replacement dropped', () => {
+    const opts = options();
+    let storage: S = { sellerList: { 1: full('A'), 2: { ...full('B'), sellerID: 2 } } };
+    storage = applyChangeSet(storage, { sellerList: { upsertList: [full('A'), { ...full('B'), sellerID: 2 }] } }, primaryKeyList, { ...opts, seq: 1 }).storage;
+    storage = applyChangeSet(storage, {
+      sellerList: { replaceList: { 1: full('A') }, upsertList: [{ ...full('B2'), sellerID: 2 }] },
+    }, primaryKeyList, { ...opts, seq: 2 }).storage;
+    expect(storage.sellerList[2]?.name).toBe('B2');
+  });
+
+  it('remove and re-add at the same sequence apply in order, whichever comes first', () => {
+    const write: CdeebeeChangeSet<S> = { sellerList: { upsertList: [full('A')] } };
+    const remove: CdeebeeChangeSet<S> = { sellerList: { removeIDList: [1] } };
+    expect(run([{ seq: 1, change: write }, { seq: 1, change: remove }]).storage.sellerList[1]).toBeUndefined();
+    expect(run([{ seq: 1, change: remove }, { seq: 1, change: write }]).storage.sellerList[1]?.name).toBe('A');
+  });
+
+  it('removeIDList rejects stale resurrection but permits a newer re-add', () => {
     const opts = options();
     let storage: S = { sellerList: {} };
     storage = applyChangeSet(storage, { sellerList: { upsertList: [full('A')] } }, primaryKeyList, { ...opts, seq: 5 }).storage;
     storage = applyChangeSet(storage, { sellerList: { removeIDList: [1] } }, primaryKeyList, { ...opts, seq: 6 }).storage;
     storage = applyChangeSet(storage, { sellerList: { upsertList: [full('again')] } }, primaryKeyList, { ...opts, seq: 1 }).storage;
+    expect(storage.sellerList[1]).toBeUndefined();
+    storage = applyChangeSet(storage, { sellerList: { upsertList: [full('again')] } }, primaryKeyList, { ...opts, seq: 7 }).storage;
     expect(storage.sellerList[1].name).toBe('again');
   });
 
@@ -226,6 +283,26 @@ describe('replaceList honors freshness per entity', () => {
     expect(Object.keys(storage.sellerList)).toEqual(['1']);
     expect(storage.sellerList[1].name).toBe('a2');
     expect(opts.metaList.get('sellerList')?.has(2)).toBe(false);
+  });
+
+  it('list reset and a stale upsert commute: the absent id stays absent in either order', () => {
+    const reset: CdeebeeChangeSet<S> = { sellerList: { replaceList: {} } };
+    const stale: CdeebeeChangeSet<S> = { sellerList: { upsertList: [full('stale')] } };
+    expect(run([{ seq: 5, change: reset }, { seq: 1, change: stale }]).storage.sellerList).toEqual({});
+    expect(run([{ seq: 1, change: stale }, { seq: 5, change: reset }]).storage.sellerList).toEqual({});
+  });
+
+  it('a reset sent before a later reset refreshes what it carries but deletes nothing', () => {
+    const opts = options(true);
+    const at = (n: number) => `2026-01-01T00:00:0${n}Z`;
+    let storage: S = { sellerList: {} };
+    storage = applyChangeSet(storage, { sellerList: { upsertList: [full('X', at(9))] } }, primaryKeyList, { ...opts, seq: 1 }).storage;
+    // the later reset carries an older version, so X is kept with its seq-1 meta
+    storage = applyChangeSet(storage, { sellerList: { replaceList: { 1: full('old', at(8)) } } }, primaryKeyList, { ...opts, seq: 5 }).storage;
+    expect(storage.sellerList[1].name).toBe('X');
+    // an earlier-sent empty reset arrives last: it must not delete what the seq-5 reset affirmed
+    storage = applyChangeSet(storage, { sellerList: { replaceList: {} } }, primaryKeyList, { ...opts, seq: 3 }).storage;
+    expect(storage.sellerList[1].name).toBe('X');
   });
 
   it('a replaceList carrying an older server version keeps the newer stored entity', () => {

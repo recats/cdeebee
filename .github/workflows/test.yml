@@ -6,7 +6,8 @@ on:
       - '**'
     paths:
       - 'lib/**'
-      - 'tests/lib/**'
+      - 'tests/**'
+      - 'vite.config.mjs'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'vitest.config.ts'
@@ -48,6 +49,9 @@ jobs:
 
       - name: Run tests
         run: pnpm test:run
+
+      - name: Validate packed package
+        run: pnpm test:package
 
       - name: Generate coverage
         run: pnpm test:coverage

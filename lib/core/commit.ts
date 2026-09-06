@@ -19,6 +19,8 @@ export type EntityMetaList = Map<EntityID, CdeebeeEntityMeta>;
 
 export interface ApplyChangeSetOptions<S> {
   metaList: Map<string, EntityMetaList>;
+  /** per-list sequence of the last `replaceList` / `clearList` */
+  listSeqMap: Map<string, number>;
   seq: number;
   versionKeyList?: CdeebeeVersionKeyList<S>;
 }
@@ -69,6 +71,13 @@ const compareFreshness = (prevMeta: CdeebeeEntityMeta | undefined, version: numb
   return seq >= prevMeta.seq ? 'newer' : 'older';
 };
 
+/** gate for writes that find no stored entity, and for removals. Equal sequence passes, so the parts of one commit apply in order. */
+const isStale = (prevMeta: CdeebeeEntityMeta | undefined, listSeq: number | undefined, seq: number): boolean => (
+  (prevMeta !== undefined && seq < prevMeta.seq) || (listSeq !== undefined && seq < listSeq)
+);
+
+const tombstone = (seq: number): CdeebeeEntityMeta => ({ seq, complete: false, deleted: true });
+
 interface EntityWrite {
   entity: CdeebeeEntity;
   meta: CdeebeeEntityMeta;
@@ -81,17 +90,18 @@ export function mergeEntity(
   mode: WriteMode,
   version: number | undefined,
   seq: number,
+  listSeq?: number,
 ): EntityWrite | undefined {
-  const freshness = compareFreshness(prevMeta, version, seq);
+  if (prevEntity === undefined) {
+    if (isStale(prevMeta, listSeq, seq)) return undefined;
+    return { entity: nextEntity, meta: { version, seq, complete: mode === 'upsert' } };
+  }
   const sameVersion = prevMeta?.version !== undefined && version !== undefined && version === prevMeta.version;
 
-  if (freshness === 'newer') {
-    if (mode === 'upsert' || mode === 'set' || prevEntity === undefined) {
-      const complete = mode === 'upsert' ? true : mode === 'set' ? (prevMeta?.complete ?? false) : false;
-      return {
-        entity: nextEntity,
-        meta: { version: version ?? prevMeta?.version, seq, complete },
-      };
+  if (prevMeta === undefined || compareFreshness(prevMeta, version, seq) === 'newer') {
+    if (mode === 'upsert' || mode === 'set') {
+      const complete = mode === 'upsert' ? true : (prevMeta?.complete ?? false);
+      return { entity: nextEntity, meta: { version: version ?? prevMeta?.version, seq, complete } };
     }
     return {
       entity: fill(nextEntity, prevEntity),
@@ -99,7 +109,6 @@ export function mergeEntity(
     };
   }
 
-  if (prevMeta === undefined || prevEntity === undefined) return undefined;
   if (prevMeta.complete) return undefined;
   const filled = fill(prevEntity, nextEntity);
   const versionKnown = prevMeta.version !== undefined && version !== undefined;
@@ -121,26 +130,34 @@ function applyListChange<S>(
   const { seq } = options;
   let list = prevList;
   let copied = false;
+  let listSeq = options.listSeqMap.get(listName);
 
   if (change.replaceList) {
+    listSeq = Math.max(listSeq ?? seq, seq);
+    options.listSeqMap.set(listName, listSeq);
+    // A reset sent before a later one may still refresh entities it carries, but must not delete anything.
+    const staleReset = seq < listSeq;
     const nextList: CdeebeeList = {};
     let changed = false;
     const replaceKeyList = Object.keys(change.replaceList);
     for (let i = 0; i < replaceKeyList.length; i += 1) {
       const key = replaceKeyList[i];
+      const metaID = toEntityID(key);
       const nextEntity = change.replaceList[key];
       const prevEntity = prevList[key];
+      const prevMeta = meta.get(metaID);
+      if (prevEntity === undefined && isStale(prevMeta, listSeq, seq)) continue;
       const version = readVersion(nextEntity, versionKey);
-      if (prevEntity !== undefined && compareFreshness(meta.get(toEntityID(key)), version, seq) === 'older') {
+      if (prevEntity !== undefined && compareFreshness(prevMeta, version, seq) === 'older') {
         nextList[key] = prevEntity;
         continue;
       }
-      meta.set(toEntityID(key), { version, seq, complete: true });
+      meta.set(metaID, { version, seq, complete: true });
       if (prevEntity !== undefined && shallowEqual(prevEntity, nextEntity)) {
         nextList[key] = prevEntity;
       } else {
         nextList[key] = nextEntity;
-        entityIDList.push(toEntityID(key));
+        entityIDList.push(metaID);
         changed = true;
       }
     }
@@ -148,14 +165,20 @@ function applyListChange<S>(
     for (let i = 0; i < prevKeyList.length; i += 1) {
       const key = prevKeyList[i];
       if (key in nextList) continue;
-      if (compareFreshness(meta.get(toEntityID(key)), undefined, seq) === 'older') {
+      const metaID = toEntityID(key);
+      if (staleReset || compareFreshness(meta.get(metaID), undefined, seq) === 'older') {
         nextList[key] = prevList[key];
         continue;
       }
-      meta.delete(toEntityID(key));
-      entityIDList.push(toEntityID(key));
+      meta.delete(metaID);
+      entityIDList.push(metaID);
       changed = true;
     }
+    // listSeq now rejects everything these tombstones did.
+    const boundary = listSeq;
+    meta.forEach((entityMeta, metaID) => {
+      if (entityMeta.deleted && entityMeta.seq <= boundary) meta.delete(metaID);
+    });
     if (changed) {
       list = nextList;
       copied = true;
@@ -168,10 +191,10 @@ function applyListChange<S>(
       const entityID = readEntityID(nextEntity, primaryKey, listName);
       if (entityID === undefined) continue;
       const metaID = toEntityID(String(entityID));
-      const write = mergeEntity(list[entityID], meta.get(metaID), nextEntity, mode, readVersion(nextEntity, versionKey), seq);
+      const prevEntity = list[entityID];
+      const write = mergeEntity(prevEntity, meta.get(metaID), nextEntity, mode, readVersion(nextEntity, versionKey), seq, listSeq);
       if (write === undefined) continue;
       meta.set(metaID, write.meta);
-      const prevEntity = list[entityID];
       if (prevEntity !== undefined && shallowEqual(prevEntity, write.entity)) continue;
       if (!copied) { list = { ...list }; copied = true; }
       list[entityID] = write.entity;
@@ -186,7 +209,11 @@ function applyListChange<S>(
   if (change.removeIDList) {
     for (let i = 0; i < change.removeIDList.length; i += 1) {
       const entityID = change.removeIDList[i];
-      meta.delete(toEntityID(String(entityID)));
+      const metaID = toEntityID(String(entityID));
+      const prevMeta = meta.get(metaID);
+      if (isStale(prevMeta, listSeq, seq)) continue;
+      // Absent ids are tombstoned too: an earlier-sent fetch must not re-add what this removal deleted.
+      if (!prevMeta?.deleted || prevMeta.seq < seq) meta.set(metaID, tombstone(seq));
       if (!(entityID in list)) continue;
       if (!copied) { list = { ...list }; copied = true; }
       delete list[entityID];
@@ -197,7 +224,7 @@ function applyListChange<S>(
   return { list, entityIDList };
 }
 
-const defaultOptions = <S>(): ApplyChangeSetOptions<S> => ({ metaList: new Map(), seq: 0 });
+const defaultOptions = <S>(): ApplyChangeSetOptions<S> => ({ metaList: new Map(), listSeqMap: new Map(), seq: 0 });
 
 export function applyChangeSet<S extends CdeebeeStorageShape<S>>(
   storage: S,

@@ -19,6 +19,15 @@ const make = (fetch: typeof globalThis.fetch, options: CdeebeeHistoryOptions = {
 };
 
 describe('history plugin', () => {
+  it('a response carrying no lists (empty body, plain ack) leaves lastResultIDList alone', async () => {
+    const { db, plugin } = make(mockFetch([jsonResponse(envelope([1, 2])), new Response(null, { status: 204 }), jsonResponse({ ok: true })]));
+    await db.request({ api: '/x' });
+    await db.request({ api: '/x' });
+    await db.request({ api: '/x' });
+    expect(plugin.getState().lastResultIDList['/x']).toEqual({ userList: [1, 2] });
+    expect(plugin.getState().doneList['/x']).toHaveLength(3);
+  });
+
   it('records done entries with response and lastResultIDList', async () => {
     const { db, plugin } = make(mockFetch([jsonResponse(envelope([1, 2]))]));
     await db.request({ api: '/x' });

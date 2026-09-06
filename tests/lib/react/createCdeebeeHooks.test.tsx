@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { createCdeebee } from '../../../lib/core/createCdeebee';
 import { createCdeebeeHooks } from '../../../lib/react/createCdeebeeHooks';
 import { history } from '../../../lib/plugins/history';
+import { shallowEqual } from '../../../lib/utils/shallowEqual';
 import { jsonResponse, mockFetch, deferred } from '../test-helpers';
 
 interface User { userID: number; name: string; orgID: number }
@@ -242,5 +243,47 @@ describe('createCdeebeeHooks', () => {
     expect(screen.getByTestId('r').textContent).toBe('1');
     await act(async () => { await db.request({ api: '/x' }); });
     expect(screen.getByTestId('r').textContent).toBe('2');
+  });
+});
+
+describe('useStore selector changes', () => {
+  type S = { userList: Record<number, { userID: number; v: number }> };
+  const settings = { fetch: {}, primaryKeyList: { userList: 'userID' as const } };
+
+  it('useStore must recompute when selector props change', () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    db.setEntity('userList', 2, { v: 2 });
+    const hooks = createCdeebeeHooks(db);
+    const { result, rerender } = renderHook(({ id }) => hooks.useStore(s => s.storage.userList[id]), { initialProps: { id: 1 } });
+    rerender({ id: 2 });
+    expect(result.current.v).toBe(2);
+  });
+
+  it('useStore with an inline selector keeps a stable reference across parent re-renders', () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    const hooks = createCdeebeeHooks(db);
+    let selectorCallCount = 0;
+    const { result, rerender } = renderHook(() => hooks.useStore(s => { selectorCallCount += 1; return Object.keys(s.storage.userList); }, shallowEqual));
+    const first = result.current;
+    rerender();
+    rerender();
+    expect(result.current).toBe(first);
+    expect(selectorCallCount).toBeLessThanOrEqual(3);
+  });
+
+  it('useStore applies a changed equality function and stays subscribed', async () => {
+    const db = createCdeebee<S>(settings);
+    db.setEntity('userList', 1, { v: 1 });
+    const hooks = createCdeebeeHooks(db);
+    const selector = (s: ReturnType<typeof db.getState>) => s.storage.userList[1].v;
+    const { result, rerender } = renderHook(({ equal }) => hooks.useStore(selector, equal), { initialProps: { equal: (_a: number, _b: number) => true } });
+    await act(async () => { db.setEntity('userList', 1, { v: 2 }); });
+    expect(result.current).toBe(1);
+    rerender({ equal: Object.is });
+    expect(result.current).toBe(2);
+    await act(async () => { db.setEntity('userList', 1, { v: 3 }); });
+    expect(result.current).toBe(3);
   });
 });

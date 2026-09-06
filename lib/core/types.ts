@@ -44,6 +44,7 @@ export interface CdeebeeEntityMeta {
   version?: number;
   seq: number;
   complete: boolean;
+  deleted?: boolean;
 }
 
 export interface CdeebeeDependency<S> {

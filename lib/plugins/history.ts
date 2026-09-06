@@ -69,9 +69,10 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
       const { kind, message, status, response } = ctx.error;
       state = { ...state, errorList: append(state.errorList, ctx.api, { ...base, error: { kind, message, status, response } }, maxHistorySize) };
     } else {
-      const lastResultIDList = ctx.changeSet === undefined
+      const resultIDList = ctx.changeSet === undefined ? undefined : extractResultIDList(ctx.changeSet, ctx.db.settings.primaryKeyList);
+      const lastResultIDList = resultIDList === undefined || Object.keys(resultIDList).length === 0
         ? state.lastResultIDList
-        : { ...state.lastResultIDList, [ctx.api]: extractResultIDList(ctx.changeSet, ctx.db.settings.primaryKeyList) };
+        : { ...state.lastResultIDList, [ctx.api]: resultIDList };
       state = {
         ...state,
         doneList: append(state.doneList, ctx.api, { ...base, response: ctx.response }, maxHistorySize),

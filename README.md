@@ -48,7 +48,7 @@ navigate(campaignLink.edit(response.campaignList.data[0].campaignID));
 
 ### Custom fetch
 
-`settings.fetch.fetch` injects the fetch implementation used for every request — it defaults to `globalThis.fetch`. Pass your own to run in an environment without a global `fetch`, to point tests at a stub without touching the global, or to wrap the real `fetch` with instrumentation (timing, logging, auth refresh):
+`settings.fetch.fetch` injects the fetch implementation used for every request — it defaults to `globalThis.fetch`. Pass your own to run in an environment without a global `fetch`, to point tests at a stub without touching the global, or to wrap the real `fetch` with instrumentation (timing, logging, auth refresh). A stub must return a `Response`-like object with `ok`, `status` and `text()` (plus `blob()` for blob requests) — JSON bodies are read through `text()` so an empty body can be told apart from a malformed one:
 
 ```ts
 createCdeebee<Storage>({
@@ -101,9 +101,9 @@ Two responses can carry the same entity and disagree — because one is thin and
 | older | `complete` | dropped |
 | older | incomplete | stored fields win, incoming fills the holes; `complete` if it was an `upsert` at the same version |
 
-`db.getEntityMeta(listName, entityID)` exposes `{ version, seq, complete }` for debugging and tests. Local mutations (`setEntity`) replace the entity whole at a fresh sequence (so an edit can clear an array or unset a field) while keeping its completeness flag, so a slow response to an earlier request cannot overwrite what the user just typed. `replaceList` is checked per entity too: a stale list response neither overrides nor removes entities written by a later send.
+`db.getEntityMeta(listName, entityID)` exposes `{ version, seq, complete }` for debugging and tests; a removed entity has no meta, exactly like one never seen (its tombstone stays internal). Local mutations (`setEntity`) replace the entity whole at a fresh sequence (so an edit can clear an array or unset a field) while keeping its completeness flag, so a slow response to an earlier request cannot overwrite what the user just typed. `replaceList` is checked per entity too: a stale list response neither overrides nor removes entities written by a later send.
 
-Without `versionKeyList`, send order is the only ordering signal; it is wrong only when the server happened to process an earlier-issued request after a later one. The `queryQueue` plugin removes that case by never having two requests in flight — at the cost of serializing them.
+Without `versionKeyList`, send order is the only ordering signal; it cannot detect when the server processes requests in a different order. `queryQueue` sends requests concurrently and orders response processing within each queue. It does not serialize server execution; await each `db.request()` before sending the next when that ordering is required.
 
 ## Local mutations
 
@@ -111,7 +111,7 @@ Storage can also be changed without a request, through the same commit path (so 
 
 - `db.setEntity(listName, entityID, patch)` — a plain object `patch` is shallow-merged over the previous entity; a `(prevEntity) => nextEntity` updater function replaces the entity with its return value. Either way, cdeebee always sets the primary key field on the result to `entityID`, so an updater does not need to (and cannot accidentally omit or override) it.
 - `db.removeEntityList(listName, entityIDList)` — removes entities by id.
-- `db.clearList(listName)` — empties a list.
+- `db.clearList(listName)` — empties a list. Deletions retain sequence tombstones, and list resets (`clearList` / `replaceList`) retain a sequence boundary, so earlier requests cannot restore removed entities (including IDs absent when the list was cleared). A later write can add them again. A list reset drops the tombstones it makes redundant, so only removals sent after the last reset keep one.
 - `db.replaceList(listName, entityRecord)` — replaces a whole list with a keyed record.
 - `db.commit(changeSet, meta)` — the low-level primitive all of the above call; use it directly to touch several lists atomically in one `{ listName: { upsertList, removeIDList, replaceList } }` change set.
 
@@ -126,7 +126,7 @@ Storage can also be changed without a request, through the same commit path (so 
 | `method` | `'GET' \| 'POST' \| 'PUT' \| 'DELETE' \| 'PATCH'` | Defaults to `'POST'`. |
 | `headerList` | `Record<string, string>` | Merged over `settings.fetch.headerList`. |
 | `fileList` | `File[]` | When present, the request body is sent as `FormData` (files under `fileKey`, the JSON payload under `bodyKey`) and no `Content-Type` header is sent — the browser sets the multipart boundary. |
-| `responseType` | `'json' \| 'text' \| 'blob'` | Defaults to `'json'`. |
+| `responseType` | `'json' \| 'text' \| 'blob'` | Defaults to `'json'`. An empty JSON body (HTTP 204/205, or a 200 with no content) resolves to `undefined` — `normalize` receives it as-is (the default one commits nothing); invalid JSON rejects with a parse error. `text` resolves `''` and `blob` an empty `Blob` in that case. |
 | `strategyList` | `Partial<Record<listName, strategy>>` | Per-request strategy override. |
 | `normalize` | `(response, ctx) => ChangeSet` | Per-request normalize override; falls back to `settings.normalize`, then the built-in `defaultNormalize`. |
 | `ignoreStorage` | `boolean` | Skip normalizing and committing the response entirely; the request still resolves with the raw response. |
@@ -188,7 +188,7 @@ All hooks are returned from `createCdeebeeHooks(db)` and only re-render a compon
 | `useLastResultIDList(api, listName)` | the id list `listName` received from the last successful call to `api` (requires the `history` plugin) |
 | `useLastResponse<R>(api)` | the newest successful response for `api` (`undefined` before the first one); use it for the non-list parts of a response (`extension`, `rawResponse`) instead of keeping a copy in your own state (requires the `history` plugin) |
 
-`useStore` is a last resort — reach for it only when nothing above fits, since a selector over the whole state is easy to over-subscribe with. A common pattern for a parent/rows split:
+`useStore` is a last resort — reach for it only when nothing above fits, since a selector over the whole state is easy to over-subscribe with. An inline selector re-runs on every render of its component; when it derives a new object or array, pass `shallowEqual` (exported from the package) or another `equalityFn` so the previous reference is kept and `useEffect` / `React.memo` dependencies stay stable. A common pattern for a parent/rows split:
 
 ```tsx
 function CampaignTable() {
@@ -235,11 +235,20 @@ Built-ins, all importable from `@recats/cdeebee/core` (or `@recats/cdeebee`):
 |---|---|---|
 | `history(options?)` | `{ maxHistorySize?, ignoreAbort? }` | Records done/error entries and `lastResultIDList` per api; exposes `getState()`, `getLast(api)`, `subscribe(listener, apiList?)`, `clear(api?)`; honors the `historyClear` request option. Required by `useRequestHistory`, `useRequestErrorList`, `useLastResultIDList`, `useLastResponse`. Every entry retains the full parsed `response` object, so history is capped at `maxHistorySize` entries per api — `20` by default; pass `maxHistorySize: 0` for unbounded. Aborted requests are not recorded in `errorList` unless `ignoreAbort: false`. |
 | `cancelation(options?)` | `{ apiList?, mode?: 'previous' \| 'latest' }` | Deduplicates concurrent calls to the same api: `'previous'` (default) aborts the in-flight call and lets the new one proceed; `'latest'` skips the new call while one is in flight. Restricted to `apiList` when given. |
-| `queryQueue(options?)` | `{ apiList? }` | Serializes matching requests so responses are committed in send order, even if they arrive out of order over the network. Restricted to `apiList` when given. |
+| `queryQueue(options?)` | `{ apiList?, key?: (ctx) => string }` | Sends matching requests concurrently and processes successful responses in send order within each key. Uses one shared queue by default; `apiList` restricts participation. Failed or aborted entries preserve predecessor ordering. Aborting a waiting response rejects promptly. |
 | `retry(options)` | `{ count, backoffMs?, when? }` | Retries a failed request up to `count` times (`when` defaults to network errors only); `backoffMs` is a fixed delay or `(attempt) => ms`. |
 | `devtools(options?)` | `{ name? }` | Connects to the Redux DevTools browser extension if present and streams every commit and settled request as an action. Use one `devtools()` instance per store. |
 
 Plugin order is the order of `pluginList` for every hook. List `queryQueue` first — an async `onSettled` in an earlier plugin delays the queue release, and with it every request waiting behind the current one.
+
+Use independent queue keys when unrelated responses should not block each other:
+
+```ts
+queryQueue<Storage>({ key: ctx => ctx.api }); // one queue per API
+queryQueue<Storage>({ key: ctx => String(ctx.meta.resourceKey ?? ctx.api) }); // group related endpoints
+```
+
+Requests that must be ordered together must return the same key. Queue keys control response processing only; they do not deduplicate requests or change entity freshness checks. `key` runs inside `onRequest`, so it must not throw.
 
 App-level plugins are just objects matching the interface. Some examples:
 
@@ -247,6 +256,7 @@ App-level plugins are just objects matching the interface. Some examples:
 const apiVersion = (): CdeebeePlugin<Storage> => ({
   name: 'apiVersion',
   onResponse: ctx => {
+    if (ctx.response === undefined) return;   // 204 / empty body
     const { apiVersion, expectedUiVersion } = ctx.response as CleanServerResponse;
     forceUpdateOnStaleUiVersion(BUILD_VERSION, expectedUiVersion);
     if (apiVersion !== getApiVersion()) { setApiVersion(apiVersion); resetWindowCache(true); }
@@ -281,9 +291,9 @@ Pass server-rendered data as `settings.initialStorage` when constructing the sto
 
 1. **Atomic commit**: one response produces one change set across all lists, one new snapshot, one flush — readers never see a half-applied response.
 2. **Immutable snapshot**: `db.getState()` returns the same object until a commit, so `useSyncExternalStore` never tears; `getSnapshot()` is a fresh serializable wrapper (`{ state, pluginStateList }`) for SSR/devtools, built on every call.
-3. **Ordering**: with `queryQueue`, commits apply in send order even when responses arrive out of order; without it, the last response to settle wins.
+3. **Ordering**: `queryQueue` processes successful responses in send order within each queue key. Entity freshness checks apply with or without the plugin: versions take precedence when both are known and differ, otherwise send sequence decides.
 4. **Abort → no commit**: an aborted or plugin-skipped request never touches storage, `activeRequestList` is cleaned up, and the promise rejects with `kind: 'abort'`.
-5. **Local edits vs. responses**: both go through the same sequential commit path; the last writer wins at the entity level. There is no rollback in v4.0.
+5. **Local edits vs. responses**: local edits receive a fresh sequence. Deletions and list resets prevent earlier requests from resurrecting removed entities. There is no rollback in v4.0.
 6. **Batching**: request commits inside one microtask notify once; local mutations (`setEntity`/`removeEntityList`/`clearList`/`replaceList`) notify synchronously so controlled inputs never lose their caret. React 18+ coalesces renders either way.
 7. **Notify only on real change**: entities are compared with a shallow equality check, so unchanged entities keep their reference and their listeners are not notified.
 
