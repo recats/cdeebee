@@ -349,3 +349,25 @@ describe('deletion boundaries survive re-adding an entity', () => {
     expect(storage).toBe(before);
   });
 });
+
+describe('list reset fast path', () => {
+  it('skips an entire stale composite change but still updates other lists', () => {
+    interface Store { sellerList: Record<number, Seller>; otherList: Record<number, Seller> }
+    const opts: ApplyChangeSetOptions<Store> = { metaList: new Map(), listSeqMap: new Map(), seq: 5 };
+    const keys = { sellerList: 'sellerID', otherList: 'sellerID' } as const;
+    const initial: Store = { sellerList: {}, otherList: {} };
+    const reset = applyChangeSet(initial, { sellerList: { replaceList: { 1: full('kept') } } }, keys, opts);
+    const stale = applyChangeSet(reset.storage, {
+      sellerList: {
+        replaceList: {}, upsertList: [full('old')], patchList: [thin('old')],
+        setList: [thin('old')], removeIDList: [1],
+      },
+      otherList: { upsertList: [full('other')] },
+    }, keys, { ...opts, seq: 4 });
+    expect(stale.storage.sellerList).toBe(reset.storage.sellerList);
+    expect(stale.storage.otherList[1]).toEqual(full('other'));
+    expect(stale.changedList).toEqual([{ listName: 'otherList', entityIDList: [1] }]);
+    const equal = applyChangeSet(stale.storage, { sellerList: { patchList: [thin('equal')] } }, keys, opts);
+    expect(equal.storage.sellerList[1].name).toBe('equal');
+  });
+});

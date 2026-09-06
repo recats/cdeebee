@@ -83,6 +83,12 @@ const isStale = (prevMeta: CdeebeeEntityMeta | undefined, listSeq: number | unde
 
 const tombstone = (seq: number): CdeebeeEntityMeta => ({ seq, complete: false, deleted: true });
 
+const writeMeta = (version: number | undefined, seq: number, complete: boolean, removedSeq: number | undefined): EntityMeta => {
+  const meta: EntityMeta = { version, seq, complete };
+  if (removedSeq !== undefined) meta.removedSeq = removedSeq;
+  return meta;
+};
+
 interface EntityWrite {
   entity: CdeebeeEntity;
   meta: EntityMeta;
@@ -99,21 +105,20 @@ export function mergeEntity(
 ): EntityWrite | undefined {
   const removedSeq = prevMeta?.deleted ? prevMeta.seq : prevMeta?.removedSeq;
   if ((listSeq !== undefined && seq < listSeq) || (removedSeq !== undefined && seq < removedSeq)) return undefined;
-  const removalMeta = removedSeq === undefined ? {} : { removedSeq };
   if (prevEntity === undefined) {
     if (isStale(prevMeta, listSeq, seq)) return undefined;
-    return { entity: nextEntity, meta: { ...removalMeta, version, seq, complete: mode === 'upsert' } };
+    return { entity: nextEntity, meta: writeMeta(version, seq, mode === 'upsert', removedSeq) };
   }
   const sameVersion = prevMeta?.version !== undefined && version !== undefined && version === prevMeta.version;
 
   if (prevMeta === undefined || compareFreshness(prevMeta, version, seq) === 'newer') {
     if (mode === 'upsert' || mode === 'set') {
       const complete = mode === 'upsert' ? true : (prevMeta?.complete ?? false);
-      return { entity: nextEntity, meta: { ...removalMeta, version: version ?? prevMeta?.version, seq, complete } };
+      return { entity: nextEntity, meta: writeMeta(version ?? prevMeta?.version, seq, complete, removedSeq) };
     }
     return {
       entity: fill(nextEntity, prevEntity),
-      meta: { ...removalMeta, version: version ?? prevMeta?.version, seq, complete: sameVersion ? (prevMeta?.complete ?? false) : false },
+      meta: writeMeta(version ?? prevMeta?.version, seq, sameVersion ? (prevMeta?.complete ?? false) : false, removedSeq),
     };
   }
 
@@ -143,8 +148,6 @@ function applyListChange<S>(
   if (change.replaceList) {
     listSeq = Math.max(listSeq ?? seq, seq);
     options.listSeqMap.set(listName, listSeq);
-    // A reset sent before a later one must neither refresh nor delete entities.
-    const staleReset = seq < listSeq;
     const nextList: CdeebeeList = {};
     let changed = false;
     const replaceKeyList = Object.keys(change.replaceList);
@@ -155,7 +158,7 @@ function applyListChange<S>(
       const prevEntity = prevList[key];
       const prevMeta = meta.get(metaID);
       const removedSeq = prevMeta?.deleted ? prevMeta.seq : prevMeta?.removedSeq;
-      if (staleReset || (removedSeq !== undefined && seq < removedSeq)
+      if ((removedSeq !== undefined && seq < removedSeq)
         || (prevEntity === undefined && isStale(prevMeta, listSeq, seq))) {
         if (prevEntity !== undefined) nextList[key] = prevEntity;
         continue;
@@ -165,7 +168,7 @@ function applyListChange<S>(
         nextList[key] = prevEntity;
         continue;
       }
-      meta.set(metaID, { ...(removedSeq === undefined ? {} : { removedSeq }), version, seq, complete: true });
+      meta.set(metaID, writeMeta(version, seq, true, removedSeq));
       if (prevEntity !== undefined && shallowEqual(prevEntity, nextEntity)) {
         nextList[key] = prevEntity;
       } else {
@@ -179,7 +182,7 @@ function applyListChange<S>(
       const key = prevKeyList[i];
       if (key in nextList) continue;
       const metaID = toEntityID(key);
-      if (staleReset || compareFreshness(meta.get(metaID), undefined, seq) === 'older') {
+      if (compareFreshness(meta.get(metaID), undefined, seq) === 'older') {
         nextList[key] = prevList[key];
         continue;
       }
@@ -254,6 +257,10 @@ export function applyChangeSet<S extends CdeebeeStorageShape<S>>(
     const listName = listNameList[i];
     const change = changeSet[listName] as ListChange | undefined;
     if (!change) continue;
+    // Every operation in this list change predates its reset, including removals.
+    // Equal sequences must pass for composite commits and same-sequence writes.
+    const listSeq = options.listSeqMap.get(listName);
+    if (listSeq !== undefined && options.seq < listSeq) continue;
     const prevList: CdeebeeList = storage[listName] ?? {};
     const primaryKey = primaryKeyList[listName] as string;
     let meta = options.metaList.get(listName);

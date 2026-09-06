@@ -115,6 +115,9 @@ Storage can also be changed without a request, through the same commit path (so 
 - `db.replaceList(listName, entityRecord)` — replaces a whole list with a keyed record.
 - `db.commit(changeSet, meta)` — the low-level primitive all of the above call; use it directly to touch several lists atomically in one `{ listName: { upsertList, removeIDList, replaceList } }` change set.
 
+For bulk edits, pass all updated entities in one `db.commit({ listName: { setList: entities } }, { source: 'set' })`. `setList` replaces each entity whole; include its primary key and any fields to retain. One commit copies each affected list once and flushes subscribers once, avoiding repeated list copies from a loop of `setEntity` calls. This matters especially for large lists keyed by UUIDs.
+
+
 ## Request options
 
 `db.request<Response, Data>(options)`:
