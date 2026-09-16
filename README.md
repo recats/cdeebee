@@ -198,6 +198,8 @@ All hooks are returned from `createCdeebeeHooks(db)` and only re-render a compon
 | `useLastResultIDList(api, listName)` | the IDs for `listName` from the latest successful normalized response containing lists; explicitly empty lists clear IDs, responses without lists retain them (requires the `history` plugin) |
 | `useLastResponse<R>(api)` | the newest successful response for `api` (`undefined` before the first one); use it for the non-list parts of a response (`extension`, `rawResponse`) instead of keeping a copy in your own state (requires the `history` plugin) |
 
+`usePluginState(subscribe, getSnapshot, keyList)` is the building block the history hooks are made of, exported standalone for app plugins that keep their own state: it subscribes `getSnapshot` to the given keys through any `CdeebeeSubscription['subscribe']` (`db.subscribeRequest`, `history().subscribe`, or your plugin's own `createSubscription().subscribe`) and re-renders only when one of them is notified. `getSnapshot` may be an inline closure — only its *result* has to be stable between notifications (return the stored reference, or an `EMPTY_LIST` constant instead of a fresh `[]`). The subscription is re-created only when `subscribe` or the contents of `keyList` change, so passing a new array with the same keys is free. See the plugin section for a stateful plugin example.
+
 `useStore` is a last resort — a selector over the whole state is easy to over-subscribe with. An inline selector runs on every render; when it derives an object or array, pass `shallowEqual` (exported from the package) or another `equalityFn` so the reference stays stable for `useEffect` / `React.memo`. `equalityFn` must fully define equivalence: it is applied across renders and prop changes, so comparing only a length is not enough. A common parent/rows split:
 
 ```tsx
@@ -262,7 +264,47 @@ queryQueue<Storage>({ key: ctx => String(ctx.meta.resourceKey ?? ctx.api) }); //
 
 Requests that must be ordered together must return the same key. Queue keys control response processing only; they do not deduplicate requests or change entity freshness checks. `key` runs inside `onRequest`, so it must not throw.
 
-App-level plugins are just objects matching the interface. Some examples:
+App-level plugins are just objects matching the interface. A plugin that keeps state for components uses `createSubscription()` (from `@recats/cdeebee/core`) for the same keyed, microtask-batched notifications the store and the `history` plugin use, and components read it through `usePluginState`:
+
+```ts
+import { createSubscription, type CdeebeePlugin, type CdeebeeSubscription } from '@recats/cdeebee/core';
+import { usePluginState } from '@recats/cdeebee';
+
+interface ServerErrorPlugin extends CdeebeePlugin<Storage> {
+  getState: () => Record<string, CleanServerResponse>;
+  subscribe: CdeebeeSubscription['subscribe'];
+  dismiss: (api: string) => void;
+}
+
+const serverError = (): ServerErrorPlugin => {
+  let state: Record<string, CleanServerResponse> = {};
+  const subscription = createSubscription();
+  return {
+    name: 'serverError',
+    getState: () => state,
+    subscribe: subscription.subscribe,
+    onError: ctx => {
+      if (ctx.error?.kind !== 'http') return;
+      state = { ...state, [ctx.api]: ctx.error.response as CleanServerResponse };
+      subscription.notify(ctx.api);
+    },
+    dismiss: api => {
+      if (!(api in state)) return;
+      const { [api]: _dismissed, ...rest } = state;
+      state = rest;
+      subscription.notify(api);
+    },
+  };
+};
+
+export const serverErrorPlugin = serverError();
+
+export function useServerError(api: string): CleanServerResponse | undefined {
+  return usePluginState(serverErrorPlugin.subscribe, () => serverErrorPlugin.getState()[api], [api]);
+}
+```
+
+`subscribe(listener, keyList?)` without a key list is a global listener; `notify(key | keyList)` enqueues the listeners of every given key plus the global ones and runs each once per microtask; `flush()` runs them synchronously (tests). Some more examples:
 
 ```ts
 const apiVersion = (): CdeebeePlugin<Storage> => ({

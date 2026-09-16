@@ -5,6 +5,7 @@ export { defaultNormalize, isListEnvelope, extractResultIDList, type CdeebeeList
 export type { FetchContext } from './core/fetchClient';
 export { CdeebeeRequestError, isAbortError } from './core/requestError';
 export { shallowEqual } from './utils/shallowEqual';
+export { createSubscription } from './core/subscription';
 export { history, type CdeebeeHistoryPlugin, type CdeebeeHistoryState, type CdeebeeHistoryEntry, type CdeebeeHistoryError, type CdeebeeHistoryOptions } from './plugins/history';
 export { cancelation, type CdeebeeCancelationOptions } from './plugins/cancelation';
 export { queryQueue, type CdeebeeQueryQueueOptions } from './plugins/queryQueue';

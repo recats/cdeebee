@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { SubscriptionManager, RequestSubscriptionManager } from '../../../lib/core/subscription';
+import { SubscriptionManager, createSubscription } from '../../../lib/core/subscription';
 
 interface S { userList: Record<number, { id: number }>; postList: Record<number, { id: number }> }
 
@@ -106,9 +106,9 @@ describe('SubscriptionManager', () => {
   });
 });
 
-describe('RequestSubscriptionManager', () => {
+describe('createSubscription', () => {
   it('fires listeners keyed by api and global listeners', async () => {
-    const m = new RequestSubscriptionManager();
+    const m = createSubscription();
     const byApi = vi.fn();
     const other = vi.fn();
     const global = vi.fn();
@@ -120,5 +120,78 @@ describe('RequestSubscriptionManager', () => {
     expect(byApi).toHaveBeenCalledTimes(1);
     expect(other).not.toHaveBeenCalled();
     expect(global).toHaveBeenCalledTimes(1);
+  });
+
+  it('notify with a key list reaches every key and calls a shared listener once', async () => {
+    const m = createSubscription();
+    const shared = vi.fn();
+    const onlyB = vi.fn();
+    const onlyC = vi.fn();
+    m.subscribe(shared, ['/a', '/b']);
+    m.subscribe(onlyB, ['/b']);
+    m.subscribe(onlyC, ['/c']);
+    m.notify(['/a', '/b']);
+    await tick();
+    expect(shared).toHaveBeenCalledTimes(1);
+    expect(onlyB).toHaveBeenCalledTimes(1);
+    expect(onlyC).not.toHaveBeenCalled();
+  });
+
+  it('batches several notify calls into one flush', async () => {
+    const m = createSubscription();
+    const listener = vi.fn();
+    m.subscribe(listener, ['/a', '/b']);
+    m.notify('/a');
+    m.notify(['/b']);
+    expect(listener).not.toHaveBeenCalled();
+    await tick();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('flush() runs pending notifications synchronously', () => {
+    const m = createSubscription();
+    const listener = vi.fn();
+    m.subscribe(listener, ['/a']);
+    m.notify('/a');
+    m.flush();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('an empty key list subscribes to nothing but an empty notify still reaches global listeners', async () => {
+    const m = createSubscription();
+    const keyed = vi.fn();
+    const global = vi.fn();
+    m.subscribe(keyed, []);
+    m.subscribe(global);
+    m.notify([]);
+    m.notify('/a');
+    await tick();
+    expect(keyed).not.toHaveBeenCalled();
+    expect(global).toHaveBeenCalledTimes(1);
+  });
+
+  it('unsubscribe removes the listener from every key and drops empty buckets', async () => {
+    const m = createSubscription();
+    const listener = vi.fn();
+    const unsubscribe = m.subscribe(listener, ['/a', '/b']);
+    unsubscribe();
+    m.notify(['/a', '/b']);
+    await tick();
+    expect(listener).not.toHaveBeenCalled();
+    unsubscribe();
+    m.notify('/a');
+    await tick();
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('a throwing listener does not starve the others; the error is rethrown from flush()', () => {
+    const m = createSubscription();
+    const bad = vi.fn(() => { throw new Error('boom'); });
+    const good = vi.fn();
+    m.subscribe(bad, ['/a']);
+    m.subscribe(good, ['/a']);
+    m.notify('/a');
+    expect(() => m.flush()).toThrow('boom');
+    expect(good).toHaveBeenCalledTimes(1);
   });
 });
