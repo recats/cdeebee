@@ -151,6 +151,42 @@ describe('history plugin', () => {
     expect(plugin.getState().doneList['/x']).toHaveLength(2);
   });
 
+  it('keeps lastResultIDList references when a response repeats the same ids', async () => {
+    const { db, plugin } = make(mockFetch([jsonResponse(envelope([1, 2])), jsonResponse(envelope([1, 2])), jsonResponse(envelope([2, 1]))]));
+    await db.request({ api: '/x' });
+    const first = plugin.getState().lastResultIDList['/x'];
+    await db.request({ api: '/x' });
+    expect(plugin.getState().lastResultIDList['/x']).toBe(first);
+    await db.request({ api: '/x' });
+    expect(plugin.getState().lastResultIDList['/x']).not.toBe(first);
+    expect(plugin.getState().lastResultIDList['/x']).toEqual({ userList: [2, 1] });
+  });
+
+  it('keeps the unchanged list array when another list in the same response changes', async () => {
+    interface S2 { userList: Record<number, { userID: number }>; postList: Record<number, { postID: number }> }
+    const plugin = history<S2>();
+    const respond = (postID: number) => jsonResponse({ ...envelope([1]), postList: { data: [{ postID }], primaryKey: 'postID' } });
+    const db = createCdeebee<S2>({ fetch: { fetch: mockFetch([respond(1), respond(2)]) }, primaryKeyList: { userList: 'userID', postList: 'postID' }, pluginList: [plugin] });
+    await db.request({ api: '/x' });
+    const first = plugin.getState().lastResultIDList['/x'];
+    await db.request({ api: '/x' });
+    const second = plugin.getState().lastResultIDList['/x'];
+    expect(second).not.toBe(first);
+    expect(second.userList).toBe(first.userList);
+    expect(second.postList).toEqual([2]);
+  });
+
+  it('clear() notifies every recorded api in one flush', async () => {
+    const { db, plugin } = make(mockFetch([jsonResponse({}), jsonResponse({}, { ok: false, status: 500 })]));
+    await db.request({ api: '/a' });
+    await db.request({ api: '/b' }).catch(() => undefined);
+    const listener = vi.fn();
+    plugin.subscribe(listener, ['/a', '/b']);
+    plugin.clear();
+    await new Promise<void>(resolve => queueMicrotask(resolve));
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it('getLast returns the newest done entry or undefined', async () => {
     const { db, plugin } = make(mockFetch([jsonResponse({ n: 1 }), jsonResponse({ n: 2 })]));
     expect(plugin.getLast('/x')).toBeUndefined();

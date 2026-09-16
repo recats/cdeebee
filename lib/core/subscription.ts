@@ -1,4 +1,4 @@
-import type { CdeebeeChangedList, CdeebeeDependency, CdeebeeListener, EntityID, ListName } from './types';
+import type { CdeebeeChangedList, CdeebeeDependency, CdeebeeListener, CdeebeeSubscription, EntityID, ListName } from './types';
 
 type ListenerSet = Set<CdeebeeListener>;
 
@@ -107,35 +107,35 @@ export class SubscriptionManager<S> {
   }
 }
 
-export class RequestSubscriptionManager {
-  private globalSet: ListenerSet = new Set();
-  private apiMap = new Map<string, ListenerSet>();
-  private scheduler = new FlushScheduler();
+export function createSubscription(): CdeebeeSubscription {
+  const globalSet: ListenerSet = new Set();
+  const keyMap = new Map<string, ListenerSet>();
+  const scheduler = new FlushScheduler();
+  const enqueue = (key: string) => keyMap.get(key)?.forEach(listener => scheduler.add(listener));
 
-  subscribe(listener: CdeebeeListener, apiList?: string[]): () => void {
-    if (!apiList) {
-      this.globalSet.add(listener);
-      return () => { this.globalSet.delete(listener); };
-    }
-    for (let i = 0; i < apiList.length; i += 1) {
-      let set = this.apiMap.get(apiList[i]);
-      if (!set) { set = new Set(); this.apiMap.set(apiList[i], set); }
-      set.add(listener);
-    }
-    return () => {
-      for (let i = 0; i < apiList.length; i += 1) {
-        const set = this.apiMap.get(apiList[i]);
-        if (set) { set.delete(listener); if (set.size === 0) this.apiMap.delete(apiList[i]); }
+  return {
+    subscribe: (listener, keyList) => {
+      if (!keyList) {
+        globalSet.add(listener);
+        return () => { globalSet.delete(listener); };
       }
-    };
-  }
-
-  notify(api: string): void {
-    this.globalSet.forEach(listener => this.scheduler.add(listener));
-    this.apiMap.get(api)?.forEach(listener => this.scheduler.add(listener));
-  }
-
-  flush(): void {
-    this.scheduler.flush();
-  }
+      for (let i = 0; i < keyList.length; i += 1) {
+        let set = keyMap.get(keyList[i]);
+        if (!set) { set = new Set(); keyMap.set(keyList[i], set); }
+        set.add(listener);
+      }
+      return () => {
+        for (let i = 0; i < keyList.length; i += 1) {
+          const set = keyMap.get(keyList[i]);
+          if (set) { set.delete(listener); if (set.size === 0) keyMap.delete(keyList[i]); }
+        }
+      };
+    },
+    notify: keyList => {
+      globalSet.forEach(listener => scheduler.add(listener));
+      if (typeof keyList === 'string') enqueue(keyList);
+      else for (let i = 0; i < keyList.length; i += 1) enqueue(keyList[i]);
+    },
+    flush: () => scheduler.flush(),
+  };
 }

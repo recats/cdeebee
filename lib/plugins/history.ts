@@ -1,5 +1,6 @@
-import { RequestSubscriptionManager } from '../core/subscription';
+import { createSubscription } from '../core/subscription';
 import { extractResultIDList } from '../core/normalize';
+import { shallowEqual } from '../utils/shallowEqual';
 import type { CdeebeeErrorKind, CdeebeeListener, CdeebeePlugin, CdeebeeRequestContext, EntityID } from '../core/types';
 
 export interface CdeebeeHistoryError {
@@ -56,9 +57,22 @@ const omitKey = <V>(record: Record<string, V>, key: string): Record<string, V> =
   return next;
 };
 
+const keepIDList = (prev: Record<string, EntityID[]> | undefined, next: Record<string, EntityID[]>): Record<string, EntityID[]> => {
+  if (prev === undefined) return next;
+  const listNameList = Object.keys(next);
+  let same = listNameList.length === Object.keys(prev).length;
+  for (let i = 0; i < listNameList.length; i += 1) {
+    const listName = listNameList[i];
+    const prevIDList = prev[listName];
+    if (prevIDList !== undefined && shallowEqual(prevIDList, next[listName])) next[listName] = prevIDList;
+    else same = false;
+  }
+  return same ? prev : next;
+};
+
 export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryPlugin<S> {
   let state: CdeebeeHistoryState = { doneList: {}, errorList: {}, lastResultIDList: {} };
-  const subscriptionManager = new RequestSubscriptionManager();
+  const subscription = createSubscription();
   const maxHistorySize = options.maxHistorySize ?? DEFAULT_MAX_HISTORY_SIZE;
   const ignoreAbort = options.ignoreAbort ?? true;
 
@@ -72,21 +86,21 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
       const resultIDList = ctx.changeSet === undefined ? undefined : extractResultIDList(ctx.changeSet, ctx.db.settings.primaryKeyList);
       const lastResultIDList = resultIDList === undefined || Object.keys(resultIDList).length === 0
         ? state.lastResultIDList
-        : { ...state.lastResultIDList, [ctx.api]: resultIDList };
+        : { ...state.lastResultIDList, [ctx.api]: keepIDList(state.lastResultIDList[ctx.api], resultIDList) };
       state = {
         ...state,
         doneList: append(state.doneList, ctx.api, { ...base, response: ctx.response }, maxHistorySize),
         lastResultIDList,
       };
     }
-    subscriptionManager.notify(ctx.api);
+    subscription.notify(ctx.api);
   };
 
   const clear = (api?: string) => {
     if (api === undefined) {
-      const apiList = new Set([...Object.keys(state.doneList), ...Object.keys(state.errorList)]);
+      const apiList = [...new Set([...Object.keys(state.doneList), ...Object.keys(state.errorList), ...Object.keys(state.lastResultIDList)])];
       state = { doneList: {}, errorList: {}, lastResultIDList: {} };
-      apiList.forEach(api => subscriptionManager.notify(api));
+      subscription.notify(apiList);
       return;
     }
     if (!(api in state.doneList) && !(api in state.errorList) && !(api in state.lastResultIDList)) return;
@@ -95,7 +109,7 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
       errorList: omitKey(state.errorList, api),
       lastResultIDList: omitKey(state.lastResultIDList, api),
     };
-    subscriptionManager.notify(api);
+    subscription.notify(api);
   };
 
   return {
@@ -109,7 +123,7 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
       const entryList = state.doneList[api];
       return entryList === undefined ? undefined : entryList[entryList.length - 1];
     },
-    subscribe: (listener, apiList) => subscriptionManager.subscribe(listener, apiList),
+    subscribe: subscription.subscribe,
     clear,
   };
 }

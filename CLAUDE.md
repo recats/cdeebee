@@ -38,7 +38,7 @@ lib/
   core/      createCdeebee.ts, commit.ts, subscription.ts, indexManager.ts, normalize.ts,
              fetchClient.ts, requestError.ts, pipeline.ts, types.ts
   plugins/   history.ts, cancelation.ts, queryQueue.ts, retry.ts, devtools.ts
-  react/     createCdeebeeHooks.ts
+  react/     createCdeebeeHooks.ts, usePluginState.ts
   utils/     batchingUpdate.ts, shallowEqual.ts, keyBy.ts, entityID.ts, isRecord.ts, env.ts, requestID.ts
   core.ts    entry point re-exporting core/ + plugins/ (no React import, ever)
   index.ts   entry point re-exporting core.ts + react/ (the full package)
@@ -51,7 +51,7 @@ Two package entry points: `@recats/cdeebee` (`lib/index.ts`, everything) and `@r
 - **One immutable snapshot.** `db.getState()` returns `{ storage, activeRequestList }`; a new object is only produced when something actually changed. `db.getSnapshot()` additionally includes each plugin's `getState()` under `pluginStateList`, for devtools/SSR.
 - **`commit` is the single write path.** Every mutation — a request response, `setEntity`, `removeEntityList`, `clearList`, `replaceList` — funnels through `db.commit(changeSet, meta)` in `lib/core/createCdeebee.ts`, which calls `applyChangeSet` (`lib/core/commit.ts`) once and produces at most one new storage object and one `changedList`.
 - **`ChangeSet`.** `{ [listName]: { upsertList?, removeIDList?, replaceList? } }`. `applyChangeSet` compares each incoming entity with `shallowEqual` against the existing one and keeps the old reference when nothing changed, so unaffected entities and unaffected lists never get new references.
-- **Keyed subscriptions + microtask flush.** `SubscriptionManager` (`lib/core/subscription.ts`) tracks listeners at three granularities — global, per-list, per-entity — and batches notifications: a listener is enqueued into a `FlushScheduler` and actually called once per microtask (`db.flush()` flushes synchronously, used by tests). Commits with `meta.source === 'set'` (the local mutations) flush synchronously inside `commit`, so a controlled input bound to `useEntity` never loses its caret; request commits stay microtask-batched. `RequestSubscriptionManager` does the same for `activeRequestList`, keyed by api.
+- **Keyed subscriptions + microtask flush.** `SubscriptionManager` (`lib/core/subscription.ts`) tracks listeners at three granularities — global, per-list, per-entity — and batches notifications: a listener is enqueued into a `FlushScheduler` and actually called once per microtask (`db.flush()` flushes synchronously, used by tests). Commits with `meta.source === 'set'` (the local mutations) flush synchronously inside `commit`, so a controlled input bound to `useEntity` never loses its caret; request commits stay microtask-batched. `createSubscription()` (same file, exported from the core entry) is the string-keyed variant with the same batching: `createCdeebee` uses one for `activeRequestList` keyed by api, the `history` plugin uses one for its state, and app plugins use it for theirs. `notify` takes one key or a list of keys; global listeners (no key list) fire on every notify.
 - **`IndexManager`** (`lib/core/indexManager.ts`) maintains secondary indexes declared in `settings.indexList` incrementally on every commit (`rebuild`/`update`/`get`/`has`), so `db.getIndex(listName, fieldName, value)` and `useEntityListBy` are O(1) lookups instead of a scan.
 - **Request pipeline order** (`lib/core/pipeline.ts`, `runRequest`): an abort check for an already-aborted `options.signal` → `onRequest` (any plugin returning `false` throws an abort) → `fetchWithRetry` (retries only while some plugin's `onRetry` returns a delay) → `onResponse` (the abort signal is re-checked after every hook) → an abort re-check → normalize + `commit` (skipped when `ignoreStorage`) → `onSettled`. On any failure: `onError` then `onSettled`. `onRequest`/`onResponse` throwing aborts the request and rejects it; `onError`/`onSettled` failures are isolated — caught and `console.error`'d, never change the outcome.
 - **Error kinds** (`CdeebeeErrorKind`): `'http'` (non-ok response, body parsed first), `'network'` (fetch itself threw), `'abort'` (external signal, `cancelation`, a plugin's `false`, or an abort mid-parse of a non-ok body), `'parse'` (body could not be parsed as `responseType`).
@@ -105,8 +105,9 @@ Tests: `tests/lib/core/merge.test.ts` pins each rule pairwise; `tests/lib/core/f
 | `useIsLoading()` | any request at all being in flight |
 | `useStore(selector, equalityFn?)` | full state through `selector` (`equalityFn` defaults to `Object.is`); last resort — prefer a more specific hook |
 | `useRequestHistory(api)` / `useRequestErrorList(api)` / `useLastResultIDList(api, listName)` / `useLastResponse(api)` | the `history` plugin's state for `api`; throw if `history()` is not in `settings.pluginList` |
+| `usePluginState(subscribe, getSnapshot, keyList)` (`lib/react/usePluginState.ts`, standalone export) | any `CdeebeeSubscription['subscribe']` notified for one of `keyList`; the primitive under `useLoading` and the history hooks, and the way app plugins expose state to components |
 
-All hooks are built on `useSyncExternalStore`, so they are safe to use with concurrent React features.
+All hooks are built on `useSyncExternalStore`, so they are safe to use with concurrent React features. `getSnapshot` closures are passed inline — `useSyncExternalStore` compares snapshot *values* with `Object.is`, so only the returned reference has to be stable, not the function. `useRef` caches exist only where a hook derives a new array or object per call (`useEntityList`, `useListSelector`, `useEntityListBy`, `useStore`); `lastResultIDList` keeps its array references inside the `history` plugin instead, so `useLastResultIDList` needs none.
 
 ## Important Implementation Notes
 
@@ -120,7 +121,7 @@ File uploads (`options.fileList`) send a `FormData` body: files under `settings.
 
 ### History
 
-The `history` plugin (`lib/plugins/history.ts`) records `doneList`/`errorList`/`lastResultIDList` keyed by api on `onSettled`. Each entry retains the full parsed `response` object, so the cap matters: `maxHistorySize` defaults to `20` entries per api, and `maxHistorySize: 0` (or `Infinity`) makes it unbounded. `lastResultIDList[api]` is left untouched by `ignoreStorage` requests (there is no change set to read ids from). Aborted requests are not recorded unless `ignoreAbort: false`. Clear it with `db.getPlugin('history').clear(api?)`.
+The `history` plugin (`lib/plugins/history.ts`) records `doneList`/`errorList`/`lastResultIDList` keyed by api on `onSettled`. `lastResultIDList[api]` keeps the previous array reference per list (and the previous record when every list is unchanged) when a response repeats the same ids, so consumers can compare by reference. Each entry retains the full parsed `response` object, so the cap matters: `maxHistorySize` defaults to `20` entries per api, and `maxHistorySize: 0` (or `Infinity`) makes it unbounded. `lastResultIDList[api]` is left untouched by `ignoreStorage` requests (there is no change set to read ids from). Aborted requests are not recorded unless `ignoreAbort: false`. Clear it with `db.getPlugin('history').clear(api?)`.
 
 ### Entity ids
 

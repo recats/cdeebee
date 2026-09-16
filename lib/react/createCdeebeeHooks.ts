@@ -1,5 +1,6 @@
 import { useCallback, useRef, useSyncExternalStore } from 'react';
 import { shallowEqual } from '../utils/shallowEqual';
+import { usePluginState } from './usePluginState';
 import type { CdeebeeHistoryEntry, CdeebeeHistoryPlugin } from '../plugins/history';
 import type { CdeebeeInstance, CdeebeeList, CdeebeeState, CdeebeeStorageShape, EntityID, EntityOf, EntityFieldName, ListName } from '../core/types';
 
@@ -112,12 +113,9 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   };
 
-  const useLoading = (apiList: string[]): boolean => {
-    const key = apiList.join('\0');
-    const subscribe = useCallback((listener: () => void) => db.subscribeRequest(listener, apiList), [key]);
-    const getSnapshot = useCallback(() => db.getState().activeRequestList.some(request => apiList.includes(request.api)), [key]);
-    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  };
+  const useLoading = (apiList: string[]): boolean => (
+    usePluginState(db.subscribeRequest, () => db.getState().activeRequestList.some(request => apiList.includes(request.api)), apiList)
+  );
 
   const useIsLoading = (): boolean => {
     const subscribe = useCallback((listener: () => void) => db.subscribeRequest(listener), []);
@@ -153,31 +151,23 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
 
   const useHistorySlice = <R>(api: string, select: (plugin: CdeebeeHistoryPlugin<S>) => R): R => {
     const plugin = getHistoryPlugin();
-    const subscribe = useCallback((listener: () => void) => plugin.subscribe(listener, [api]), [plugin, api]);
-    const getSnapshot = useCallback(() => select(plugin), [plugin, api, select]);
-    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+    return usePluginState(plugin.subscribe, () => select(plugin), [api]);
   };
 
   const useRequestHistory = (api: string): CdeebeeHistoryEntry[] => (
-    useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getState().doneList[api] ?? EMPTY_LIST, [api]))
+    useHistorySlice(api, plugin => plugin.getState().doneList[api] ?? EMPTY_LIST)
   );
 
   const useRequestErrorList = (api: string): CdeebeeHistoryEntry[] => (
-    useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getState().errorList[api] ?? EMPTY_LIST, [api]))
+    useHistorySlice(api, plugin => plugin.getState().errorList[api] ?? EMPTY_LIST)
   );
 
-  const useLastResultIDList = <K extends ListName<S>>(api: string, listName: K): EntityID[] => {
-    const cacheRef = useRef<EntityID[]>(undefined);
-    return useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => {
-      const next = plugin.getState().lastResultIDList[api]?.[listName] ?? EMPTY_LIST;
-      const result = keepIfEqual(cacheRef.current, next);
-      cacheRef.current = result;
-      return result;
-    }, [api, listName]));
-  };
+  const useLastResultIDList = <K extends ListName<S>>(api: string, listName: K): EntityID[] => (
+    useHistorySlice(api, plugin => plugin.getState().lastResultIDList[api]?.[listName] ?? EMPTY_LIST)
+  );
 
   const useLastResponse = <R = unknown>(api: string): R | undefined => (
-    useHistorySlice(api, useCallback((plugin: CdeebeeHistoryPlugin<S>) => plugin.getLast(api)?.response as R | undefined, [api]))
+    useHistorySlice(api, plugin => plugin.getLast(api)?.response as R | undefined)
   );
 
   return {

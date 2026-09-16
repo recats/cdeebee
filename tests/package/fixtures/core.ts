@@ -1,4 +1,4 @@
-import { createCdeebee, queryQueue, type CdeebeeQueryQueueOptions } from '@recats/cdeebee/core';
+import { createCdeebee, createSubscription, queryQueue, type CdeebeePlugin, type CdeebeeQueryQueueOptions, type CdeebeeSubscription } from '@recats/cdeebee/core';
 
 interface Storage { userList: Record<number, { userID: number; name: string }> }
 const options: CdeebeeQueryQueueOptions<Storage> = { key: ctx => ctx.api };
@@ -34,3 +34,16 @@ createCdeebee<TypedStorage>({
   // @ts-expect-error booleans are not supported server versions
   versionKeyList: { itemList: 'active' },
 });
+
+const subscription: CdeebeeSubscription = createSubscription();
+const unsubscribe: () => void = subscription.subscribe(() => {}, ['/x']);
+unsubscribe();
+subscription.notify('/x');
+subscription.notify(['/x', '/y']);
+subscription.flush();
+// @ts-expect-error keys are strings
+subscription.notify(1);
+export const counter = (): CdeebeePlugin<Storage> & { subscribe: CdeebeeSubscription['subscribe']; getState: () => number } => {
+  let count = 0;
+  return { name: 'counter', subscribe: subscription.subscribe, getState: () => count, onSettled: ctx => { count += 1; subscription.notify(ctx.api); } };
+};

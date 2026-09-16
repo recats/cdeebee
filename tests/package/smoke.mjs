@@ -31,7 +31,8 @@ try {
       store.setEntity('userList', 1, { name: 'Ada' });
       if (store.getState().storage.userList[1].name !== 'Ada') throw new Error('store smoke check failed');
       if (typeof db.queryQueue !== 'function') throw new Error('plugin export missing');
-      ${specifier.endsWith('/core') ? '' : "if (typeof db.createCdeebeeHooks !== 'function') throw new Error('React export missing');"}
+      if (typeof db.createSubscription !== 'function') throw new Error('subscription export missing');
+      ${specifier.endsWith('/core') ? '' : "if (typeof db.createCdeebeeHooks !== 'function' || typeof db.usePluginState !== 'function') throw new Error('React export missing');"}
     `);
     execFileSync(process.execPath, [filename], { cwd: temporary, stdio: 'pipe', env: { ...process.env, NODE_PATH: '' } });
   };

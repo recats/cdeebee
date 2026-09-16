@@ -157,6 +157,12 @@ export interface CdeebeeSettings<S> {
 
 export type CdeebeeListener = () => void;
 
+export interface CdeebeeSubscription {
+  subscribe: (listener: CdeebeeListener, keyList?: string[]) => () => void;
+  notify: (keyList: string | string[]) => void;
+  flush: () => void;
+}
+
 export interface CdeebeeInstance<S> {
   settings: CdeebeeSettings<S>;
   pluginList: CdeebeePlugin<S>[];

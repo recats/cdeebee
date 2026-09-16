@@ -2,7 +2,7 @@ import { toEntityID } from '../utils/entityID';
 import { applyChangeSet, type EntityMetaList } from './commit';
 import { IndexManager } from './indexManager';
 import { runRequest } from './pipeline';
-import { SubscriptionManager, RequestSubscriptionManager } from './subscription';
+import { SubscriptionManager, createSubscription } from './subscription';
 import type {
   CdeebeeChangeSet, CdeebeeCommitMeta, CdeebeeInstance, CdeebeePlugin, CdeebeeRequestOptions,
   CdeebeeSettings, CdeebeeState, CdeebeeStorage, CdeebeeStorageShape, EntityID, EntityOf, ListName,
@@ -36,7 +36,7 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
   const nextSeq = () => { seqCounter += 1; return seqCounter; };
 
   const subscriptionManager = new SubscriptionManager<S>();
-  const requestSubscriptionManager = new RequestSubscriptionManager();
+  const requestSubscription = createSubscription();
   const indexManager = new IndexManager<S>(settings.indexList);
   indexManager.rebuild(state.storage);
 
@@ -58,13 +58,13 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
     nextSeq,
     addActiveRequest(api, requestID) {
       state = { ...state, activeRequestList: [...state.activeRequestList, { api, requestID }] };
-      requestSubscriptionManager.notify(api);
+      requestSubscription.notify(api);
     },
     removeActiveRequest(api, requestID) {
       const nextList = state.activeRequestList.filter(request => !(request.api === api && request.requestID === requestID));
       if (nextList.length === state.activeRequestList.length) return;
       state = { ...state, activeRequestList: nextList };
-      requestSubscriptionManager.notify(api);
+      requestSubscription.notify(api);
     },
   };
 
@@ -107,12 +107,12 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
       commit({ [listName]: { replaceList: entityRecord } } as unknown as CdeebeeChangeSet<S>, { source: 'set', label: `replaceList:${listName}` });
     },
     subscribe: (listener, dependencyList) => subscriptionManager.subscribe(listener, dependencyList),
-    subscribeRequest: (listener, apiList) => requestSubscriptionManager.subscribe(listener, apiList),
+    subscribeRequest: (listener, apiList) => requestSubscription.subscribe(listener, apiList),
     getIndex: (listName, fieldName, value) => indexManager.get(listName, fieldName, value),
     request: options => runner(db, internal, options),
     flush: () => {
       subscriptionManager.flush();
-      requestSubscriptionManager.flush();
+      requestSubscription.flush();
     },
   };
 
