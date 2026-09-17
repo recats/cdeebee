@@ -105,12 +105,15 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
       const list = getList(listName);
       const cache = cacheRef.current;
       if (cache && cache.list === list && cache.fieldName === fieldName && shallowEqual(cache.valueList, valueList)) return cache.result;
-      const seen = new Set<EntityID>();
+      const seenValue = valueList.length > 1 ? new Set<unknown>() : undefined;
       const next: EntityOf<S[K]>[] = [];
       for (let i = 0; i < valueList.length; i += 1) {
-        db.getIndex(listName, fieldName, valueList[i]).forEach(entityID => {
-          if (seen.has(entityID)) return;
-          seen.add(entityID);
+        const value = valueList[i];
+        if (seenValue) {
+          if (seenValue.has(value)) continue;
+          seenValue.add(value);
+        }
+        db.getIndex(listName, fieldName, value).forEach(entityID => {
           const entity = list[entityID];
           if (entity !== undefined) next.push(entity);
         });

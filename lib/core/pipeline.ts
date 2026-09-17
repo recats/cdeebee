@@ -23,15 +23,9 @@ const runIsolated = async <S>(plugin: CdeebeePlugin<S>, hook: 'onError' | 'onSet
   }
 };
 
-const runHook = async <S>(plugin: CdeebeePlugin<S>, hook: 'onRequest' | 'onResponse', ctx: CdeebeeRequestContext<S>) => {
-  const fn = plugin[hook];
-  if (!fn) return undefined;
-  try {
-    return await fn(ctx);
-  } catch (error) {
-    throw toRequestError(error, ctx, 'plugin', `plugin "${plugin.name}" ${hook}`);
-  }
-};
+const pluginError = <S>(error: unknown, plugin: CdeebeePlugin<S>, hook: 'onRequest' | 'onResponse', ctx: CdeebeeRequestContext<S>) => (
+  toRequestError(error, ctx, 'plugin', `plugin "${plugin.name}" ${hook}`)
+);
 
 async function fetchWithRetry<S>(ctx: CdeebeeRequestContext<S>, db: CdeebeeInstance<S>): Promise<void> {
   for (;;) {
@@ -105,7 +99,12 @@ export async function runRequest<S, R, D>(
   try {
     if (controller.signal.aborted) throw abortError(ctx);
     for (let i = 0; i < pluginList.length; i += 1) {
-      const result = await runHook(pluginList[i], 'onRequest', ctx);
+      let result: void | false;
+      try {
+        result = await pluginList[i].onRequest?.(ctx);
+      } catch (error) {
+        throw pluginError(error, pluginList[i], 'onRequest', ctx);
+      }
       if (result === false) throw abortError(ctx, `[cdeebee] request ${ctx.api} skipped by plugin "${pluginList[i].name}"`);
     }
     if (controller.signal.aborted) throw abortError(ctx);
@@ -113,7 +112,11 @@ export async function runRequest<S, R, D>(
     await fetchWithRetry(ctx, db);
 
     for (let i = 0; i < pluginList.length; i += 1) {
-      await runHook(pluginList[i], 'onResponse', ctx);
+      try {
+        await pluginList[i].onResponse?.(ctx);
+      } catch (error) {
+        throw pluginError(error, pluginList[i], 'onResponse', ctx);
+      }
       if (controller.signal.aborted) throw abortError(ctx);
     }
 

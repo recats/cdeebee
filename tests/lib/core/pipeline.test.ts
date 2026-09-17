@@ -278,6 +278,19 @@ describe('runRequest', () => {
 
     const db2 = make(mockFetch([jsonResponse(envelope([]))]), { pluginList: [{ name: 'bad', onRequest: () => { throw new Error('early'); } }] });
     await expect(db2.request({ api: '/x' })).rejects.toMatchObject({ kind: 'plugin', message: '[cdeebee] plugin error on /x (plugin "bad" onRequest): early' });
+
+    const db3 = make(mockFetch([jsonResponse(envelope([]))]), { pluginList: [{ name: 'async', onRequest: async () => { throw new Error('later'); } }] });
+    await expect(db3.request({ api: '/x' })).rejects.toMatchObject({ kind: 'plugin', message: '[cdeebee] plugin error on /x (plugin "async" onRequest): later' });
+  });
+
+  it('a synchronous onRequest reaches fetch one microtask after request()', async () => {
+    const fetch = mockFetch([jsonResponse(envelope([]))]);
+    const db = make(fetch, { pluginList: [{ name: 'sync', onRequest: () => undefined }, { name: 'bare' }] });
+    const pending = db.request({ api: '/x' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await pending;
   });
 
   it('a throwing normalize rejects with kind normalize and commits nothing', async () => {
