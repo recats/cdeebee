@@ -23,6 +23,10 @@ try {
     accessSync(join(packageDirectory, entry.import.default));
     accessSync(join(packageDirectory, entry.require.default));
   }
+  const coreChunkName = readdirSync(join(packageDirectory, 'dist')).find(name => name.startsWith('core-') && name.endsWith('.js'));
+  assert.ok(coreChunkName, 'packed dist/ must contain a core-*.js chunk');
+  const coreChunkSource = readFileSync(join(packageDirectory, 'dist', coreChunkName), 'utf8');
+  assert.ok(coreChunkSource.includes('process.env.NODE_ENV'), 'packed core chunk must keep process.env.NODE_ENV as a literal for bundlers to inline');
   const check = (specifier, format) => {
     const filename = join(temporary, `consumer.${format}`);
     const load = format === 'mjs' ? `import * as db from '${specifier}';` : `const db = require('${specifier}');`;

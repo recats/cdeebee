@@ -13,10 +13,10 @@ interface SelectorCache<R> {
   result: R;
 }
 
-interface IndexSelectorCache<R> {
+interface IndexLookupCache<R> {
   list: unknown;
   fieldName: string;
-  value: unknown;
+  valueList: unknown[];
   result: R;
 }
 
@@ -33,6 +33,12 @@ const keepIfEqual = <R>(prev: R | undefined, next: R): R => (
 
 export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: CdeebeeInstance<S>) {
   const getList = <K extends ListName<S>>(listName: K) => db.getState().storage[listName] as unknown as CdeebeeList<EntityOf<S[K]>>;
+
+  const assertIndex = <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>) => {
+    if (!db.settings.indexList?.[listName]?.includes(fieldName)) {
+      throw new Error(`[cdeebee] no index for ${listName}.${fieldName} — add it to settings.indexList`);
+    }
+  };
 
   const useEntity = <K extends ListName<S>>(listName: K, entityID: EntityID | null | undefined): EntityOf<S[K]> | undefined => {
     const subscribe = useCallback(
@@ -91,31 +97,43 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   };
 
-  const useEntityListBy = <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>, value: unknown): EntityOf<S[K]>[] => {
-    if (!db.settings.indexList?.[listName]?.includes(fieldName)) {
-      throw new Error(`[cdeebee] no index for ${listName}.${fieldName} — add it to settings.indexList`);
-    }
-    const cacheRef = useRef<IndexSelectorCache<EntityOf<S[K]>[]>>(undefined);
+  const useIndexLookup = <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>, valueList: unknown[]): EntityOf<S[K]>[] => {
+    assertIndex(listName, fieldName);
+    const cacheRef = useRef<IndexLookupCache<EntityOf<S[K]>[]>>(undefined);
     const subscribe = useCallback((listener: () => void) => db.subscribe(listener, [{ listName }]), [listName]);
     const getSnapshot = () => {
       const list = getList(listName);
       const cache = cacheRef.current;
-      if (cache && cache.list === list && cache.fieldName === fieldName && Object.is(cache.value, value)) return cache.result;
+      if (cache && cache.list === list && cache.fieldName === fieldName && shallowEqual(cache.valueList, valueList)) return cache.result;
+      const seen = new Set<EntityID>();
       const next: EntityOf<S[K]>[] = [];
-      db.getIndex(listName, fieldName, value).forEach(entityID => {
-        const entity = list[entityID];
-        if (entity !== undefined) next.push(entity);
-      });
+      for (let i = 0; i < valueList.length; i += 1) {
+        db.getIndex(listName, fieldName, valueList[i]).forEach(entityID => {
+          if (seen.has(entityID)) return;
+          seen.add(entityID);
+          const entity = list[entityID];
+          if (entity !== undefined) next.push(entity);
+        });
+      }
       const result = keepIfEqual(cache?.result, next);
-      cacheRef.current = { list, fieldName, value, result };
+      cacheRef.current = { list, fieldName, valueList, result };
       return result;
     };
     return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   };
 
-  const useLoading = (apiList: string[]): boolean => (
-    usePluginState(db.subscribeRequest, () => db.getState().activeRequestList.some(request => apiList.includes(request.api)), apiList)
+  const useEntityListBy = <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>, value: unknown): EntityOf<S[K]>[] => (
+    useIndexLookup(listName, fieldName, [value])
   );
+
+  const useEntityListIn = <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>, valueList: unknown[]): EntityOf<S[K]>[] => (
+    useIndexLookup(listName, fieldName, valueList)
+  );
+
+  const useLoading = (api: string | string[]): boolean => {
+    const apiList = typeof api === 'string' ? [api] : api;
+    return usePluginState(db.subscribeRequest, () => db.getState().activeRequestList.some(request => apiList.includes(request.api)), apiList);
+  };
 
   const useIsLoading = (): boolean => {
     const subscribe = useCallback((listener: () => void) => db.subscribeRequest(listener), []);
@@ -176,6 +194,7 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     useEntityList,
     useListSelector,
     useEntityListBy,
+    useEntityListIn,
     useLoading,
     useIsLoading,
     useStore,

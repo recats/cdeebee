@@ -2,6 +2,7 @@ import { toEntityID } from '../utils/entityID';
 import { applyChangeSet, type EntityMetaList } from './commit';
 import { IndexManager } from './indexManager';
 import { runRequest } from './pipeline';
+import { CdeebeeRequestError } from './requestError';
 import { SubscriptionManager, createSubscription } from './subscription';
 import type {
   CdeebeeChangeSet, CdeebeeCommitMeta, CdeebeeInstance, CdeebeePlugin, CdeebeeRequestOptions,
@@ -110,6 +111,14 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
     subscribeRequest: (listener, apiList) => requestSubscription.subscribe(listener, apiList),
     getIndex: (listName, fieldName, value) => indexManager.get(listName, fieldName, value),
     request: options => runner(db, internal, options),
+    requestSettled: async options => {
+      try {
+        return { ok: true, response: await runner(db, internal, options) };
+      } catch (error) {
+        if (!(error instanceof CdeebeeRequestError)) throw error;
+        return { ok: false, error };
+      }
+    },
     flush: () => {
       subscriptionManager.flush();
       requestSubscription.flush();

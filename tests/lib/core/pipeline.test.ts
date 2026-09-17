@@ -248,6 +248,47 @@ describe('runRequest', () => {
     expect(db.getState().activeRequestList).toEqual([]);
   });
 
+  it('removes its listener from a shared external signal once the request settles', async () => {
+    const controller = new AbortController();
+    const addSpy = vi.spyOn(controller.signal, 'addEventListener');
+    const removeSpy = vi.spyOn(controller.signal, 'removeEventListener');
+    const db = make(mockFetch([jsonResponse(envelope([]))]));
+    await db.request({ api: '/x', signal: controller.signal });
+    await db.request({ api: '/x', signal: controller.signal });
+    expect(addSpy).toHaveBeenCalledTimes(2);
+    expect(removeSpy).toHaveBeenCalledTimes(2);
+    const [, onAbort] = addSpy.mock.calls[0];
+    expect(removeSpy.mock.calls[0][1]).toBe(onAbort);
+  });
+
+  it('removes the listener when the request rejects', async () => {
+    const controller = new AbortController();
+    const removeSpy = vi.spyOn(controller.signal, 'removeEventListener');
+    const db = make(mockFetch([new TypeError('down')]));
+    await db.request({ api: '/x', signal: controller.signal }).catch(() => undefined);
+    expect(removeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a throwing onRequest / onResponse rejects with kind plugin naming the plugin', async () => {
+    const db = make(mockFetch([jsonResponse(envelope([]))]), { pluginList: [{ name: 'bad', onResponse: () => { throw new Error('hook bug'); } }] });
+    const error = await db.request({ api: '/x' }).catch(e => e) as CdeebeeRequestError;
+    expect(error.kind).toBe('plugin');
+    expect(error.message).toBe('[cdeebee] plugin error on /x (plugin "bad" onResponse): hook bug');
+    expect(db.getState().storage.userList).toEqual({});
+
+    const db2 = make(mockFetch([jsonResponse(envelope([]))]), { pluginList: [{ name: 'bad', onRequest: () => { throw new Error('early'); } }] });
+    await expect(db2.request({ api: '/x' })).rejects.toMatchObject({ kind: 'plugin', message: '[cdeebee] plugin error on /x (plugin "bad" onRequest): early' });
+  });
+
+  it('a throwing normalize rejects with kind normalize and commits nothing', async () => {
+    const db = make(mockFetch([jsonResponse(envelope([{ userID: 1, name: 'a' }]))]), { normalize: () => { throw new Error('shape'); } });
+    const error = await db.request({ api: '/x' }).catch(e => e) as CdeebeeRequestError;
+    expect(error.kind).toBe('normalize');
+    expect(error.message).toBe('[cdeebee] normalize error on /x: shape');
+    expect(db.getState().storage.userList).toEqual({});
+    expect(db.getState().activeRequestList).toEqual([]);
+  });
+
   it('options.meta is exposed to plugins as ctx.meta (empty object by default)', async () => {
     const seen: unknown[] = [];
     const db = make(mockFetch([jsonResponse({})]), { pluginList: [{

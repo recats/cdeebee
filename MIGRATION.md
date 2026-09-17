@@ -16,7 +16,7 @@ cdeebee 4.0 removes the Redux dependency entirely. `createCdeebee` now builds an
 | `slice.actions.set(valueList)` | `db.setEntity` / `db.commit`; `batchingUpdate` remains as a utility for your own state |
 | `slice.actions.historyClear(api)` / `historyClear: true` | `historyClear: true` request option (same semantics) or `db.getPlugin('history').clear(api)` |
 | `state.cdeebee.storage.xList` | `db.getState().storage.xList` / `useList('xList')` |
-| `state.cdeebee.request.active` | `db.getState().activeRequestList` / `useLoading(apiList)` |
+| `state.cdeebee.request.active` | `db.getState().activeRequestList` / `useLoading(api)` |
 | `useStorageList(list)` / `useStorage()` | `useList(list)` / `useStore(s => s.storage)` |
 | `useRequestHistory` / `useRequestErrors` / `useLastResultIdList` | `useRequestHistory` / `useRequestErrorList` / `useLastResultIDList` / `useLastResponse` (history plugin required) |
 | `useLastResultIdList(api, list): string[]` | `useLastResultIDList(api, list): EntityID[]` — ids keep their original type (`string \| number`), numeric-looking ones come back as numbers |
@@ -45,3 +45,11 @@ cdeebee 4.0 removes the Redux dependency entirely. `createCdeebee` now builds an
 4. **Rename hooks** at call sites: `useStorageList` → `useList`, `useStorage` → `useStore(s => s.storage)`, `useRequestErrors` → `useRequestErrorList`, `useLastResultIdList` → `useLastResultIDList`. `createCdeebeeHooks` now takes the `db` instance instead of a state selector.
 5. **Delete `normalize` helpers that deep-merged.** `patch` (the default) keeps stored values for keys a response omits or sends as `[]`; `upsert` replaces the entity whole. List every full-fetch and save endpoint in `settings.apiStrategyList` as `upsert`, and set `settings.versionKeyList` for lists whose entities carry `updatedAt` (see the README's "Freshness and completeness" section).
 6. **Run the app with `devtools()` attached** and compare snapshots against the 3.x Redux DevTools trace for the same flows, to catch any strategy or ordering regression before removing the old store.
+
+## 4.0.0-beta.6
+
+- `CdeebeeErrorKind` gains `'plugin'` (an `onRequest`/`onResponse` hook threw) and `'normalize'` (`normalize` threw). Both were reported as `'network'` before. Handlers that branch on `kind === 'network'` no longer see these failures; an exhaustive `switch` or `Record<CdeebeeErrorKind, …>` needs the two new members.
+- `useLoading(api)` also accepts a single api string.
+- `useEntityListIn(listName, fieldName, valueList)` reads an index for several values at once.
+- `db.requestSettled(options)` resolves `{ ok: true, response } | { ok: false, error }` instead of rejecting with a `CdeebeeRequestError`.
+- `isDev()` reads `process.env.NODE_ENV` as a literal so bundlers can inline it; dev-only warnings now reach the browser.

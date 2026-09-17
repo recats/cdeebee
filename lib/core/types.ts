@@ -73,7 +73,7 @@ export interface CdeebeeSnapshot<S> {
   pluginStateList: Record<string, unknown>;
 }
 
-export type CdeebeeErrorKind = 'http' | 'network' | 'abort' | 'parse';
+export type CdeebeeErrorKind = 'http' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize';
 
 export interface CdeebeeFetchSettings {
   baseUrl?: string;
@@ -110,6 +110,10 @@ export interface CdeebeeRequestOptions<S, R = unknown, D = unknown> {
   historyClear?: boolean;
   meta?: Record<string, unknown>;
 }
+
+export type CdeebeeRequestResult<R> =
+  | { ok: true; response: R; error?: undefined }
+  | { ok: false; response?: undefined; error: CdeebeeRequestError };
 
 export interface CdeebeeRequestContext<S> {
   requestID: string;
@@ -183,5 +187,6 @@ export interface CdeebeeInstance<S> {
   subscribeRequest: (listener: CdeebeeListener, apiList?: string[]) => () => void;
   getIndex: <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>, value: unknown) => ReadonlySet<EntityID>;
   request: <R = unknown, D = unknown>(options: CdeebeeRequestOptions<S, R, D>) => Promise<R>;
+  requestSettled: <R = unknown, D = unknown>(options: CdeebeeRequestOptions<S, R, D>) => Promise<CdeebeeRequestResult<R>>;
   flush: () => void;
 }

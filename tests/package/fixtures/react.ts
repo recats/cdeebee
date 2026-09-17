@@ -18,3 +18,9 @@ export function useSettledCount(api: string): number {
   void invalid;
   return count;
 }
+
+export function useHookSurface() {
+  const inList = hooks.useEntityListIn('userList', 'userID', [1, 2]);
+  const single = hooks.useLoading('/x');
+  void inList; void single;
+}
