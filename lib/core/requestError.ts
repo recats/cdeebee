@@ -33,17 +33,23 @@ export function isAbortError(error: unknown): boolean {
   return error instanceof CdeebeeRequestError && error.kind === 'abort';
 }
 
-export function toRequestError(error: unknown, ctx: { api: string; requestID: string }): CdeebeeRequestError {
+export function toRequestError(
+  error: unknown,
+  ctx: { api: string; requestID: string },
+  kind: 'network' | 'plugin' | 'normalize' = 'network',
+  source?: string,
+): CdeebeeRequestError {
   if (error instanceof CdeebeeRequestError) return error;
   if (error instanceof Error && error.name === 'AbortError') {
     return new CdeebeeRequestError({ kind: 'abort', api: ctx.api, requestID: ctx.requestID, cause: error });
   }
   const message = error instanceof Error ? error.message : String(error);
+  const where = source === undefined ? '' : ` (${source})`;
   return new CdeebeeRequestError({
-    kind: 'network',
+    kind,
     api: ctx.api,
     requestID: ctx.requestID,
-    message: `[cdeebee] network error on ${ctx.api}: ${message}`,
+    message: `[cdeebee] ${kind} error on ${ctx.api}${where}: ${message}`,
     cause: error,
   });
 }

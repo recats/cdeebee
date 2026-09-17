@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createCdeebee } from '../../../lib/core/createCdeebee';
+import { createCdeebee, type RequestRunner } from '../../../lib/core/createCdeebee';
+import { CdeebeeRequestError } from '../../../lib/core/requestError';
 import type { CdeebeePlugin } from '../../../lib/core/types';
+import { jsonResponse, mockFetch } from '../test-helpers';
 
 interface User { userID: number; name: string; orgID: number }
 interface S { userList: Record<number, User>; postList: Record<number, { postID: number }> }
@@ -114,6 +116,32 @@ describe('createCdeebee store', () => {
       { source: 'set', label: 'setEntity:postList' },
       [{ listName: 'postList', entityIDList: [3] }],
     );
+  });
+
+  it('requestSettled resolves ok/error instead of throwing', async () => {
+    const okDb = createCdeebee<S>({ fetch: { fetch: mockFetch([jsonResponse({ hello: 1 })]) }, primaryKeyList: { userList: 'userID', postList: 'postID' } });
+    const ok = await okDb.requestSettled<{ hello: number }>({ api: '/x' });
+    expect(ok).toEqual({ ok: true, response: { hello: 1 } });
+
+    const badDb = createCdeebee<S>({ fetch: { fetch: mockFetch([new TypeError('down')]) }, primaryKeyList: { userList: 'userID', postList: 'postID' } });
+    const bad = await badDb.requestSettled({ api: '/x' });
+    expect(bad.ok).toBe(false);
+    expect(bad.error).toBeInstanceOf(CdeebeeRequestError);
+    expect(bad.error?.kind).toBe('network');
+    expect(badDb.getState().activeRequestList).toEqual([]);
+  });
+
+  it('requestSettled captures abort and rethrows non-cdeebee errors', async () => {
+    const abortDb = createCdeebee<S>({ fetch: { fetch: mockFetch([jsonResponse({})]) }, primaryKeyList: { userList: 'userID', postList: 'postID' } });
+    const controller = new AbortController();
+    controller.abort();
+    const aborted = await abortDb.requestSettled({ api: '/x', signal: controller.signal });
+    expect(aborted.ok).toBe(false);
+    expect(aborted.error?.kind).toBe('abort');
+
+    const runner: RequestRunner = async () => { throw new Error('bug'); };
+    const bugDb = createCdeebee<S>({ fetch: {}, primaryKeyList: { userList: 'userID', postList: 'postID' } }, runner);
+    await expect(bugDb.requestSettled({ api: '/x' })).rejects.toThrow('bug');
   });
 
 });

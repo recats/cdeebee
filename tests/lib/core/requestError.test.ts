@@ -39,4 +39,13 @@ describe('CdeebeeRequestError', () => {
     expect(e.cause).toBe(cause);
     expect(e.message).toContain('Failed to fetch');
   });
+
+  it('toRequestError uses the fallback kind and source label', () => {
+    const error = toRequestError(new Error('boom'), { api: '/x', requestID: 'r1' }, 'plugin', 'plugin "notification" onResponse');
+    expect(error.kind).toBe('plugin');
+    expect(error.message).toBe('[cdeebee] plugin error on /x (plugin "notification" onResponse): boom');
+    expect(error.cause).toBeInstanceOf(Error);
+    const abort = toRequestError(new DOMException('aborted', 'AbortError'), { api: '/x', requestID: 'r1' }, 'plugin');
+    expect(abort.kind).toBe('abort');
+  });
 });

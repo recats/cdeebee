@@ -6,11 +6,18 @@ const bareOptions: CdeebeeQueryQueueOptions = { apiList: ['/x'] };
 export const db = createCdeebee<Storage>({
   fetch: {},
   primaryKeyList: { userList: 'userID' },
+  indexList: { userList: ['userID'] },
   pluginList: [queryQueue(options), queryQueue<Storage>(bareOptions), queryQueue(bareOptions)],
 });
 db.setEntity('userList', 1, { name: 'Ada' });
 const name: string = db.getState().storage.userList[1].name;
 void name;
+async function useSettled() {
+  const settled = await db.requestSettled<{ hello: number }>({ api: '/x' });
+  if (settled.ok) { const n: number = settled.response.hello; void n; }
+  else { const kind: string = settled.error.kind; void kind; }
+}
+void useSettled;
 // @ts-expect-error entity fields must retain their declared types
 db.setEntity('userList', 1, { name: 123 });
 // @ts-expect-error list names must be checked

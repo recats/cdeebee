@@ -152,6 +152,47 @@ describe('createCdeebeeHooks', () => {
     expect(screen.getByTestId('l').textContent).toBe('false|false|false');
   });
 
+  it('useEntityListIn reads several index values in order and keeps the reference when unchanged', async () => {
+    const { db, hooks } = make();
+    const seen: unknown[] = [];
+    const Comp = ({ valueList }: { valueList: number[] }) => {
+      const result = hooks.useEntityListIn('userList', 'orgID', valueList);
+      seen.push(result);
+      return <span data-testid='in'>{result.map(u => u.name).join(',')}</span>;
+    };
+    const { rerender } = render(<Comp valueList={[20, 10]} />);
+    expect(screen.getByTestId('in').textContent).toBe('c,a,b');
+    rerender(<Comp valueList={[20, 10]} />);
+    expect(seen[seen.length - 1]).toBe(seen[0]);
+    await act(async () => { db.setEntity('userList', 4, { name: 'd', orgID: 20 } as Partial<User>); });
+    expect(screen.getByTestId('in').textContent).toBe('c,d,a,b');
+    rerender(<Comp valueList={[99]} />);
+    expect(screen.getByTestId('in').textContent).toBe('');
+    rerender(<Comp valueList={[10, 20, 10]} />);
+    expect(screen.getByTestId('in').textContent).toBe('a,b,c,d');
+    rerender(<Comp valueList={[]} />);
+    expect(screen.getByTestId('in').textContent).toBe('');
+
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const Bad = () => { hooks.useEntityListIn('userList', 'name', ['a']); return null; };
+    expect(() => render(<Bad />)).toThrow('[cdeebee] no index for userList.name');
+    spy.mockRestore();
+  });
+
+  it('useLoading accepts a single api string', async () => {
+    const d = deferred<Response>();
+    const fetch = vi.fn(() => d.promise) as unknown as typeof globalThis.fetch;
+    const { db, hooks } = make({ fetch: { fetch } });
+    const Comp = () => <span data-testid='one'>{String(hooks.useLoading('/x'))}</span>;
+    render(<Comp />);
+    expect(screen.getByTestId('one').textContent).toBe('false');
+    let promise!: Promise<unknown>;
+    await act(async () => { promise = db.request({ api: '/x' }); });
+    expect(screen.getByTestId('one').textContent).toBe('true');
+    await act(async () => { d.resolve(jsonResponse({})); await promise; });
+    expect(screen.getByTestId('one').textContent).toBe('false');
+  });
+
   it('useStore with equalityFn bails out on equal results', async () => {
     const { db, hooks } = make();
     let renderCount = 0;
@@ -422,7 +463,7 @@ describe('list hook changes', () => {
 const strictWrapper = ({ children }: PropsWithChildren) => <StrictMode>{children}</StrictMode>;
 
 describe('subscriptions under StrictMode', () => {
-  const hookNames = ['useEntity', 'useList', 'useEntityList', 'useListSelector', 'useEntityListBy', 'useLoading', 'useIsLoading', 'useStore', 'useRequestHistory', 'useRequestErrorList', 'useLastResultIDList', 'useLastResponse'] as const;
+  const hookNames = ['useEntity', 'useList', 'useEntityList', 'useListSelector', 'useEntityListBy', 'useEntityListIn', 'useLoading', 'useIsLoading', 'useStore', 'useRequestHistory', 'useRequestErrorList', 'useLastResultIDList', 'useLastResponse'] as const;
   it.each(hookNames)('%s cleans up all subscriptions on unmount', async hookName => {
     const plugin = history<S>();
     const { db, hooks } = make({ pluginList: [plugin] });
@@ -445,6 +486,7 @@ describe('subscriptions under StrictMode', () => {
         case 'useEntityList': return hooks.useEntityList('userList', [1, 2]);
         case 'useListSelector': return hooks.useListSelector('userList', list => Object.keys(list));
         case 'useEntityListBy': return hooks.useEntityListBy('userList', 'orgID', 10);
+        case 'useEntityListIn': return hooks.useEntityListIn('userList', 'orgID', [10]);
         case 'useLoading': return hooks.useLoading(['/x']);
         case 'useIsLoading': return hooks.useIsLoading();
         case 'useStore': return hooks.useStore(state => state.storage.userList);

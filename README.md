@@ -35,7 +35,7 @@ export const db = createCdeebee<Storage>({
   initialStorage: typeof window !== 'undefined' ? window.__PRELOADED_STATE__?.storage : undefined,
 });
 
-export const { useEntity, useList, useEntityList, useListSelector, useEntityListBy, useLoading, useIsLoading, useStore, useRequestHistory, useRequestErrorList, useLastResultIDList, useLastResponse } = createCdeebeeHooks(db);
+export const { useEntity, useList, useEntityList, useListSelector, useEntityListBy, useEntityListIn, useLoading, useIsLoading, useStore, useRequestHistory, useRequestErrorList, useLastResultIDList, useLastResponse } = createCdeebeeHooks(db);
 ```
 
 ```ts
@@ -152,7 +152,7 @@ A rejected request throws a `CdeebeeRequestError`:
 
 ```ts
 interface CdeebeeRequestError extends Error {
-  kind: 'http' | 'network' | 'abort' | 'parse';
+  kind: 'http' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize';
   api: string;
   requestID: string;
   status?: number;
@@ -164,6 +164,8 @@ interface CdeebeeRequestError extends Error {
 - `'network'` — `fetch` itself threw (offline, DNS, CORS, ...).
 - `'abort'` — the request was aborted (external `signal`, `cancelation` plugin, or a plugin returning `false` from `onRequest`), including an abort that happens while a non-ok response body is still being parsed.
 - `'parse'` — the response body could not be parsed as the requested `responseType`.
+- `'plugin'` — a plugin's `onRequest` or `onResponse` threw; the message names the plugin and hook. Nothing is committed.
+- `'normalize'` — `normalize` (the request's, the settings', or the default) threw. Nothing is committed.
 
 `isAbortError(error)` is a type guard for the `'abort'` kind, useful for silencing expected cancellations:
 
@@ -179,6 +181,14 @@ try {
 }
 ```
 
+`db.requestSettled(options)` runs the same pipeline but resolves `{ ok: true, response }` or `{ ok: false, error }` instead of rejecting; only a `CdeebeeRequestError` is captured — anything else a custom `runner` throws still propagates, for callers that branch on both outcomes:
+
+```ts
+const result = await db.requestSettled<UserListResponse>({ api: '/user/list' });
+if (!result.ok) return showError(result.error);
+render(result.response);
+```
+
 ## Hooks
 
 All hooks are returned from `createCdeebeeHooks(db)` and only re-render a component when the data it actually reads changes.
@@ -190,7 +200,8 @@ All hooks are returned from `createCdeebeeHooks(db)` and only re-render a compon
 | `useEntityList(listName, entityIDList)` | any of the listed entities |
 | `useListSelector(listName, selector, depList?)` | the list or `depList`, re-running `selector`; keeps the previous array reference when the result is shallow-equal. `selector` runs again only when the list or `depList` changes, so list every prop it closes over, like `useMemo`; for one entity by id use `useEntity` |
 | `useEntityListBy(listName, fieldName, value)` | the list, reading through an index configured in `settings.indexList`; `fieldName` is typed to the entity's own keys and it throws if that `(listName, fieldName)` pair was not indexed. Order is index insertion order (first seen), stable across edits that do not change the indexed field; not sorted |
-| `useLoading(apiList)` | whether any api in `apiList` is currently in flight |
+| `useEntityListIn(listName, fieldName, valueList)` | same index as `useEntityListBy`, for several values at once: entities whose `fieldName` is any of `valueList`, each once, in `valueList` order then index insertion order. Replaces a loop of `getIndex` calls inside a `useListSelector` |
+| `useLoading(api)` | whether `api` (one string or a list) is currently in flight |
 | `useIsLoading()` | whether any request at all is currently in flight |
 | `useStore(selector, equalityFn?)` | the whole state (storage + `activeRequestList`), through `selector`; `equalityFn` defaults to `Object.is` |
 | `useRequestHistory(api)` | successful request history for `api` (requires the `history` plugin) |
@@ -225,7 +236,7 @@ onRequest → fetch (+ onRetry loop) → onResponse → commit → onCommit → 
          ↘ failure ─────────────────────────────────────→ onError → onSettled → reject
 ```
 
-`onRequest`/`onResponse` throwing (or `onRequest` returning `false`) aborts the request and rejects the promise. `onError`/`onSettled` failures are isolated: they are logged with `console.error` and never change the request's outcome. The abort signal is re-checked after every `onResponse` hook and right before the response is committed, so an abort that lands after the network call still completes is honored — the response is never stored. A `signal` that is already aborted when `db.request` is called rejects immediately, before any `onRequest` hook runs. Per-request data for plugins travels in `options.meta` and is read as `ctx.meta`.
+`onRequest`/`onResponse` throwing rejects the request with `kind: 'plugin'` (the message names the plugin and hook); `onRequest` returning `false` aborts it with `kind: 'abort'`. `onError`/`onSettled` failures are isolated: they are logged with `console.error` and never change the request's outcome. The abort signal is re-checked after every `onResponse` hook and right before the response is committed, so an abort that lands after the network call still completes is honored — the response is never stored. A `signal` that is already aborted when `db.request` is called rejects immediately, before any `onRequest` hook runs. Per-request data for plugins travels in `options.meta` and is read as `ctx.meta`.
 
 ```ts
 interface CdeebeePlugin<Storage> {

@@ -23,6 +23,16 @@ const runIsolated = async <S>(plugin: CdeebeePlugin<S>, hook: 'onError' | 'onSet
   }
 };
 
+const runHook = async <S>(plugin: CdeebeePlugin<S>, hook: 'onRequest' | 'onResponse', ctx: CdeebeeRequestContext<S>) => {
+  const fn = plugin[hook];
+  if (!fn) return undefined;
+  try {
+    return await fn(ctx);
+  } catch (error) {
+    throw toRequestError(error, ctx, 'plugin', `plugin "${plugin.name}" ${hook}`);
+  }
+};
+
 async function fetchWithRetry<S>(ctx: CdeebeeRequestContext<S>, db: CdeebeeInstance<S>): Promise<void> {
   for (;;) {
     try {
@@ -55,9 +65,15 @@ export async function runRequest<S, R, D>(
   const { settings, pluginList } = db;
   const requestID = generateRequestID();
   const controller = new AbortController();
-  if (options.signal) {
-    if (options.signal.aborted) controller.abort();
-    else options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+  let detachSignal: () => void = () => {};
+  const externalSignal = options.signal;
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else {
+      const onAbort = () => controller.abort();
+      externalSignal.addEventListener('abort', onAbort, { once: true });
+      detachSignal = () => externalSignal.removeEventListener('abort', onAbort);
+    }
   }
 
   const ctx: CdeebeeRequestContext<S> = {
@@ -81,6 +97,7 @@ export async function runRequest<S, R, D>(
   const settle = async () => {
     if (settled) return;
     settled = true;
+    detachSignal();
     internal.removeActiveRequest(ctx.api, requestID);
     for (let i = 0; i < pluginList.length; i += 1) await runIsolated(pluginList[i], 'onSettled', ctx);
   };
@@ -88,7 +105,7 @@ export async function runRequest<S, R, D>(
   try {
     if (controller.signal.aborted) throw abortError(ctx);
     for (let i = 0; i < pluginList.length; i += 1) {
-      const result = await pluginList[i].onRequest?.(ctx);
+      const result = await runHook(pluginList[i], 'onRequest', ctx);
       if (result === false) throw abortError(ctx, `[cdeebee] request ${ctx.api} skipped by plugin "${pluginList[i].name}"`);
     }
     if (controller.signal.aborted) throw abortError(ctx);
@@ -96,7 +113,7 @@ export async function runRequest<S, R, D>(
     await fetchWithRetry(ctx, db);
 
     for (let i = 0; i < pluginList.length; i += 1) {
-      await pluginList[i].onResponse?.(ctx);
+      await runHook(pluginList[i], 'onResponse', ctx);
       if (controller.signal.aborted) throw abortError(ctx);
     }
 
@@ -105,13 +122,17 @@ export async function runRequest<S, R, D>(
     if (!options.ignoreStorage) {
       const normalize = (options.normalize ?? settings.normalize ?? defaultNormalize) as CdeebeeNormalize<S, unknown>;
       const strategyList = { ...(settings.strategyList ?? {}), ...(settings.apiStrategyList?.[ctx.api] ?? {}), ...(options.strategyList ?? {}) } as CdeebeeStrategyList<S>;
-      ctx.changeSet = normalize(ctx.response, {
-        storage: db.getState().storage,
-        primaryKeyList: settings.primaryKeyList,
-        strategyList,
-        api: ctx.api,
-        requestID,
-      });
+      try {
+        ctx.changeSet = normalize(ctx.response, {
+          storage: db.getState().storage,
+          primaryKeyList: settings.primaryKeyList,
+          strategyList,
+          api: ctx.api,
+          requestID,
+        });
+      } catch (error) {
+        throw toRequestError(error, ctx, 'normalize');
+      }
       db.commit(ctx.changeSet, { source: 'request', api: ctx.api, requestID, seq: ctx.seq, label: `request:${ctx.api}` });
     }
 

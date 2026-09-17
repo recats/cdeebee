@@ -4,7 +4,7 @@ import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 
 export default defineConfig({
-  plugins: [dts({ include: ['lib'], outDir: 'dist', rollupTypes: false })],
+  plugins: [dts({ include: ['lib'], outDir: 'dist', rollupTypes: false, compilerOptions: { types: ['node'] } })],
   build: {
     lib: {
       entry: { index: resolve(import.meta.dirname, 'lib/index.ts'), core: resolve(import.meta.dirname, 'lib/core.ts') },
