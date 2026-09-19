@@ -8,7 +8,7 @@ cdeebee is a standalone normalized data store with a typed request pipeline: it 
 pnpm add @recats/cdeebee
 ```
 
-Peer dependency: `react >= 19`. If you only need the store and request pipeline (no React), import from `@recats/cdeebee/core` — that entry point has no React dependency at all and can be used in workers, tests, or non-React apps.
+React hooks require `react >= 19`, installed by the application. React is an optional peer dependency: consumers of `@recats/cdeebee/core` do not need to install it. The core entry works in workers, tests, or non-React apps.
 
 ## Quick start
 
@@ -61,7 +61,9 @@ createCdeebee<Storage>({
 
 An API response is expected to carry one or more list envelopes shaped `{ data: [...], primaryKey: 'fieldName' }`. On a successful request, each envelope is normalized into `storage.<listName>[entityID]` — keyed by the entity's primary key. Any other key on the response (not a list envelope) is not stored; it is only available on the value the request promise resolves with.
 
-`primaryKeyList` (passed to `createCdeebee`) is the source of truth for each list's primary key field, not the response's own `primaryKey`. If they disagree, cdeebee warns in development (`console.warn`) and uses the configured key.
+`primaryKeyList` defines the storage schema and each list's primary key. The default normalizer ignores undeclared lists; their data remains available in the full response. A custom normalizer or direct `commit` that names an undeclared list is rejected before writing any of its lists. If an envelope's `primaryKey` disagrees with the configured key, cdeebee warns in development and uses the configured key.
+
+Storage and history dictionaries have no prototype, so IDs and API names such as `__proto__` and `constructor` are ordinary keys. Use `Object.keys`, `Object.values`, or `Object.hasOwn` to inspect them. Entities are plain data objects; stored objects, arrays, and index sets are borrowed read-only values. Do not mutate them or pass an object to the store and mutate it later; use the mutation methods instead. Equality is shallow: freshly parsed nested objects count as changed even if their contents match.
 
 ## Strategies
 
@@ -89,9 +91,9 @@ Save and full-fetch endpoints **must** be `upsert`: with `patch`, a field the se
 
 ## Freshness and completeness
 
-Two responses can carry the same entity and disagree — because one is thin and the other full, or because the server changed between them. cdeebee keeps two facts per stored entity and resolves every write with them, so the result does not depend on the order responses arrive:
+Two responses can carry the same entity and disagree — because one is thin and the other full, or because the server changed between them. cdeebee tracks version and completeness per stored entity, together with request send sequences and deletion boundaries:
 
-- **version** — the server's own version of the entity, read through `settings.versionKeyList` (`{ itemList: 'updatedAt' }`; numbers as-is, ISO timestamps parsed to ms). When absent, the **send order** of the request stands in: the response to a later-issued request wins.
+- **version** — the server's own version of the entity, read through `settings.versionKeyList` (`{ itemList: 'updatedAt' }`; finite numbers as-is, ISO timestamps parsed to ms). When absent, the **send order** of the request stands in: the response to a later-issued request wins.
 - **complete** — set once an `upsert`/`replaceList` write landed at the current version; from then on an older write is dropped instead of merged.
 
 | incoming write | stored entity | result |
@@ -115,7 +117,14 @@ Storage can also be changed without a request, through the same commit path (so 
 - `db.removeEntityList(listName, entityIDList)` — removes entities by id.
 - `db.clearList(listName)` — empties a list.
 - `db.replaceList(listName, entityRecord)` — replaces a whole list with a keyed record.
+- `db.reset()` — empties every list and built-in plugin state, aborts pending requests, and clears loading. Keeps settings, subscriptions, and indexes so the same store can serve a new session; it does not restore `initialStorage`.
 - `db.commit(changeSet, meta)` — the low-level primitive all of the above call; use it directly to touch several lists atomically in one `{ listName: { upsertList, removeIDList, replaceList } }` change set.
+
+### Session reset
+
+Call `db.reset()` when logging out or switching accounts, after updating the credentials supplied by your fetch settings. It advances the store's request generation and list boundaries: a response from the old session cannot repopulate storage or history, including when a custom fetch ignores its abort signal. New requests use fresh cancellation and queue slots. The store remains usable and existing hooks remain subscribed.
+
+Stateful custom plugins implement synchronous `onReset()` to clear their state and release resources. Requests started before reset receive no further error/settled hooks; `onReset` replaces their cleanup. Hooks already executing cannot be forcibly stopped: asynchronous plugin code must honor `ctx.controller.signal` before performing its own side effects after an `await`. Reset clears library-owned data, not application state held elsewhere.
 
 ### Deletions and resets
 
@@ -144,7 +153,7 @@ A removal leaves a sequence tombstone and a reset (`clearList` / `replaceList`) 
 | `historyClear` | `boolean` | Clear the `history` plugin's entries for this `api` before the request starts — the classic "reset the form's server error on resubmit". |
 | `meta` | `Record<string, unknown>` | Free-form data for your plugins, exposed as `ctx.meta` (defaults to `{}`), e.g. `meta: { silentError: true }`. |
 
-The library always sets an `ui-request-id` header to the request's internal id; it cannot be overridden by `headerList`. For JSON bodies, callers may set their own `Content-Type` via `headerList`.
+The library always sets an `ui-request-id` header to the request's internal id; it cannot be overridden by `headerList`. Header names are merged case-insensitively: per-request values replace settings, and `ui-request-id` remains library-owned. For JSON bodies, callers may set their own `Content-Type` via `headerList`.
 
 ## Errors
 
@@ -152,7 +161,7 @@ A rejected request throws a `CdeebeeRequestError`:
 
 ```ts
 interface CdeebeeRequestError extends Error {
-  kind: 'http' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize';
+  kind: 'http' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize' | 'request';
   api: string;
   requestID: string;
   status?: number;
@@ -162,10 +171,11 @@ interface CdeebeeRequestError extends Error {
 
 - `'http'` — the server responded with a non-ok status; `status` and the parsed body (`response`) are set.
 - `'network'` — `fetch` itself threw (offline, DNS, CORS, ...).
+- `'request'` — preparing the URL, dynamic headers/data, or request body failed before fetch was called. These failures are not retried.
 - `'abort'` — the request was aborted (external `signal`, `cancelation` plugin, or a plugin returning `false` from `onRequest`), including an abort that happens while a non-ok response body is still being parsed.
 - `'parse'` — the response body could not be parsed as the requested `responseType`.
-- `'plugin'` — a plugin's `onRequest` or `onResponse` threw; the message names the plugin and hook. Nothing is committed.
-- `'normalize'` — `normalize` (the request's, the settings', or the default) threw. Nothing is committed.
+- `'plugin'` — a plugin's `onRequest`, `onResponse`, or `onRetry` threw, or a retry hook returned an invalid delay; the message names the plugin and hook. Nothing is committed.
+- `'normalize'` — normalization failed or returned a change set with undeclared lists. Nothing is committed.
 
 `isAbortError(error)` is a type guard for the `'abort'` kind, useful for silencing expected cancellations:
 
@@ -236,7 +246,7 @@ onRequest → fetch (+ onRetry loop) → onResponse → commit → onCommit → 
          ↘ failure ─────────────────────────────────────→ onError → onSettled → reject
 ```
 
-`onRequest`/`onResponse` throwing rejects the request with `kind: 'plugin'` (the message names the plugin and hook); `onRequest` returning `false` aborts it with `kind: 'abort'`. `onError`/`onSettled` failures are isolated: they are logged with `console.error` and never change the request's outcome. The abort signal is re-checked after every `onResponse` hook and right before the response is committed, so an abort that lands after the network call still completes is honored — the response is never stored. A `signal` that is already aborted when `db.request` is called rejects immediately, before any `onRequest` hook runs. Per-request data for plugins travels in `options.meta` and is read as `ctx.meta`.
+`onRequest`/`onResponse`/`onRetry` throwing rejects the request with `kind: 'plugin'` (the message names the plugin and hook); `onRequest` returning `false` aborts it with `kind: 'abort'`. `onCommit`/`onReset` are synchronous observers. Their failures, and `onError`/`onSettled` failures, are isolated: they are logged with `console.error` and never change the request's outcome. The abort signal is checked before request preparation, after every request/response hook, and after normalization, so an abort that lands after the network call still completes is honored — the response is never stored. A `signal` that is already aborted when `db.request` is called rejects immediately, before any `onRequest` hook runs. Waiting for fetch and async request/response hooks is abortable even if the implementation ignores the signal; late results are discarded and late rejections are observed. This cannot undo server writes or a plugin's own side effects. Per-request data for plugins travels in `options.meta` and is read as `ctx.meta`.
 
 ```ts
 interface CdeebeePlugin<Storage> {
@@ -248,6 +258,7 @@ interface CdeebeePlugin<Storage> {
   onError?: (ctx: CdeebeeRequestContext<Storage>) => void | Promise<void>;
   onSettled?: (ctx: CdeebeeRequestContext<Storage>) => void | Promise<void>;
   onCommit?: (changeSet: CdeebeeChangeSet<Storage>, meta: CdeebeeCommitMeta, changedList: CdeebeeChangedList<Storage>[]) => void;
+  onReset?: () => void;
   getState?: () => unknown;
 }
 ```
@@ -257,14 +268,14 @@ Built-ins, all importable from `@recats/cdeebee/core` (or `@recats/cdeebee`):
 | Plugin | Options | Behavior |
 |---|---|---|
 | `history(options?)` | `{ maxHistorySize?, ignoreAbort? }` | Records done/error entries and `lastResultIDList` per api; exposes `getState()`, `getLast(api)`, `subscribe(listener, apiList?)`, `clear(api?)`; honors the `historyClear` request option. Required by `useRequestHistory`, `useRequestErrorList`, `useLastResultIDList`, `useLastResponse`. Every entry retains the full parsed `response` object, so history is capped at `maxHistorySize` entries per api — `20` by default; pass `maxHistorySize: 0` for unbounded. Aborted requests are not recorded in `errorList` unless `ignoreAbort: false`. |
-| `cancelation(options?)` | `{ apiList?, mode?: 'previous' \| 'latest' }` | Deduplicates concurrent calls to the same api: `'previous'` (default) aborts the in-flight call and lets the new one proceed; `'latest'` skips the new call while one is in flight. Restricted to `apiList` when given. |
+| `cancelation(options?)` | `{ apiList?, mode?: 'previous' \| 'latest', key?: (ctx) => string }` | Cancels concurrent calls within one key (defaults to `ctx.api`): `'previous'` (default) aborts the in-flight call and lets the new one proceed; `'latest'` skips the new call while one is in flight. Restricted to `apiList` when given. Use separate keys for independent consumers of the same API. It does not share a response promise between callers. |
 | `queryQueue(options?)` | `{ apiList?, key?: (ctx) => string }` | Sends matching requests concurrently and processes successful responses in send order within each key. Uses one shared queue by default; `apiList` restricts participation. Failed or aborted entries preserve predecessor ordering. Aborting a waiting response rejects promptly. |
-| `retry(options)` | `{ count, backoffMs?, when? }` | Retries a failed request up to `count` times (`when` defaults to network errors only); `backoffMs` is a fixed delay or `(attempt) => ms`. |
+| `retry(options)` | `{ count, backoffMs?, when? }` | Retries a failed request up to `count` times (`when` defaults to network errors only); `backoffMs` is a finite non-negative delay or `(attempt) => ms`. Request preparation failures and aborts are never retried. Retrying a mutation requires an application/server idempotency policy: a network failure does not prove the server rejected the write. |
 | `devtools(options?)` | `{ name? }` | Connects to the Redux DevTools browser extension if present and streams every commit and settled request as an action. Use one `devtools()` instance per store. |
 
 `history` records the normalized change set as proposed, not what freshness checks kept, so `lastResultIDList` can name ids no longer in storage (a list cleared while a request was in flight); `useEntityList` omits them. Responses without list envelopes keep the previous ids, while `getLast()` / `useLastResponse()` always reflect the latest successful response.
 
-Plugin order is the order of `pluginList` for every hook. List `queryQueue` first — an async `onSettled` in an earlier plugin delays the queue release, and with it every request waiting behind the current one.
+Create separate stateful plugin instances for each store. Plugin order is the order of `pluginList` for every hook. List `queryQueue` first — an async `onSettled` in an earlier plugin delays the queue release, and with it every request waiting behind the current one.
 
 Use independent queue keys when unrelated responses should not block each other:
 
@@ -292,6 +303,11 @@ const serverError = (): ServerErrorPlugin => {
   const subscription = createSubscription();
   return {
     name: 'serverError',
+    onReset: () => {
+      const apiList = Object.keys(state);
+      state = {};
+      subscription.notify(apiList);
+    },
     getState: () => state,
     subscribe: subscription.subscribe,
     onError: ctx => {
@@ -350,17 +366,20 @@ const internalError = (): CdeebeePlugin<Storage> => {
 
 ## SSR
 
-Pass server-rendered data as `settings.initialStorage` when constructing the store. To hand the client the same snapshot, serialize `db.getSnapshot().state.storage` into the page (e.g. `window.__PRELOADED_STATE__`) and read it back when constructing the client-side store, as in the quick start example above.
+Construct a separate store for each server request; a module-level server singleton would share data between users. Pass server-rendered data as `settings.initialStorage` when constructing the client store. Initial entities receive their configured server version and sequence zero, with `complete: false` because storage alone does not prove whether a full entity was fetched. Older versions can fill missing fields but cannot overwrite defined fields. This transfers data, not live requests, history, completeness flags, or deletion metadata. To hand the client the same snapshot, serialize `db.getSnapshot().state.storage` into the page (e.g. `window.__PRELOADED_STATE__`) and read it back when constructing the client-side store, as in the quick start example above.
 
 ## Consistency guarantees
 
 1. **Atomic commit**: one response produces one change set across all lists, one new snapshot, one flush — readers never see a half-applied response.
-2. **Immutable snapshot**: `db.getState()` returns the same object until a commit, so `useSyncExternalStore` never tears; `getSnapshot()` is a fresh serializable wrapper (`{ state, pluginStateList }`) for SSR/devtools, built on every call.
+2. **Immutable snapshot**: `db.getState()` returns the same object until storage or active requests change, so `useSyncExternalStore` never tears; `getSnapshot()` is a fresh serializable wrapper (`{ state, pluginStateList }`) for SSR/devtools, built on every call.
 3. **Ordering**: `queryQueue` processes successful responses in send order within each queue key. Entity freshness checks apply with or without the plugin: versions take precedence when both are known and differ, otherwise send sequence decides.
 4. **Abort → no commit**: an aborted or plugin-skipped request never touches storage, `activeRequestList` is cleaned up, and the promise rejects with `kind: 'abort'`.
 5. **Local edits vs. responses**: local edits receive a fresh sequence. Deletions and list resets prevent earlier requests from resurrecting removed entities. There is no rollback in v4.0.
-6. **Batching**: request commits inside one microtask notify once; local mutations (`setEntity`/`removeEntityList`/`clearList`/`replaceList`) notify synchronously so controlled inputs never lose their caret. React 18+ coalesces renders either way.
+6. **Batching**: request commits inside one microtask notify once; local mutations (`setEntity`/`removeEntityList`/`clearList`/`replaceList`) notify synchronously so controlled inputs never lose their caret. React 19 coalesces renders either way.
 7. **Notify only on real change**: entities are compared with a shallow equality check, so unchanged entities keep their reference and their listeners are not notified.
+8. **Session isolation**: `reset()` invalidates requests from the previous generation and clears built-in plugin state.
+
+The store does not provide automatic cache eviction, query caching, optimistic rollback, or server transaction ordering. History is bounded per API, but storage retains entities until removed or reset. Tombstones on a list remain until a list reset makes them redundant. Applications choose when to evict large details; do not treat normalized storage as an automatically bounded cache.
 
 ## Migration from 3.x
 

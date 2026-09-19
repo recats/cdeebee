@@ -2,6 +2,7 @@ import { shallowEqual } from '../utils/shallowEqual';
 import { isRecord } from '../utils/isRecord';
 import { isDev } from '../utils/env';
 import { toEntityID } from '../utils/entityID';
+import { createRecord } from '../utils/record';
 import type {
   CdeebeeChangeSet, CdeebeeChangedList, CdeebeeEntity, CdeebeeEntityMeta, CdeebeeList, CdeebeeListChange, CdeebeePrimaryKeyList,
   CdeebeeStorage, CdeebeeStorageShape, CdeebeeVersionKeyList, EntityID, ListName,
@@ -40,7 +41,7 @@ const readEntityID = (entity: unknown, primaryKey: string, listName: string): En
 export const readVersion = (entity: unknown, versionKey: string | undefined): number | undefined => {
   if (versionKey === undefined || !isRecord(entity)) return undefined;
   const value = entity[versionKey];
-  if (typeof value === 'number') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
   if (typeof value === 'string') {
     const parsed = Date.parse(value);
     return Number.isNaN(parsed) ? undefined : parsed;
@@ -57,9 +58,12 @@ export function fill(base: CdeebeeEntity, donor: CdeebeeEntity): CdeebeeEntity {
   for (let i = 0; i < keyList.length; i += 1) {
     const key = keyList[i];
     const donorValue = donorRecord[key];
-    if (isHole(donorValue) || !isHole(result[key])) continue;
+    if (isHole(donorValue)) continue;
+    const current = result[key];
+    if (!isHole(current) && ((typeof current !== 'function' && key !== '__proto__') || Object.hasOwn(result, key))) continue;
     if (result === base) result = { ...result };
-    result[key] = donorValue;
+    if (key === '__proto__') Object.defineProperty(result, key, { value: donorValue, enumerable: true, writable: true, configurable: true });
+    else result[key] = donorValue;
   }
   return result;
 }
@@ -148,7 +152,7 @@ function applyListChange<S>(
     const previousListSeq = listSeq;
     listSeq = Math.max(listSeq ?? seq, seq);
     options.listSeqMap.set(listName, listSeq);
-    const nextList: CdeebeeList = {};
+    const nextList = createRecord<CdeebeeEntity>();
     let changed = false;
     const replaceKeyList = Object.keys(change.replaceList);
     for (let i = 0; i < replaceKeyList.length; i += 1) {
@@ -183,7 +187,7 @@ function applyListChange<S>(
     const prevKeyList = Object.keys(prevList);
     for (let i = 0; i < prevKeyList.length; i += 1) {
       const key = prevKeyList[i];
-      if (key in nextList) continue;
+      if (nextList[key] !== undefined) continue;
       const metaID = toEntityID(key);
       if (isStale(meta.get(metaID), listSeq, seq)) {
         nextList[key] = prevList[key];
@@ -215,7 +219,8 @@ function applyListChange<S>(
       if (write === undefined) continue;
       meta.set(metaID, write.meta);
       if (prevEntity !== undefined && shallowEqual(prevEntity, write.entity)) continue;
-      if (!copied) { list = { ...list }; copied = true; }
+      // Keep this copy separate from storage/history records: mixing their shapes deoptimizes numeric-key copies in V8.
+      if (!copied) { list = Object.setPrototypeOf({ ...list }, null); copied = true; }
       list[entityID] = write.entity;
       entityIDList.push(entityID);
     }
@@ -231,13 +236,13 @@ function applyListChange<S>(
       const metaID = toEntityID(String(entityID));
       const prevMeta = meta.get(metaID);
       if (isStale(prevMeta, listSeq, seq)) {
-        if (isDev() && entityID in list) console.warn(`[cdeebee] skipped removal of "${listName}" ${String(entityID)}: a later send confirmed the entity (removal seq ${seq})`);
+        if (isDev() && list[entityID] !== undefined) console.warn(`[cdeebee] skipped removal of "${listName}" ${String(entityID)}: a later send confirmed the entity (removal seq ${seq})`);
         continue;
       }
       // Absent ids are tombstoned too: an earlier-sent fetch must not re-add what this removal deleted.
       if (!prevMeta?.deleted || prevMeta.seq < seq) meta.set(metaID, tombstone(seq));
-      if (!(entityID in list)) continue;
-      if (!copied) { list = { ...list }; copied = true; }
+      if (list[entityID] === undefined) continue;
+      if (!copied) { list = Object.setPrototypeOf({ ...list }, null); copied = true; }
       delete list[entityID];
       entityIDList.push(entityID);
     }
@@ -260,16 +265,20 @@ export function applyChangeSet<S extends CdeebeeStorageShape<S>>(
 
   const listNameList = Object.keys(changeSet) as ListName<S>[];
   for (let i = 0; i < listNameList.length; i += 1) {
+    if (typeof primaryKeyList[listNameList[i]] !== 'string') throw new TypeError(`[cdeebee] unknown list "${String(listNameList[i])}" — declare it in primaryKeyList`);
+  }
+  for (let i = 0; i < listNameList.length; i += 1) {
     const listName = listNameList[i];
     const change = changeSet[listName] as CdeebeeListChange | undefined;
     if (!change) continue;
-    const prevList: CdeebeeList = storage[listName] ?? {};
+    const storedList = storage[listName] as CdeebeeList | undefined;
+    const prevList: CdeebeeList = storedList === undefined ? createRecord() : Object.getPrototypeOf(storedList) === null ? storedList : createRecord(storedList);
     const primaryKey = primaryKeyList[listName] as string;
     let meta = options.metaList.get(listName);
     if (meta === undefined) { meta = new Map(); options.metaList.set(listName, meta); }
     const { list, entityIDList } = applyListChange(prevList, change, primaryKey, listName, meta, options);
     if (list === prevList) continue;
-    if (!copied) { nextStorage = { ...storage }; copied = true; }
+    if (!copied) { nextStorage = createRecord(storage as CdeebeeStorage) as S; copied = true; }
     (nextStorage as CdeebeeStorage)[listName] = list;
     if (entityIDList.length > 0) changedList.push({ listName, entityIDList });
   }

@@ -15,6 +15,21 @@ export interface FetchContext {
 
 const isAbsolute = (api: string): boolean => /^[a-z][a-z0-9+.-]*:\/\//i.test(api);
 
+const mergeHeaders = (...recordList: Record<string, string>[]): Record<string, string> => {
+  const headers: Record<string, string> = {};
+  const nameMap = new Map<string, string>();
+  for (const record of recordList) {
+    for (const name of Object.keys(record)) {
+      const key = name.toLowerCase();
+      const previous = nameMap.get(key);
+      if (previous !== undefined) delete headers[previous];
+      Object.defineProperty(headers, name, { value: record[name], enumerable: true, configurable: true, writable: true });
+      nameMap.set(key, name);
+    }
+  }
+  return headers;
+};
+
 export function buildUrl(baseUrl: string | undefined, api: string): string {
   if (!baseUrl || isAbsolute(api)) return api;
   return `${baseUrl.replace(/\/+$/, '')}/${api.replace(/^\/+/, '')}`;
@@ -22,7 +37,7 @@ export function buildUrl(baseUrl: string | undefined, api: string): string {
 
 export function resolveHeaderList(settings: CdeebeeFetchSettings, headerList?: Record<string, string>): Record<string, string> {
   const base = typeof settings.headerList === 'function' ? settings.headerList() : (settings.headerList ?? {});
-  return { ...base, ...(headerList ?? {}) };
+  return mergeHeaders(base, headerList ?? {});
 }
 
 export function resolveData(settings: CdeebeeFetchSettings, data: unknown): unknown {
@@ -35,10 +50,10 @@ export function resolveData(settings: CdeebeeFetchSettings, data: unknown): unkn
 export function buildRequestInit(ctx: FetchContext, settings: CdeebeeFetchSettings): RequestInit {
   const isGet = ctx.method === 'GET';
   const fileList = ctx.options.fileList;
-  const json = JSON.stringify(ctx.data);
 
   let body: BodyInit | undefined;
   if (!isGet) {
+    const json = JSON.stringify(ctx.data);
     if (fileList && fileList.length > 0) {
       const form = new FormData();
       const fileKey = settings.fileKey ?? 'file';
@@ -51,15 +66,14 @@ export function buildRequestInit(ctx: FetchContext, settings: CdeebeeFetchSettin
     }
   }
 
-  const headers: Record<string, string> = {};
-  if (!isGet && !(body instanceof FormData)) headers['Content-Type'] = 'application/json';
-  Object.assign(headers, ctx.headerList);
+  const defaultHeaders: Record<string, string> = {};
+  if (!isGet && !(body instanceof FormData)) defaultHeaders['Content-Type'] = 'application/json';
+  const headers = mergeHeaders(defaultHeaders, ctx.headerList, { 'ui-request-id': ctx.requestID });
   if (body instanceof FormData) {
     for (const key of Object.keys(headers)) {
       if (key.toLowerCase() === 'content-type') delete headers[key];
     }
   }
-  headers['ui-request-id'] = ctx.requestID;
 
   return { method: ctx.method, headers, signal: ctx.controller.signal, ...(body === undefined ? {} : { body }) };
 }
@@ -76,9 +90,16 @@ export async function executeFetch(ctx: FetchContext, settings: CdeebeeFetchSett
   const doFetch = settings.fetch ?? globalThis.fetch;
   const responseType = ctx.options.responseType ?? 'json';
   let raw: Response;
+  let init: RequestInit;
 
   try {
-    raw = await doFetch(ctx.url, buildRequestInit(ctx, settings));
+    init = buildRequestInit(ctx, settings);
+  } catch (error) {
+    throw toRequestError(error, ctx, 'request');
+  }
+
+  try {
+    raw = await doFetch(ctx.url, init);
   } catch (error) {
     throw toRequestError(error, ctx);
   }

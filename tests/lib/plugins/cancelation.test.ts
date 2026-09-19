@@ -27,6 +27,22 @@ const make = (fetch: typeof globalThis.fetch, options?: Parameters<typeof cancel
 });
 
 describe('cancelation plugin', () => {
+  it('custom keys isolate concurrent consumers of the same API', async () => {
+    const { fetch, deferredList } = controllableFetch();
+    const db = make(fetch, { key: ctx => String(ctx.meta.editorID) });
+    const first = db.requestSettled({ api: '/x', meta: { editorID: 1 } });
+    const other = db.requestSettled({ api: '/x', meta: { editorID: 2 } });
+    await tick();
+    const replacement = db.requestSettled({ api: '/x', meta: { editorID: 1 } });
+    await expect(first).resolves.toMatchObject({ ok: false, error: { kind: 'abort' } });
+    await tick();
+    deferredList[1].resolve(jsonResponse({ editorID: 2 }));
+    deferredList[2].resolve(jsonResponse({ editorID: 1 }));
+    await expect(other).resolves.toEqual({ ok: true, response: { editorID: 2 } });
+    await expect(replacement).resolves.toEqual({ ok: true, response: { editorID: 1 } });
+    expect(db.getState().activeRequestList).toEqual([]);
+  });
+
   it("mode 'previous' aborts the earlier in-flight request for the same api", async () => {
     const { fetch, deferredList } = controllableFetch();
     const db = make(fetch);

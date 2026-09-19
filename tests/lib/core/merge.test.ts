@@ -35,6 +35,18 @@ describe('fill', () => {
     const base = { a: 1, b: [] };
     expect(fill(base, { a: undefined, b: [] })).toBe(base);
   });
+  it('treats inherited Object.prototype members as holes and keeps own ones', () => {
+    const donor = JSON.parse('{"constructor":1,"toString":"t","hasOwnProperty":[2],"__proto__":{"x":1}}') as Record<string, unknown>;
+    const filled = fill({}, donor) as Record<string, unknown>;
+    expect(Object.hasOwn(filled, 'constructor')).toBe(true);
+    expect(filled.constructor).toBe(1);
+    expect(filled.toString).toBe('t');
+    expect(filled.hasOwnProperty).toEqual([2]);
+    expect(Object.hasOwn(filled, '__proto__')).toBe(true);
+    expect(Object.getPrototypeOf(filled)).toBe(Object.prototype);
+    const own = { constructor: () => 'own', toString: 'mine' };
+    expect(fill(own, donor)).toMatchObject({ constructor: own.constructor, toString: 'mine', hasOwnProperty: [2] });
+  });
 });
 
 describe('readVersion', () => {

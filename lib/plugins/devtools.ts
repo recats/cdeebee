@@ -18,6 +18,9 @@ export function devtools<S>(options: CdeebeeDevtoolsOptions = {}): CdeebeePlugin
 
   return {
     name: 'devtools',
+    onReset: () => {
+      if (session) session.connection.init(session.db.getSnapshot());
+    },
     setup: instance => {
       const extension = (globalThis as { __REDUX_DEVTOOLS_EXTENSION__?: DevtoolsExtension<S> }).__REDUX_DEVTOOLS_EXTENSION__;
       if (!extension) return;

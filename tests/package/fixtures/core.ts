@@ -12,6 +12,7 @@ export const db = createCdeebee<Storage>({
 db.setEntity('userList', 1, { name: 'Ada' });
 const name: string = db.getState().storage.userList[1].name;
 void name;
+db.reset();
 async function useSettled() {
   const settled = await db.requestSettled<{ hello: number }>({ api: '/x' });
   if (settled.ok) { const n: number = settled.response.hello; void n; }

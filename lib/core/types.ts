@@ -73,7 +73,7 @@ export interface CdeebeeSnapshot<S> {
   pluginStateList: Record<string, unknown>;
 }
 
-export type CdeebeeErrorKind = 'http' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize';
+export type CdeebeeErrorKind = 'http' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize' | 'request';
 
 export interface CdeebeeFetchSettings {
   baseUrl?: string;
@@ -144,6 +144,8 @@ export interface CdeebeePlugin<S> {
   onError?: (ctx: CdeebeeRequestContext<S>) => void | Promise<void>;
   onSettled?: (ctx: CdeebeeRequestContext<S>) => void | Promise<void>;
   onCommit?: (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta, changedList: CdeebeeChangedList<S>[]) => void;
+  /** Release resources and clear plugin state. Requests from before reset receive no further hooks. */
+  onReset?: () => void;
   getState?: () => unknown;
 }
 
@@ -183,6 +185,8 @@ export interface CdeebeeInstance<S> {
   removeEntityList: <K extends ListName<S>>(listName: K, entityIDList: EntityID[]) => void;
   clearList: <K extends ListName<S>>(listName: K) => void;
   replaceList: <K extends ListName<S>>(listName: K, entityRecord: Record<EntityID, EntityOf<S[K]>>) => void;
+  /** Empty storage and built-in plugin state, abort pending requests, keep subscriptions and settings. */
+  reset: () => void;
   subscribe: (listener: CdeebeeListener, dependencyList?: CdeebeeDependency<S>[]) => () => void;
   subscribeRequest: (listener: CdeebeeListener, apiList?: string[]) => () => void;
   getIndex: <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>, value: unknown) => ReadonlySet<EntityID>;

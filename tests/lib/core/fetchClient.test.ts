@@ -28,6 +28,11 @@ describe('buildUrl', () => {
 });
 
 describe('resolveHeaderList / resolveData', () => {
+  it('request headers override settings regardless of casing', () => {
+    const headers = new Headers(resolveHeaderList({ headerList: { Authorization: 'old', Accept: 'application/json' } }, { authorization: 'new' }));
+    expect(headers.get('authorization')).toBe('new');
+    expect(headers.get('accept')).toBe('application/json');
+  });
   it('merges static settings with request values, request wins', () => {
     expect(resolveHeaderList({ headerList: { A: '1', B: '1' } }, { B: '2' })).toEqual({ A: '1', B: '2' });
     expect(resolveData({ mergeWithData: { token: 't', a: 0 } }, { a: 1 })).toEqual({ token: 't', a: 1 });
@@ -45,6 +50,12 @@ describe('resolveHeaderList / resolveData', () => {
 });
 
 describe('buildRequestInit', () => {
+  it('sends one content type and one internal request ID regardless of casing', () => {
+    const init = buildRequestInit(baseCtx({ headerList: { 'content-type': 'application/custom+json', 'UI-Request-ID': 'spoof' } }), {});
+    const headers = new Headers(init.headers);
+    expect(headers.get('content-type')).toBe('application/custom+json');
+    expect(headers.get('ui-request-id')).toBe('r1');
+  });
   it('POST sends JSON body with content-type and ui-request-id', () => {
     const init = buildRequestInit(baseCtx(), {});
     expect(init.method).toBe('POST');

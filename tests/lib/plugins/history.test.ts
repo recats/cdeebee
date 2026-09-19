@@ -19,6 +19,10 @@ const make = (fetch: typeof globalThis.fetch, options: CdeebeeHistoryOptions = {
 };
 
 describe('history plugin', () => {
+  it.each([NaN, -1, 0.5])('rejects invalid history limit %s instead of silently retaining unbounded data', maxHistorySize => {
+    expect(() => history({ maxHistorySize })).toThrow(RangeError);
+  });
+
   it.each(['patch', 'upsert', 'replaceList'] as const)('an empty %s result clears IDs and records the latest response', async strategy => {
     const { db, plugin } = make(mockFetch([
       jsonResponse(envelope([1, 2])), jsonResponse(envelope([])), new Response(null, { status: 204 }),
