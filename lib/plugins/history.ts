@@ -1,6 +1,7 @@
 import { createSubscription } from '../core/subscription';
 import { extractResultIDList } from '../core/normalize';
 import { shallowEqual } from '../utils/shallowEqual';
+import { createRecord } from '../utils/record';
 import type { CdeebeeErrorKind, CdeebeeListener, CdeebeePlugin, CdeebeeRequestContext, EntityID } from '../core/types';
 
 export interface CdeebeeHistoryError {
@@ -48,11 +49,11 @@ const append = (
 ): Record<string, CdeebeeHistoryEntry[]> => {
   let entryList = [...(record[api] ?? []), entry];
   if (maxHistorySize && Number.isFinite(maxHistorySize) && entryList.length > maxHistorySize) entryList = entryList.slice(-maxHistorySize);
-  return { ...record, [api]: entryList };
+  return Object.assign(createRecord(record), { [api]: entryList });
 };
 
 const omitKey = <V>(record: Record<string, V>, key: string): Record<string, V> => {
-  const next = { ...record };
+  const next = createRecord(record);
   delete next[key];
   return next;
 };
@@ -71,9 +72,13 @@ const keepIDList = (prev: Record<string, EntityID[]> | undefined, next: Record<s
 };
 
 export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryPlugin<S> {
-  let state: CdeebeeHistoryState = { doneList: {}, errorList: {}, lastResultIDList: {} };
+  const emptyState = (): CdeebeeHistoryState => ({ doneList: createRecord(), errorList: createRecord(), lastResultIDList: createRecord() });
+  let state = emptyState();
   const subscription = createSubscription();
   const maxHistorySize = options.maxHistorySize ?? DEFAULT_MAX_HISTORY_SIZE;
+  if (maxHistorySize !== Infinity && (!Number.isSafeInteger(maxHistorySize) || maxHistorySize < 0)) {
+    throw new RangeError('[cdeebee] maxHistorySize must be a non-negative safe integer or Infinity');
+  }
   const ignoreAbort = options.ignoreAbort ?? true;
 
   const onSettled = (ctx: CdeebeeRequestContext<S>) => {
@@ -86,7 +91,7 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
       const resultIDList = ctx.changeSet === undefined ? undefined : extractResultIDList(ctx.changeSet, ctx.db.settings.primaryKeyList);
       const lastResultIDList = resultIDList === undefined || Object.keys(resultIDList).length === 0
         ? state.lastResultIDList
-        : { ...state.lastResultIDList, [ctx.api]: keepIDList(state.lastResultIDList[ctx.api], resultIDList) };
+        : Object.assign(createRecord(state.lastResultIDList), { [ctx.api]: keepIDList(state.lastResultIDList[ctx.api], resultIDList) });
       state = {
         ...state,
         doneList: append(state.doneList, ctx.api, { ...base, response: ctx.response }, maxHistorySize),
@@ -99,7 +104,7 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
   const clear = (api?: string) => {
     if (api === undefined) {
       const apiList = [...new Set([...Object.keys(state.doneList), ...Object.keys(state.errorList), ...Object.keys(state.lastResultIDList)])];
-      state = { doneList: {}, errorList: {}, lastResultIDList: {} };
+      state = emptyState();
       subscription.notify(apiList);
       return;
     }
@@ -114,6 +119,7 @@ export function history<S>(options: CdeebeeHistoryOptions = {}): CdeebeeHistoryP
 
   return {
     name: 'history',
+    onReset: () => clear(),
     onRequest: ctx => {
       if (ctx.options.historyClear) clear(ctx.api);
     },

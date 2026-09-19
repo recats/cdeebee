@@ -1,5 +1,6 @@
 import { toEntityID } from '../utils/entityID';
-import { applyChangeSet, type EntityMetaList } from './commit';
+import { createRecord } from '../utils/record';
+import { applyChangeSet, readVersion, type EntityMetaList } from './commit';
 import { IndexManager } from './indexManager';
 import { runRequest } from './pipeline';
 import { CdeebeeRequestError } from './requestError';
@@ -10,9 +11,11 @@ import type {
 } from './types';
 
 export interface CdeebeeInternal {
-  addActiveRequest: (api: string, requestID: string) => void;
+  addActiveRequest: (api: string, requestID: string, controller: AbortController) => void;
   removeActiveRequest: (api: string, requestID: string) => void;
+  finishRequest: (requestID: string) => void;
   nextSeq: () => number;
+  getGeneration: () => number;
 }
 
 export type RequestRunner = <S, R, D>(
@@ -25,15 +28,31 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
   const { primaryKeyList } = settings;
   const pluginList: CdeebeePlugin<S>[] = settings.pluginList ?? [];
 
-  const storage = {} as CdeebeeStorage;
+  const storage = createRecord<CdeebeeStorage[string]>();
   const listNameList = Object.keys(primaryKeyList) as ListName<S>[];
   for (let i = 0; i < listNameList.length; i += 1) {
-    storage[listNameList[i]] = settings.initialStorage?.[listNameList[i]] ?? {};
+    const listName = listNameList[i];
+    storage[listName] = createRecord(settings.initialStorage && Object.hasOwn(settings.initialStorage, listName) ? settings.initialStorage[listName] : undefined);
   }
   let state: CdeebeeState<S> = { storage: storage as S, activeRequestList: [] };
   const metaList = new Map<string, EntityMetaList>();
+  for (const listName of listNameList) {
+    const list = storage[listName];
+    const entityMeta: EntityMetaList = new Map();
+    for (const key of Object.keys(list)) {
+      entityMeta.set(toEntityID(key), {
+        version: readVersion(list[key], settings.versionKeyList?.[listName]),
+        seq: 0,
+        writeSeq: 0,
+        complete: false,
+      });
+    }
+    if (entityMeta.size > 0) metaList.set(listName, entityMeta);
+  }
   const listSeqMap = new Map<string, number>();
   let seqCounter = 0;
+  let generation = 0;
+  const controllerMap = new Map<string, AbortController>();
   const nextSeq = () => { seqCounter += 1; return seqCounter; };
 
   const subscriptionManager = new SubscriptionManager<S>();
@@ -41,7 +60,7 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
   const indexManager = new IndexManager<S>(settings.indexList);
   indexManager.rebuild(state.storage);
 
-  const commit = (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta) => {
+  const commit = (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta, deferFlush = false) => {
     const prevStorage = state.storage;
     const seq = meta.seq ?? nextSeq();
     if (seq > seqCounter) seqCounter = seq; // later local writes must outrank a caller-supplied seq
@@ -50,14 +69,24 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
     state = { ...state, storage: nextStorage };
     indexManager.update(prevStorage, nextStorage, changedList);
     subscriptionManager.notify(changedList);
-    if (meta.source === 'set') subscriptionManager.flush();
-    for (let i = 0; i < pluginList.length; i += 1) pluginList[i].onCommit?.(changeSet, meta, changedList);
+    if (meta.source === 'set' && !deferFlush) subscriptionManager.flush();
+    for (let i = 0; i < pluginList.length; i += 1) {
+      const plugin = pluginList[i];
+      try {
+        plugin.onCommit?.(changeSet, meta, changedList);
+      } catch (error) {
+        console.error(`[cdeebee] plugin "${plugin.name}" onCommit failed`, error);
+      }
+    }
     return changedList;
   };
 
   const internal: CdeebeeInternal = {
     nextSeq,
-    addActiveRequest(api, requestID) {
+    getGeneration: () => generation,
+    finishRequest: requestID => { controllerMap.delete(requestID); },
+    addActiveRequest(api, requestID, controller) {
+      controllerMap.set(requestID, controller);
       state = { ...state, activeRequestList: [...state.activeRequestList, { api, requestID }] };
       requestSubscription.notify(api);
     },
@@ -74,7 +103,7 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
     pluginList,
     getState: () => state,
     getSnapshot: () => {
-      const pluginStateList: Record<string, unknown> = {};
+      const pluginStateList = createRecord<unknown>();
       for (let i = 0; i < pluginList.length; i += 1) {
         const plugin = pluginList[i];
         if (plugin.getState) pluginStateList[plugin.name] = plugin.getState();
@@ -106,6 +135,25 @@ export function createCdeebee<S extends CdeebeeStorageShape<S>>(settings: Cdeebe
     },
     replaceList: (listName, entityRecord) => {
       commit({ [listName]: { replaceList: entityRecord } } as unknown as CdeebeeChangeSet<S>, { source: 'set', label: `replaceList:${listName}` });
+    },
+    reset: () => {
+      generation += 1;
+      const controllerList = Array.from(controllerMap.values());
+      const apiList = state.activeRequestList.map(request => request.api);
+      controllerMap.clear();
+      if (state.activeRequestList.length > 0) state = { ...state, activeRequestList: [] };
+      const changeSet = Object.fromEntries(Object.keys(state.storage).map(listName => [listName, { replaceList: {} }]));
+      commit(changeSet as CdeebeeChangeSet<S>, { source: 'set', label: 'reset' }, true);
+      for (const plugin of pluginList) {
+        try {
+          plugin.onReset?.();
+        } catch (error) {
+          console.error(`[cdeebee] plugin "${plugin.name}" onReset failed`, error);
+        }
+      }
+      for (const controller of controllerList) controller.abort();
+      if (apiList.length > 0) requestSubscription.notify(apiList);
+      db.flush();
     },
     subscribe: (listener, dependencyList) => subscriptionManager.subscribe(listener, dependencyList),
     subscribeRequest: (listener, apiList) => requestSubscription.subscribe(listener, apiList),

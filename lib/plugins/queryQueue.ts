@@ -30,6 +30,11 @@ export function queryQueue<S>(options: CdeebeeQueryQueueOptions<S> = {}): Cdeebe
 
   return {
     name: 'queryQueue',
+    onReset: () => {
+      for (const ticket of ticketMap.values()) ticket.release();
+      ticketMap.clear();
+      tailMap.clear();
+    },
     onRequest: ctx => {
       if (!applies(ctx.api)) return;
       const key = options.key?.(ctx) ?? '';

@@ -2,6 +2,7 @@ import { isRecord } from '../utils/isRecord';
 import { keyBy } from '../utils/keyBy';
 import { isDev } from '../utils/env';
 import { toEntityID } from '../utils/entityID';
+import { createRecord } from '../utils/record';
 import type { CdeebeeChangeSet, CdeebeeEntity, CdeebeeListChange, CdeebeeNormalizeContext, CdeebeePrimaryKeyList, EntityID, ListName } from './types';
 
 export interface CdeebeeListEnvelope {
@@ -14,7 +15,7 @@ export function isListEnvelope(value: unknown): value is CdeebeeListEnvelope {
 }
 
 export function defaultNormalize<S>(response: unknown, ctx: CdeebeeNormalizeContext<S>): CdeebeeChangeSet<S> {
-  const changeSet: Record<string, CdeebeeListChange> = {};
+  const changeSet = createRecord<CdeebeeListChange>();
   if (!isRecord(response)) return changeSet as CdeebeeChangeSet<S>;
 
   const keyList = Object.keys(response);
@@ -22,6 +23,7 @@ export function defaultNormalize<S>(response: unknown, ctx: CdeebeeNormalizeCont
     const listName = keyList[i] as ListName<S>;
     const value = response[listName];
     if (!isListEnvelope(value)) continue;
+    if (!Object.hasOwn(ctx.primaryKeyList, listName)) continue;
 
     const settingsPrimaryKey = ctx.primaryKeyList[listName];
     if (settingsPrimaryKey !== undefined && settingsPrimaryKey !== value.primaryKey && isDev()) {
@@ -47,7 +49,7 @@ export function extractResultIDList<S>(
   changeSet: CdeebeeChangeSet<S>,
   primaryKeyList: CdeebeePrimaryKeyList<S>,
 ): Record<string, EntityID[]> {
-  const result: Record<string, EntityID[]> = {};
+  const result = createRecord<EntityID[]>();
   const listNameList = Object.keys(changeSet) as ListName<S>[];
   for (let i = 0; i < listNameList.length; i += 1) {
     const listName = listNameList[i];

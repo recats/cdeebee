@@ -62,11 +62,11 @@ describe('defaultNormalize', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
-  it('unknown list (not in primaryKeyList) uses backend primaryKey', () => {
+  it('unknown lists are left in the response but are not normalized into typed storage', () => {
     const changeSet = defaultNormalize<S>({
       extraList: { data: [{ extraID: 5 }], primaryKey: 'extraID' },
     }, ctx());
-    expect(changeSet).toEqual({ extraList: { patchList: [{ extraID: 5 }] } });
+    expect(changeSet).toEqual({});
   });
 
   it('non-object response yields an empty change set', () => {
