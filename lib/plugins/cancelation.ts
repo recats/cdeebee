@@ -10,7 +10,7 @@ export interface CdeebeeCancelationOptions<S = any> {
 
 export function cancelation<S>(options: CdeebeeCancelationOptions<S> = {}): CdeebeePlugin<S> {
   const mode = options.mode ?? 'previous';
-  const inFlightMap = new Map<string, Set<CdeebeeRequestContext<S>>>();
+  const inFlightMap = new Map<string, CdeebeeRequestContext<S>>();
   const keyByRequest = new WeakMap<object, string>();
   const applies = (api: string) => !options.apiList || options.apiList.includes(api);
 
@@ -20,24 +20,17 @@ export function cancelation<S>(options: CdeebeeCancelationOptions<S> = {}): Cdee
     onRequest: ctx => {
       if (!applies(ctx.api)) return;
       const key = options.key?.(ctx) ?? ctx.api;
+      const previous = inFlightMap.get(key);
+      if (previous && !previous.controller.signal.aborted && mode === 'latest') return false;
       keyByRequest.set(ctx, key);
-      let inFlight = inFlightMap.get(key);
-      if (!inFlight) { inFlight = new Set(); inFlightMap.set(key, inFlight); }
-      if (inFlight.size > 0) {
-        if (mode === 'latest') return false;
-        inFlight.forEach(prev => prev.controller.abort());
-        inFlight.clear();
-      }
-      inFlight.add(ctx);
+      inFlightMap.set(key, ctx);
+      previous?.controller.abort();
     },
     onSettled: ctx => {
       const key = keyByRequest.get(ctx);
       if (key === undefined) return;
       keyByRequest.delete(ctx);
-      const inFlight = inFlightMap.get(key);
-      if (!inFlight) return;
-      inFlight.delete(ctx);
-      if (inFlight.size === 0) inFlightMap.delete(key);
+      if (inFlightMap.get(key) === ctx) inFlightMap.delete(key);
     },
   };
 }

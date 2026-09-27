@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { applyChangeSet, fill, mergeEntity, readVersion, type ApplyChangeSetOptions } from '../../../lib/core/commit';
 import type { CdeebeeChangeSet } from '../../../lib/core/types';
 
-interface Item { itemID: number; name: string; updatedAt?: string; domainList: string[]; note?: string }
+interface Item { itemID: number; name: string; updatedAt?: string; domainList?: string[]; note?: string }
 interface S { itemList: Record<number, Item> }
 const primaryKeyList = { itemList: 'itemID' } as const;
 
 const full = (name: string, updatedAt?: string): Item => ({ itemID: 1, name, updatedAt, domainList: ['a.com', 'b.com'], note: 'n' });
-const thin = (name: string, updatedAt?: string): Item => ({ itemID: 1, name, updatedAt, domainList: [] });
+const thin = (name: string, updatedAt?: string): Item => ({ itemID: 1, name, updatedAt });
 
 const options = (versioned = false): ApplyChangeSetOptions<S> => ({
   metaList: new Map(),
@@ -27,11 +27,16 @@ const run = (stepList: Array<{ seq: number; change: CdeebeeChangeSet<S> }>, vers
 };
 
 describe('fill', () => {
-  it('fills only keys the base lacks or holds as []', () => {
-    const base = { a: 1, b: [], c: undefined, d: 'x' };
-    expect(fill(base, { a: 2, b: [1], c: 3, d: 'y', e: 5 })).toEqual({ a: 1, b: [1], c: 3, d: 'x', e: 5 });
+  it('copies explicit empty and undefined donor fields when absent', () => {
+    const result = fill({}, { values: [], removed: undefined });
+    expect(result).toEqual({ values: [], removed: undefined });
+    expect(Object.hasOwn(result, 'removed')).toBe(true);
   });
-  it('ignores donor holes and returns the same reference when nothing is filled', () => {
+  it('fills only absent own keys and preserves explicit values', () => {
+    const base = { a: 1, b: [], c: undefined, d: 'x' };
+    expect(fill(base, { a: 2, b: [1], c: 3, d: 'y', e: 5 })).toEqual({ a: 1, b: [], c: undefined, d: 'x', e: 5 });
+  });
+  it('returns the same reference when all donor keys are already present', () => {
     const base = { a: 1, b: [] };
     expect(fill(base, { a: undefined, b: [] })).toBe(base);
   });
@@ -74,6 +79,15 @@ describe('mergeEntity', () => {
 });
 
 describe('completeness: thin and full responses commute', () => {
+  it.each([false, true])('a partial response explicitly clears fields regardless of arrival order (reverse=%s)', reverse => {
+    const steps = [
+      { seq: 1, change: { itemList: { upsertList: [full('old')] } } },
+      { seq: 2, change: { itemList: { patchList: [{ itemID: 1, domainList: [], note: undefined }] } } },
+    ];
+    const { storage } = run(reverse ? steps.reverse() : steps);
+    expect(storage.itemList[1]).toMatchObject({ itemID: 1, name: 'old', domainList: [], note: undefined });
+    expect(Object.hasOwn(storage.itemList[1], 'note')).toBe(true);
+  });
   const fullChange = (name: string): CdeebeeChangeSet<S> => ({ itemList: { upsertList: [full(name)] } });
   const thinChange = (name: string): CdeebeeChangeSet<S> => ({ itemList: { patchList: [thin(name)] } });
 

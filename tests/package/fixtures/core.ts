@@ -10,6 +10,9 @@ export const db = createCdeebee<Storage>({
   pluginList: [queryQueue(options), queryQueue<Storage>(bareOptions), queryQueue(bareOptions)],
 });
 db.setEntity('userList', 1, { name: 'Ada' });
+db.commit({ userList: { patchList: [{ userID: 1 }] } }, { source: 'set' });
+const resetSourceIsPrivate: 'reset' extends Parameters<typeof db.commit>[1]['source'] ? false : true = true;
+void resetSourceIsPrivate;
 const name: string = db.getState().storage.userList[1].name;
 void name;
 db.reset();

@@ -7,7 +7,7 @@ interface S { itemList: Record<number, Item> }
 const N = 10_000;
 const at = (n: number) => new Date(1_700_000_000_000 + n * 1000).toISOString();
 const full = (i: number, v = 0): Item => ({ itemID: i, groupID: i % 100, name: `n${i}`, updatedAt: at(v), tagList: ['a', 'b'], note: 'x' });
-const thin = (i: number, v = 0): Item => ({ itemID: i, groupID: i % 100, name: `t${i}`, updatedAt: at(v), tagList: [] });
+const thin = (i: number, v = 0): Partial<Item> => ({ itemID: i, groupID: i % 100, name: `t${i}`, updatedAt: at(v) });
 
 const fullList = Array.from({ length: N }, (_, i) => full(i + 1));
 const fullCopyList = fullList.map(item => ({ ...item }));

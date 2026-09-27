@@ -4,7 +4,7 @@ import { history } from '../../../lib/plugins/history';
 import { retry } from '../../../lib/plugins/retry';
 import { cancelation } from '../../../lib/plugins/cancelation';
 import { queryQueue } from '../../../lib/plugins/queryQueue';
-import type { CdeebeePlugin } from '../../../lib/core/types';
+import type { CdeebeePlugin, CdeebeeRequestContext } from '../../../lib/core/types';
 import { deferred, jsonResponse, mockFetch, tick } from '../test-helpers';
 
 interface Item { id: number; version: number; name: string; detail?: string }
@@ -199,6 +199,34 @@ describe('retry lifecycle', () => {
 });
 
 describe('store reset', () => {
+  it.each(['onError', 'onSettled'] as const)('returns abort when reset interrupts %s of a failed request', async phase => {
+    let retainedContext!: CdeebeeRequestContext<Storage>;
+    const ready = deferred<void>();
+    const release = deferred<void>();
+    const onError = vi.fn();
+    const onSettled = vi.fn();
+    const requestHistory = history<Storage>({ ignoreAbort: false });
+    const db = createCdeebee<Storage>({
+      fetch: { fetch: mockFetch([new TypeError('offline')]) }, primaryKeyList,
+      pluginList: [
+        { name: 'pending', [phase]: async (ctx: CdeebeeRequestContext<Storage>) => { retainedContext = ctx; ready.resolve(); await release.promise; } },
+        { name: 'later', onError, onSettled },
+        requestHistory,
+      ],
+    });
+    const result = db.requestSettled({ api: '/read' });
+    await ready.promise;
+    db.reset();
+    release.resolve();
+    await expect(result).resolves.toMatchObject({ ok: false, error: { kind: 'abort', cause: { kind: 'network' } } });
+    const settled = await result;
+    if (!settled.ok) expect(retainedContext.error).toBe(settled.error);
+    if (phase === 'onError') expect(onError).not.toHaveBeenCalled();
+    expect(onSettled).not.toHaveBeenCalled();
+    expect(requestHistory.getLast('/read')).toBeUndefined();
+    expect(db.getState().activeRequestList).toEqual([]);
+  });
+
   it('signals hooks already settling and suppresses their remaining callbacks and result after reset', async () => {
     const ready = deferred<void>();
     const release = deferred<void>();
@@ -301,4 +329,42 @@ describe('store reset', () => {
     expect(onReset).toHaveBeenCalledTimes(2);
     expect(log).toHaveBeenCalledTimes(2);
   });
+});
+
+it('starts requests queued by reset hooks after every plugin has reset', async () => {
+  const requestHistory = history<Storage>();
+  const onReset = vi.fn();
+  let fresh: ReturnType<typeof db.requestSettled> | undefined;
+  let fetched = false;
+  const db = createCdeebee<Storage>({
+    fetch: { fetch: async () => { fetched = true; return jsonResponse(response); } }, primaryKeyList,
+    pluginList: [
+      { name: 'restart', onReset: () => {
+        onReset();
+        db.reset();
+        fresh = db.requestSettled({ api: '/fresh' });
+        expect(db.getState().activeRequestList).toEqual([]);
+        expect(fetched).toBe(false);
+      } },
+      cancelation({ mode: 'latest' }), queryQueue(), requestHistory,
+    ],
+  });
+  db.reset();
+  expect(onReset).toHaveBeenCalledTimes(1);
+  await expect(fresh).resolves.toEqual({ ok: true, response });
+  expect(requestHistory.getLast('/fresh')?.response).toEqual(response);
+  expect(db.getState().activeRequestList).toEqual([]);
+});
+
+it('drains deferred writes and remains usable after a deferred commit fails', () => {
+  const db = createCdeebee<Storage>({ fetch: {}, primaryKeyList, pluginList: [
+    { name: 'writes', onReset: () => {
+      db.commit({ missing: { patchList: [item] } } as never, { source: 'set' });
+      db.setEntity('itemList', 1, item);
+    } },
+  ] });
+  expect(() => db.reset()).toThrow('unknown list');
+  expect(db.getState().storage.itemList[1]).toEqual(item);
+  db.setEntity('itemList', 1, { name: 'after' });
+  expect(db.getState().storage.itemList[1].name).toBe('after');
 });

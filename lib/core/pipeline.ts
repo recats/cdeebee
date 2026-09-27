@@ -110,10 +110,7 @@ export async function runRequest<S, R, D>(
   };
 
   internal.addActiveRequest(ctx.api, requestID, controller);
-  let settled = false;
   const settle = async () => {
-    if (settled) return;
-    settled = true;
     detachSignal();
     internal.removeActiveRequest(ctx.api, requestID);
     try {
@@ -176,16 +173,13 @@ export async function runRequest<S, R, D>(
         throw toRequestError(error, ctx, 'normalize');
       }
     }
-
-    await settle();
-    if (generation !== internal.getGeneration()) throw abortError(ctx);
-    return ctx.response as R;
   } catch (error) {
     ctx.error = controller.signal.aborted ? abortError(ctx, undefined, error) : toRequestError(error, ctx);
-    if (!settled) {
-      for (let i = 0; i < pluginList.length && generation === internal.getGeneration(); i += 1) await runIsolated(pluginList[i], 'onError', ctx);
-    }
-    await settle();
-    throw ctx.error;
+    for (let i = 0; i < pluginList.length && generation === internal.getGeneration(); i += 1) await runIsolated(pluginList[i], 'onError', ctx);
   }
+
+  await settle();
+  if (generation !== internal.getGeneration() && ctx.error?.kind !== 'abort') ctx.error = abortError(ctx, undefined, ctx.error);
+  if (ctx.error) throw ctx.error;
+  return ctx.response as R;
 }

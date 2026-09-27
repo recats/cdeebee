@@ -6,8 +6,8 @@ interface Item { itemID: number; name: string; domainList: string[] }
 interface S { itemList: Record<number, Item> }
 
 const full = { itemID: 1, name: 'full', domainList: ['a.com'] };
-const thin = { itemID: 1, name: 'thin', domainList: [] };
-const envelope = (item: Item) => ({ itemList: { data: [item], primaryKey: 'itemID' } });
+const thin = { itemID: 1, name: 'thin' };
+const envelope = (item: Partial<Item>) => ({ itemList: { data: [item], primaryKey: 'itemID' } });
 
 const controllableFetch = () => {
   const deferredList: Array<ReturnType<typeof deferred<Response>>> = [];

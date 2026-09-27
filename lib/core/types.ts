@@ -26,7 +26,7 @@ export type CdeebeeApiStrategyList<S> = Record<string, CdeebeeStrategyList<S>>;
 
 export interface CdeebeeListChange<E = CdeebeeEntity> {
   upsertList?: E[];
-  patchList?: E[];
+  patchList?: Partial<E>[];
   setList?: E[];
   removeIDList?: EntityID[];
   replaceList?: Record<EntityID, E>;
@@ -39,7 +39,7 @@ export interface CdeebeeChangedList<S> {
 }
 
 export interface CdeebeeCommitMeta {
-  source: 'request' | 'set';
+  source: 'request' | 'set' | 'reset';
   api?: string;
   requestID?: string;
   label?: string;
@@ -176,7 +176,7 @@ export interface CdeebeeInstance<S> {
   getSnapshot: () => CdeebeeSnapshot<S>;
   getPlugin: <P extends CdeebeePlugin<S>>(name: string) => P | undefined;
   getEntityMeta: <K extends ListName<S>>(listName: K, entityID: EntityID) => CdeebeeEntityMeta | undefined;
-  commit: (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta) => CdeebeeChangedList<S>[];
+  commit: (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta & { source: 'request' | 'set' }) => CdeebeeChangedList<S>[];
   setEntity: <K extends ListName<S>>(
     listName: K,
     entityID: EntityID,

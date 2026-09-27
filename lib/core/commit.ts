@@ -49,18 +49,14 @@ export const readVersion = (entity: unknown, versionKey: string | undefined): nu
   return undefined;
 };
 
-const isHole = (value: unknown): boolean => value === undefined || (Array.isArray(value) && value.length === 0);
-
 export function fill(base: CdeebeeEntity, donor: CdeebeeEntity): CdeebeeEntity {
   let result: Record<string, unknown> = base as Record<string, unknown>;
   const donorRecord = donor as Record<string, unknown>;
   const keyList = Object.keys(donorRecord);
   for (let i = 0; i < keyList.length; i += 1) {
     const key = keyList[i];
+    if (Object.hasOwn(result, key)) continue;
     const donorValue = donorRecord[key];
-    if (isHole(donorValue)) continue;
-    const current = result[key];
-    if (!isHole(current) && ((typeof current !== 'function' && key !== '__proto__') || Object.hasOwn(result, key))) continue;
     if (result === base) result = { ...result };
     if (key === '__proto__') Object.defineProperty(result, key, { value: donorValue, enumerable: true, writable: true, configurable: true });
     else result[key] = donorValue;

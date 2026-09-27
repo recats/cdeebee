@@ -12,17 +12,6 @@ interface QueueTicket {
   release: () => void;
 }
 
-// Resolves early on abort: runRequest re-checks the signal after every onResponse hook and throws the abort error itself.
-const waitForPrevious = (previous: Promise<void>, signal: AbortSignal): Promise<void> => new Promise(resolve => {
-  const onAbort = () => resolve();
-  if (signal.aborted) { onAbort(); return; }
-  signal.addEventListener('abort', onAbort, { once: true });
-  previous.then(() => {
-    signal.removeEventListener('abort', onAbort);
-    resolve();
-  });
-});
-
 export function queryQueue<S>(options: CdeebeeQueryQueueOptions<S> = {}): CdeebeePlugin<S> {
   const tailMap = new Map<string, Promise<void>>();
   const ticketMap = new Map<string, QueueTicket>();
@@ -47,10 +36,7 @@ export function queryQueue<S>(options: CdeebeeQueryQueueOptions<S> = {}): Cdeebe
       tailMap.set(key, tail);
       void tail.then(() => { if (tailMap.get(key) === tail) tailMap.delete(key); });
     },
-    onResponse: async ctx => {
-      const ticket = ticketMap.get(ctx.requestID);
-      if (ticket) await waitForPrevious(ticket.previous, ctx.controller.signal);
-    },
+    onResponse: ctx => ticketMap.get(ctx.requestID)?.previous,
     onSettled: ctx => {
       const ticket = ticketMap.get(ctx.requestID);
       if (!ticket) return;

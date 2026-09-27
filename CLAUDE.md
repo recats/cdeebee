@@ -22,7 +22,7 @@ pnpm bench:compare      # Same, printing the delta against bench/baseline.json
 pnpm bench:save         # Rewrite bench/baseline.json — only after an intended perf change
 ```
 
-Performance is guarded twice: `tests/lib/perf.test.ts` asserts listener counts and coarse time budgets (order-of-magnitude only, so CI stays stable), and `tests/bench/store.bench.ts` measures the commit paths on 10k entities. Before merging anything that touches `lib/core`, run `pnpm bench:compare` and look at the mean deltas; a real regression shows as a consistent slowdown across runs, not a single noisy sample.
+Performance is guarded twice: `tests/lib/perf.test.ts` asserts listener counts and coarse time budgets (order-of-magnitude only, so CI stays stable), and `tests/bench/store.bench.ts` measures the commit paths on 10k entities. The two `patch thin` benchmarks now omit uncomputed fields instead of supplying placeholder arrays; their saved baseline measures the old workload. After this migration is merged, regenerate it with `pnpm bench:save`. Before merging anything that touches `lib/core`, run `pnpm bench:compare` and look at the mean deltas; a real regression shows as a consistent slowdown across runs, not a single noisy sample.
 
 Run a single test file:
 ```bash
@@ -59,7 +59,7 @@ Two package entry points: `@recats/cdeebee` (`lib/index.ts`, everything) and `@r
 ### Strategies
 
 Resolved per list as `options.strategyList[list] ?? settings.apiStrategyList[api][list] ?? settings.strategyList[list] ?? 'patch'`:
-- **`patch`** (default): incoming fields override, missing keys and `[]` are holes filled from the stored entity. For thin endpoints.
+- **`patch`** (default): incoming fields override, only absent own keys are filled from the stored entity; explicit `[]`, `undefined`, and `null` overwrite. For thin endpoints.
 - **`upsert`**: the entity is replaced whole. For full-fetch and save endpoints — declared in `settings.apiStrategyList`.
 - **`replaceList`**: the list becomes exactly the response's entities.
 - **`skip`**: the list is untouched.
@@ -80,7 +80,7 @@ Decision order for one write, sent at `seq`:
 
 1. `seq < removedSeq` — dropped. A response sent before the entity's removal cannot fill or overwrite it, even with a newer version.
 2. Entity absent — `isStale(prevMeta, listSeq, seq)`: dropped when sent before the tombstone or the list's last reset, otherwise written as new (`complete` only for `upsert`) with the list boundary carried as `removedSeq`. Equal sequence passes, so the parts of one commit apply in order.
-3. Entity stored — `mergeEntity`: versions compare first, `writeSeq` only when versions are equal or unknown. Newer: `upsert` / `set` replace whole, `patch` = `fill(incoming, stored)`. Older: dropped when complete, otherwise `fill(stored, incoming)`. Either way `seq` becomes `max(seq, stored)`: even a write that lost by version confirms the entity existed at its send. `fill` treats `undefined` and `[]` as holes.
+3. Entity stored — `mergeEntity`: versions compare first, `writeSeq` only when versions are equal or unknown. Newer: `upsert` / `set` replace whole, `patch` = `fill(incoming, stored)`. Older: dropped when complete, otherwise `fill(stored, incoming)`. Either way `seq` becomes `max(seq, stored)`: even a write that lost by version confirms the entity existed at its send. `fill` copies only absent own keys; explicit `undefined`, `null`, and `[]` are values.
 
 Per operation:
 
@@ -148,8 +148,10 @@ Enforced by ESLint:
 
 `initialStorage` seeds metadata (`version`, `seq: 0`, `writeSeq: 0`, `complete: false`). Never silently discard its server versions. `primaryKeyList` is the storage schema; normalize ignores undeclared envelopes and commit validates all list names before writing any list.
 
-`db.reset()` advances a generation, clears storage and active requests, calls isolated synchronous `onReset` hooks, aborts old controllers, and flushes subscriptions. Old generations receive no further `onError`/`onSettled` hooks. Built-in stateful plugins reset their state and queues. An asynchronous plugin already running is responsible for checking its signal before its own side effects. `onCommit` failures are isolated like `onReset`, `onError`, and `onSettled` failures.
+`db.reset()` advances a generation, clears storage and active requests, calls isolated synchronous `onReset` hooks, aborts old controllers, emits one `onCommit` with `source: 'reset'` and `label: 'reset'` (even when storage was already empty), and flushes subscriptions. DevTools recognizes the reserved reset source, not the display label, and sends its reset snapshot from this final commit notification so plugin order cannot retain old history. Old generations receive no further `onError`/`onSettled` hooks. If reset interrupts a failed request during one of those hooks, its final error is `kind: 'abort'` with the original non-abort request error in `cause`; an already-running hook is still awaited. Built-in stateful plugins reset their state and queues. An asynchronous plugin already running is responsible for checking its signal before its own side effects. `onCommit` failures are isolated like `onReset`, `onError`, and `onSettled` failures.
+
+Public `commit` permits only `source: 'request' | 'set'`; only `reset()` emits `'reset'`. Synchronous mutations and requests reentered during reset cleanup/notification are queued until every reset observer has seen cleared storage, then replayed in call order. Updater functions evaluate during replay. A deferred commit's returned change list is populated during replay; failures surface from the outer reset after the remaining operations are attempted. Explicit flush is deferred, and recursive reset calls during cleanup/notification are coalesced. Each replayed write emits its own accurate change list and snapshot after the reset event.
 
 `abortable` stops waiting for fetch/request/response hooks and observes late rejections. Retry waits remove listeners on completion and abort. Preparation failures are `kind: 'request'`, never retryable; `onRetry` failures and invalid dynamic delays are `kind: 'plugin'`.
 
-Storage/history dictionaries have null prototypes. `createRecord` builds them via normal spread followed by `Object.setPrototypeOf`. Because every stored entity list is null-prototype, `commit.ts` indexes lists directly instead of `Object.hasOwn` (the hasOwn calls cost ~15% on `setEntity`); `applyChangeSet` copies a plain-prototype input list through `createRecord` first so direct callers such as tests get the same guarantee. `fill` calls `Object.hasOwn` only for function-valued or `__proto__` keys, since only those can be inherited from `Object.prototype` on a plain entity. Keep the entity-list copy sites in `commit.ts` separate from the generic record clone: mixing numeric entity dictionaries with storage/history shapes in one spread call site causes a large V8 performance regression. Re-run the isolated numeric-ID benchmark when changing this code.
+Storage/history dictionaries have null prototypes. `createRecord` builds them via normal spread followed by `Object.setPrototypeOf`. Because every stored entity list is null-prototype, `commit.ts` indexes lists directly instead of `Object.hasOwn` (the hasOwn calls cost ~15% on `setEntity`); `applyChangeSet` copies a plain-prototype input list through `createRecord` first so direct callers such as tests get the same guarantee. `fill` checks own-key presence with `Object.hasOwn`, so explicit undefined values and prototype-named fields are preserved. Keep the entity-list copy sites in `commit.ts` separate from the generic record clone: mixing numeric entity dictionaries with storage/history shapes in one spread call site causes a large V8 performance regression. Re-run the isolated numeric-ID benchmark when changing this code.

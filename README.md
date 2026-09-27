@@ -61,7 +61,7 @@ createCdeebee<Storage>({
 
 An API response is expected to carry one or more list envelopes shaped `{ data: [...], primaryKey: 'fieldName' }`. On a successful request, each envelope is normalized into `storage.<listName>[entityID]` — keyed by the entity's primary key. Any other key on the response (not a list envelope) is not stored; it is only available on the value the request promise resolves with.
 
-`primaryKeyList` defines the storage schema and each list's primary key. The default normalizer ignores undeclared lists; their data remains available in the full response. A custom normalizer or direct `commit` that names an undeclared list is rejected before writing any of its lists. If an envelope's `primaryKey` disagrees with the configured key, cdeebee warns in development and uses the configured key.
+`primaryKeyList` defines the storage schema and each list's primary key. The default normalizer ignores undeclared lists; their data remains available in the full response. A custom normalizer or direct `commit` that names an undeclared list is rejected before writing any of its lists. If an envelope's `primaryKey` disagrees with the configured key, cdeebee warns in development and uses the configured key. A `patchList` entry without a string or number primary key is skipped (with `console.error` in development); it does not throw.
 
 Storage and history dictionaries have no prototype, so IDs and API names such as `__proto__` and `constructor` are ordinary keys. Use `Object.keys`, `Object.values`, or `Object.hasOwn` to inspect them. Entities are plain data objects; stored objects, arrays, and index sets are borrowed read-only values. Do not mutate them or pass an object to the store and mutate it later; use the mutation methods instead. Equality is shallow: freshly parsed nested objects count as changed even if their contents match.
 
@@ -71,12 +71,12 @@ Each list is merged into storage according to a strategy, resolved as `options.s
 
 | Strategy | Behavior |
 |---|---|
-| `patch` (default) | Each entity in the response overrides only the fields it carries. A missing key or an empty array is read as "this endpoint did not compute it" and the stored value is kept. Entities absent from the response are kept. |
+| `patch` (default) | Each entity in the response overrides only the fields it carries. An absent own key keeps the stored value; explicit `[]`, `undefined`, and `null` overwrite it. Entities absent from the response are kept. |
 | `upsert` | Each entity in the response replaces the stored one whole — every field, including omitted ones and `[]`, is authoritative. Entities absent from the response are kept. |
 | `replaceList` | The whole list is replaced with only the entities in the response — except entities the store wrote at a later send or newer version, which are kept as they are (see Freshness). |
 | `skip` | The list is left untouched. |
 
-The split is by endpoint, not by list: most endpoints return an entity in a *thin* shape (a stats endpoint listing items without their relation lists, a verify endpoint listing what the user can see), and a few return it *full* (get-with-relations, save). Declare the full ones once in `settings.apiStrategyList`; everything else patches by default and can never wipe a field it did not compute:
+The split is by endpoint, not by list: most endpoints return an entity in a *thin* shape (a stats endpoint listing items without their relation lists, a verify endpoint listing what the user can see), and a few return it *full* (get-with-relations, save). Declare the full ones once in `settings.apiStrategyList`; everything else patches by default and preserves fields omitted by the normalizer:
 
 ```ts
 createCdeebee<Storage>({
@@ -87,7 +87,9 @@ createCdeebee<Storage>({
 });
 ```
 
-Save and full-fetch endpoints **must** be `upsert`: with `patch`, a field the server cleared (sent as an omitted key or `[]`) would keep its stale value.
+Use `upsert` for save and full-fetch endpoints when omitted fields mean deletion. With `patch`, omitted fields retain their values; explicit empty arrays clear them. If a thin DTO uses empty arrays or nested objects as placeholders, omit those fields in an application normalizer before committing. Normalization should depend on the response and endpoint, not on what happens to be cached.
+
+Query membership, statistics for a date range, and server ordering belong to the query result. Keep them separate from canonical entities: read result IDs with `useLastResultIDList`, current entity values with `useEntityList`, and query-only fields from `useLastResponse`. Reserve `replaceList` for responses that authoritatively enumerate the entire stored list (for example, dictionaries). A filtered search must not delete entities cached by another screen.
 
 ## Freshness and completeness
 
@@ -99,9 +101,9 @@ Two responses can carry the same entity and disagree — because one is thin and
 | incoming write | stored entity | result |
 |---|---|---|
 | newer, `upsert` | any | replaced whole, `complete` |
-| newer, `patch` | any | incoming fields win, holes filled from stored; `complete` only if the version did not change |
+| newer, `patch` | any | incoming own fields win, absent keys filled from stored; `complete` only if the version did not change |
 | older | `complete` | dropped |
-| older | incomplete | stored fields win, incoming fills the holes; `complete` if it was an `upsert` at the same version |
+| older | incomplete | stored own fields win, incoming fills absent keys; `complete` if it was an `upsert` at the same version |
 
 `db.getEntityMeta(listName, entityID)` returns a detached `{ version, seq, complete }` for debugging and tests. `seq` is the latest send that confirmed the entity exists; write ordering and removal boundaries stay internal, and a removed entity has no meta, like one never seen. Local mutations (`setEntity`) replace the entity whole at a fresh sequence (an edit can clear an array or unset a field) and keep its completeness flag, so a slow response to an earlier request cannot overwrite what the user just typed. `replaceList` is checked per entity the same way: a stale list response neither overrides nor removes entities written by a later send.
 
@@ -124,7 +126,13 @@ Storage can also be changed without a request, through the same commit path (so 
 
 Call `db.reset()` when logging out or switching accounts, after updating the credentials supplied by your fetch settings. It advances the store's request generation and list boundaries: a response from the old session cannot repopulate storage or history, including when a custom fetch ignores its abort signal. New requests use fresh cancellation and queue slots. The store remains usable and existing hooks remain subscribed.
 
-Stateful custom plugins implement synchronous `onReset()` to clear their state and release resources. Requests started before reset receive no further error/settled hooks; `onReset` replaces their cleanup. Hooks already executing cannot be forcibly stopped: asynchronous plugin code must honor `ctx.controller.signal` before performing its own side effects after an `await`. Reset clears library-owned data, not application state held elsewhere.
+Stateful custom plugins implement synchronous `onReset()` to clear their state and release resources. Requests started before reset receive no further error/settled hooks; `onReset` replaces their cleanup. Hooks already executing cannot be forcibly stopped: asynchronous plugin code must honor `ctx.controller.signal` before performing its own side effects after an `await`. Reset clears library-owned data, not application state held elsewhere. Reset emits one `onCommit` with `meta.source === 'reset'` and the display label `'reset'` after every `onReset` hook and controller abort, before subscriptions flush. This notification also runs when storage was already empty, since plugin state may have changed. DevTools uses the reset source to capture the cleared plugin state regardless of plugin order; a user commit labelled `'reset'` remains an ordinary action.
+
+The `'reset'` source is reserved for `db.reset()`; public `db.commit` accepts only `'set'` or `'request'` and rejects other sources. Mutations and requests invoked synchronously from reset hooks, abort listeners, or reset commit observers are queued until the reset notification has reached every plugin. They then run in call order, with ordinary commit notifications and current-state updater evaluation. Reset observers see cleared storage; each subsequent action has its own `changedList` and snapshot. Explicit `flush()` waits until that reset notification completes. A nested `reset()` during this phase is coalesced into the current reset.
+
+A deferred `commit` returns an initially empty change list that is populated when its write runs, before the outer `reset()` returns. Deferred write failures are reported to the outer reset caller after the remaining queued operations are attempted. Calls outside reset keep their synchronous behavior.
+
+If `reset()` occurs while a failed request is awaiting `onError` or `onSettled`, the request ultimately rejects with `kind: 'abort'`; `cause` retains the original non-abort request error. `requestSettled()` returns that same error in its failure result. A hook already running is still awaited, but no remaining error/settled hooks run for the old generation.
 
 ### Deletions and resets
 

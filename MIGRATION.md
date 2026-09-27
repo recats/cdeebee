@@ -64,7 +64,7 @@ Replace `settings.listStrategy` with `settings.strategyList` and per-request `li
 
 | Strategy | Behavior in 4.x |
 |---|---|
-| `patch` | Default for thin responses: incoming fields win, while missing fields and empty arrays retain stored values |
+| `patch` | Default for thin responses: incoming own fields win; only absent keys retain stored values. Explicit `[]` and `undefined` now overwrite values |
 | `upsert` | Full entities replace stored entities, including omitted fields and empty arrays |
 | `replaceList` | Replaces the list, subject to entity freshness and deletion boundaries |
 | `skip` | Leaves the list untouched |
@@ -119,10 +119,24 @@ Move Redux middleware for `cdeebee/request/*` actions into plugins. Use `onReque
 
 `onCommit` and `onReset` are synchronous observers. Their errors, like failures in `onError` and `onSettled`, are logged and isolated. Throwing from `onCommit` does not reject an already successful save; use `onResponse` or `normalize` to reject data before it is written.
 
-Call `db.reset()` after updating credentials when logging out or switching accounts. It empties storage, loading, and built-in plugin state, invalidates old requests, and preserves subscriptions. It does not restore `initialStorage`. Stateful custom plugins implement `onReset()` to clear their state and release resources: old requests receive no further error/settled hooks. Asynchronous hooks already running must check `ctx.controller.signal` before their own side effects after an `await`.
+Call `db.reset()` after updating credentials when logging out or switching accounts. It empties storage, loading, and built-in plugin state, invalidates old requests, and preserves subscriptions. It does not restore `initialStorage`. Stateful custom plugins implement `onReset()` to clear their state and release resources: old requests receive no further error/settled hooks. The reset `onCommit` notification carries `meta.source === 'reset'` (reserved for `db.reset()`, independent of the display label) and runs after all plugins have cleared their state and old controllers have been aborted, even if storage was already empty. Asynchronous hooks already running must check `ctx.controller.signal` before their own side effects after an `await`.
+
+Synchronous mutations and requests started from reset hooks, abort listeners, or reset commit observers run after the reset notification, in call order. Reset observers see the cleared state, followed by separate notifications for those mutations. Nested reset calls during cleanup/notification are coalesced. Public `db.commit` only accepts `source: 'set' | 'request'`; plugin observers must also handle the new `'reset'` source.
 
 Cancellation defaults to grouping by API. For independent consumers of one endpoint, use a stable key such as `cancelation({ key: ctx => JSON.stringify([ctx.api, ctx.meta.editorID]) })`. List `queryQueue` before other plugins whose response processing must wait for the queue.
 
 Retry counts must be non-negative safe integers and delays finite and non-negative. Abort and request-preparation errors are never retried. History retains at most 20 entries per API by default; `maxHistorySize: 0` or `Infinity` explicitly makes it unbounded. Storage has no automatic eviction: applications decide when to remove heavy details or reset the store.
 
 Compare the migrated application's load, save, clear-field, cancellation, and account-switch flows with its previous behavior. The [README](README.md) contains complete setup and plugin examples and the storage consistency contract.
+
+### Migrating thin DTOs from v4 betas
+
+`patchList` accepts `Partial<Entity>[]`. Each entry must carry a string or number primary key to be applied. An entry without a valid primary key is skipped, with `console.error` in development; it does not throw.
+
+Empty arrays and explicit `undefined` are now values, not missing data. If your API uses `[]` or `undefined` as placeholders, remove those fields in your normalizer. Strip uncomputed nested fields even when the entity is not cached yet; consulting storage makes results depend on response arrival order. Authoritative relation endpoints can now clear arrays with a normal patch instead of rebuilding and upserting the stored entity.
+
+The behavior of `null` is unchanged: it already overwrote stored values and requires no migration.
+
+Keep filtered result IDs, query statistics, and server ordering in query state. Patch canonical entities without query-only fields, and join those entities with the response when rendering. Do not use `replaceList` for a filtered search. Full entity responses still use `upsert`; dictionaries can use `replaceList`. Once placeholder handling is independent of storage, a shared response queue is unnecessary for thin/full merging. Keep request ordering where reads must wait for pending server writes.
+
+When migrating logout/session cleanup to `db.reset()`, implement `onReset` in application plugins that retain state or pending queues. Release waiters, clear request bookkeeping, and notify plugin subscribers there. The pipeline aborts old requests and suppresses their remaining lifecycle hooks.

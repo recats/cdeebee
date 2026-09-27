@@ -18,9 +18,6 @@ export function devtools<S>(options: CdeebeeDevtoolsOptions = {}): CdeebeePlugin
 
   return {
     name: 'devtools',
-    onReset: () => {
-      if (session) session.connection.init(session.db.getSnapshot());
-    },
     setup: instance => {
       const extension = (globalThis as { __REDUX_DEVTOOLS_EXTENSION__?: DevtoolsExtension<S> }).__REDUX_DEVTOOLS_EXTENSION__;
       if (!extension) return;
@@ -31,7 +28,8 @@ export function devtools<S>(options: CdeebeeDevtoolsOptions = {}): CdeebeePlugin
     onCommit: (_changeSet, meta) => {
       if (session === undefined) return;
       const { connection, db } = session;
-      connection.send({ type: meta.label ?? meta.source, meta }, db.getSnapshot());
+      if (meta.source === 'reset') connection.init(db.getSnapshot());
+      else connection.send({ type: meta.label ?? meta.source, meta }, db.getSnapshot());
     },
     onSettled: ctx => {
       if (session === undefined) return;
