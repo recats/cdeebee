@@ -56,6 +56,9 @@ try {
   check('@recats/cdeebee/core', 'mjs');
   check('@recats/cdeebee/core', 'cjs');
   checkTypes(['core.ts']);
+  const historyMemory = join(temporary, 'history-memory.mjs');
+  copyFileSync(new URL('./fixtures/history-memory.mjs', import.meta.url), historyMemory);
+  execFileSync(process.execPath, ['--expose-gc', historyMemory], { cwd: temporary, stdio: 'inherit' });
   symlinkSync(dirname(require.resolve('react/package.json')), join(temporary, 'node_modules', 'react'), 'dir');
   check('@recats/cdeebee', 'mjs');
   check('@recats/cdeebee', 'cjs');

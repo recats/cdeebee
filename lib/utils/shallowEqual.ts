@@ -24,3 +24,7 @@ export function shallowEqual(a: unknown, b: unknown): boolean {
   }
   return true;
 }
+
+export const keepIfShallowEqual = <T>(prev: T | undefined, next: T): T => (
+  prev !== undefined && Array.isArray(next) && shallowEqual(prev, next) ? prev : next
+);

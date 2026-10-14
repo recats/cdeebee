@@ -1,25 +1,10 @@
 import { generateRequestID } from '../utils/requestID';
-import { abortable } from './abort';
+import { abortable, sleep } from './abort';
 import { buildUrl, executeFetch, resolveData, resolveHeaderList } from './fetchClient';
 import { defaultNormalize } from './normalize';
 import { CdeebeeRequestError, toRequestError } from './requestError';
 import type { CdeebeeInternal } from './createCdeebee';
 import type { CdeebeeInstance, CdeebeeNormalize, CdeebeePlugin, CdeebeeRequestContext, CdeebeeRequestOptions, CdeebeeStrategyList } from './types';
-
-const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
-  if (signal.aborted) { reject(new DOMException('aborted', 'AbortError')); return; }
-  if (ms <= 0) { resolve(); return; }
-  const onAbort = () => {
-    clearTimeout(timer);
-    signal.removeEventListener('abort', onAbort);
-    reject(new DOMException('aborted', 'AbortError'));
-  };
-  const timer = setTimeout(() => {
-    signal.removeEventListener('abort', onAbort);
-    resolve();
-  }, ms);
-  signal.addEventListener('abort', onAbort, { once: true });
-});
 
 const abortError = (ctx: { api: string; requestID: string }, message?: string, cause?: unknown) => (
   new CdeebeeRequestError({ kind: 'abort', api: ctx.api, requestID: ctx.requestID, message, cause })
@@ -121,6 +106,20 @@ export async function runRequest<S, R, D>(
   };
 
   try {
+    let startError: CdeebeeRequestError | undefined;
+    for (const plugin of pluginList) {
+      if (generation !== internal.getGeneration()) break;
+      try {
+        const result: unknown = plugin.onRequestStart?.(ctx);
+        if (result && typeof (result as { then?: unknown }).then === 'function') {
+          void Promise.resolve(result).catch(() => {});
+          throw new TypeError('onRequestStart must be synchronous');
+        }
+      } catch (error) {
+        startError ??= toRequestError(error, ctx, 'plugin', `plugin "${plugin.name}" onRequestStart`);
+      }
+    }
+    if (startError) throw startError;
     if (controller.signal.aborted) throw abortError(ctx);
     try {
       ctx.url = buildUrl(settings.fetch.baseUrl, options.api);

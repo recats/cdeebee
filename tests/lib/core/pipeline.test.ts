@@ -31,6 +31,51 @@ const controllableFetch = () => {
 };
 
 describe('runRequest', () => {
+  it('runs all onRequestStart hooks synchronously before preparation and onRequest', async () => {
+    const gate = deferred<void>();
+    const orderList: string[] = [];
+    const fetch = mockFetch([jsonResponse({})]);
+    const db = make(fetch, {
+      fetch: { fetch, mergeWithData: () => { orderList.push('prepare'); return {}; } },
+      pluginList: [
+        { name: 'first', onRequestStart: () => { orderList.push('start:first'); }, onRequest: () => { orderList.push('request:first'); return gate.promise; } },
+        { name: 'second', onRequestStart: () => { orderList.push('start:second'); }, onRequest: () => { orderList.push('request:second'); } },
+      ],
+    });
+    const request = db.request({ api: '/x' });
+    expect(orderList).toEqual(['start:first', 'start:second', 'prepare', 'request:first']);
+    gate.resolve();
+    await request;
+    expect(orderList.at(-1)).toBe('request:second');
+  });
+
+  it('a throwing onRequestStart still registers later plugins and settles the failure', async () => {
+    const orderList: string[] = [];
+    const fetch = mockFetch([jsonResponse({})]);
+    const db = make(fetch, { pluginList: [
+      { name: 'broken', onRequestStart: () => { throw new Error('start failure'); } },
+      {
+        name: 'later',
+        onRequestStart: () => { orderList.push('start'); },
+        onError: ctx => { orderList.push(ctx.error!.kind); },
+        onSettled: () => { orderList.push('settled'); },
+      },
+    ] });
+    expect((await db.requestSettled({ api: '/x' })).error?.kind).toBe('plugin');
+    expect(orderList).toEqual(['start', 'plugin', 'settled']);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(db.getState().activeRequestList).toEqual([]);
+  });
+
+  it('rejects an async onRequestStart and observes its rejection', async () => {
+    const fetch = mockFetch([jsonResponse({})]);
+    const onRequestStart = (async () => { throw new Error('late failure'); }) as unknown as () => undefined;
+    const db = make(fetch, { pluginList: [{ name: 'async', onRequestStart }] });
+    const result = await db.requestSettled({ api: '/x' });
+    expect(result.error).toMatchObject({ kind: 'plugin', cause: expect.any(TypeError) });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('resolves with the full response and commits normalized lists', async () => {
     const fetch = mockFetch([jsonResponse(envelope([{ userID: 1, name: 'a' }]))]);
     const db = make(fetch);
@@ -312,5 +357,53 @@ describe('runRequest', () => {
     await db.request({ api: '/x', meta: { silentError: true } });
     await db.request({ api: '/y' });
     expect(seen).toEqual([{ silentError: true }, { silentError: true }, {}, {}]);
+  });
+});
+
+describe('validateResponse', () => {
+  const isSuccess = (response: unknown) => (response as { responseStatus?: string }).responseStatus === 'Success';
+  const failure = { responseStatus: 'Denied', userList: { data: [{ userID: 1, name: 'x' }], primaryKey: 'userID' } };
+
+  it('an accidentally async validator cannot commit the response', async () => {
+    const fetch = mockFetch([jsonResponse(failure)]);
+    const validateResponse = (async () => false) as unknown as () => boolean;
+    const db = make(fetch, { fetch: { fetch, validateResponse } });
+    expect((await db.requestSettled({ api: '/x' })).error?.kind).toBe('response');
+    expect(db.getState().storage.userList).toEqual({});
+  });
+
+  it('a rejected body skips onResponse, normalize and commit and reaches onError and onSettled', async () => {
+    const hookList: string[] = [];
+    const plugin: CdeebeePlugin<S> = {
+      name: 'spy',
+      onResponse: () => { hookList.push('onResponse'); },
+      onError: ctx => { hookList.push(`onError:${ctx.error?.kind}`); },
+      onSettled: () => { hookList.push('onSettled'); },
+    };
+    const normalize = vi.fn();
+    const fetch = mockFetch([jsonResponse(failure)]);
+    const db = make(fetch, { fetch: { fetch, validateResponse: isSuccess }, normalize, pluginList: [plugin] });
+    const result = await db.requestSettled({ api: '/x' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatchObject({ kind: 'response', status: 200, response: failure });
+    expect(hookList).toEqual(['onError:response', 'onSettled']);
+    expect(normalize).not.toHaveBeenCalled();
+    expect(db.getState().storage.userList).toEqual({});
+  });
+
+  it('an accepted body is normalized and committed', async () => {
+    const fetch = mockFetch([jsonResponse(envelope([{ userID: 1, name: 'a' }]))]);
+    const db = make(fetch, { fetch: { fetch, validateResponse: isSuccess } });
+    await db.request({ api: '/x' });
+    expect(db.getState().storage.userList[1]).toEqual({ userID: 1, name: 'a' });
+  });
+
+  it('a retry plugin can retry a rejected body', async () => {
+    const fetch = mockFetch([jsonResponse(failure), jsonResponse(envelope([{ userID: 2, name: 'b' }]))]);
+    const plugin: CdeebeePlugin<S> = { name: 'retryResponse', onRetry: ctx => ctx.error?.kind === 'response' && ctx.attempt === 0 ? 0 : false };
+    const db = make(fetch, { fetch: { fetch, validateResponse: isSuccess }, pluginList: [plugin] });
+    await db.request({ api: '/x' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(db.getState().storage.userList[2]).toEqual({ userID: 2, name: 'b' });
   });
 });

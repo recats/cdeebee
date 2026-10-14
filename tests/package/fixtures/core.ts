@@ -1,13 +1,18 @@
-import { createCdeebee, createSubscription, queryQueue, type CdeebeePlugin, type CdeebeeQueryQueueOptions, type CdeebeeSubscription } from '@recats/cdeebee/core';
+import { createCdeebee, createSubscription, history, queryQueue, type CdeebeeHistoryOptions, type CdeebeePlugin, type CdeebeeQueryQueueOptions, type CdeebeeSubscription } from '@recats/cdeebee/core';
 
 interface Storage { userList: Record<number, { userID: number; name: string }> }
 const options: CdeebeeQueryQueueOptions<Storage> = { key: ctx => ctx.api };
 const bareOptions: CdeebeeQueryQueueOptions = { apiList: ['/x'] };
+const historyOptions: CdeebeeHistoryOptions<Storage> = { key: ctx => String(ctx.meta.scope ?? ctx.api) };
+const bareHistoryOptions: CdeebeeHistoryOptions = { maxHistorySize: 5 };
+const startPlugin: CdeebeePlugin<Storage> = { name: 'start', onRequestStart: ctx => { ctx.meta.started = true; } };
+const startRejectsAsync: (() => Promise<void>) extends NonNullable<CdeebeePlugin<Storage>['onRequestStart']> ? false : true = true;
+void startRejectsAsync;
 export const db = createCdeebee<Storage>({
-  fetch: {},
+  fetch: { validateResponse: (response, ctx) => ctx.responseType !== 'json' || (response as { ok?: boolean }).ok === true },
   primaryKeyList: { userList: 'userID' },
   indexList: { userList: ['userID'] },
-  pluginList: [queryQueue(options), queryQueue<Storage>(bareOptions), queryQueue(bareOptions)],
+  pluginList: [startPlugin, queryQueue(options), queryQueue<Storage>(bareOptions), queryQueue(bareOptions), history(historyOptions), history<Storage>(bareHistoryOptions)],
 });
 db.setEntity('userList', 1, { name: 'Ada' });
 db.commit({ userList: { patchList: [{ userID: 1 }] } }, { source: 'set' });

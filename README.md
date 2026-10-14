@@ -57,6 +57,19 @@ createCdeebee<Storage>({
 });
 ```
 
+### Failures inside an ok response
+
+Some APIs answer `200` and report failure in the body (GraphQL `errors`, JSON-RPC `error`, a `status` field in an envelope). `settings.fetch.validateResponse(response, ctx)` runs on every parsed ok response; only a synchronous `true` accepts the body; any other return value (including a Promise), or throwing, rejects the request with `kind: 'response'`, carrying `status` and the parsed body in `response`. A rejected body skips `onResponse`, normalization and commit, is offered to `onRetry`, and reaches `onError`, `onSettled` and the `history` plugin's `errorList` like any other failure. `ctx` is `{ api, requestID, status, responseType }`, so a validator can let `text` and `blob` responses through.
+
+```ts
+createCdeebee<Storage>({
+  fetch: {
+    validateResponse: (response, ctx) => ctx.responseType !== 'json' || (response as { status?: string })?.status === 'ok',
+  },
+  primaryKeyList: { campaignList: 'campaignID' },
+});
+```
+
 ## Storage model
 
 An API response is expected to carry one or more list envelopes shaped `{ data: [...], primaryKey: 'fieldName' }`. On a successful request, each envelope is normalized into `storage.<listName>[entityID]` — keyed by the entity's primary key. Any other key on the response (not a list envelope) is not stored; it is only available on the value the request promise resolves with.
@@ -158,7 +171,7 @@ A removal leaves a sequence tombstone and a reset (`clearList` / `replaceList`) 
 | `normalize` | `(response, ctx) => ChangeSet` | Per-request normalize override; falls back to `settings.normalize`, then the built-in `defaultNormalize`. |
 | `ignoreStorage` | `boolean` | Skip normalizing and committing the response entirely; the request still resolves with the raw response. |
 | `signal` | `AbortSignal` | External abort signal, in addition to the one cdeebee manages internally. |
-| `historyClear` | `boolean` | Clear the `history` plugin's entries for this `api` before the request starts — the classic "reset the form's server error on resubmit". |
+| `historyClear` | `boolean` | Clear the `history` plugin's entries for this request's history key (the `api` by default) before the request starts, and ignore responses to requests sent earlier under that key — the classic "reset the form's server error on resubmit". |
 | `meta` | `Record<string, unknown>` | Free-form data for your plugins, exposed as `ctx.meta` (defaults to `{}`), e.g. `meta: { silentError: true }`. |
 
 The library always sets an `ui-request-id` header to the request's internal id; it cannot be overridden by `headerList`. Header names are merged case-insensitively: per-request values replace settings, and `ui-request-id` remains library-owned. For JSON bodies, callers may set their own `Content-Type` via `headerList`.
@@ -169,7 +182,7 @@ A rejected request throws a `CdeebeeRequestError`:
 
 ```ts
 interface CdeebeeRequestError extends Error {
-  kind: 'http' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize' | 'request';
+  kind: 'http' | 'response' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize' | 'request';
   api: string;
   requestID: string;
   status?: number;
@@ -178,6 +191,7 @@ interface CdeebeeRequestError extends Error {
 ```
 
 - `'http'` — the server responded with a non-ok status; `status` and the parsed body (`response`) are set.
+- `'response'` — the server responded with an ok status, but `settings.fetch.validateResponse` rejected the body; `status` and the parsed body (`response`) are set, and a throwing validator is the error's `cause`.
 - `'network'` — `fetch` itself threw (offline, DNS, CORS, ...).
 - `'request'` — preparing the URL, dynamic headers/data, or request body failed before fetch was called. These failures are not retried.
 - `'abort'` — the request was aborted (external `signal`, `cancelation` plugin, or a plugin returning `false` from `onRequest`), including an abort that happens while a non-ok response body is still being parsed.
@@ -222,10 +236,10 @@ All hooks are returned from `createCdeebeeHooks(db)` and only re-render a compon
 | `useLoading(api)` | whether `api` (one string or a list) is currently in flight |
 | `useIsLoading()` | whether any request at all is currently in flight |
 | `useStore(selector, equalityFn?)` | the whole state (storage + `activeRequestList`), through `selector`; `equalityFn` defaults to `Object.is` |
-| `useRequestHistory(api)` | successful request history for `api` (requires the `history` plugin) |
-| `useRequestErrorList(api)` | failed request history for `api` (requires the `history` plugin) |
-| `useLastResultIDList(api, listName)` | the IDs for `listName` from the latest successful normalized response containing lists; explicitly empty lists clear IDs, responses without lists retain them (requires the `history` plugin) |
-| `useLastResponse<R>(api)` | the newest successful response for `api` (`undefined` before the first one); use it for the non-list parts of a response (`extension`, `rawResponse`) instead of keeping a copy in your own state (requires the `history` plugin) |
+| `useRequestHistory(key)` | successful request history for a history key — the `api` unless `history({ key })` says otherwise (requires the `history` plugin) |
+| `useRequestErrorList(key)` | failed request history for a history key (requires the `history` plugin) |
+| `useLastResultIDList(key, listName)` | the IDs for `listName` from the latest-sent successful normalized response containing lists; explicitly empty lists clear IDs, responses without lists retain them (requires the `history` plugin) |
+| `useLastResponse<R>(key)` | the latest-sent successful response for a history key (`undefined` before the first one); use it for the non-list parts of a response (`extension`, `rawResponse`) instead of keeping a copy in your own state (requires the `history` plugin) |
 
 `usePluginState(subscribe, getSnapshot, keyList)` is the building block the history hooks are made of, exported standalone for app plugins that keep their own state: it subscribes `getSnapshot` to the given keys through any `CdeebeeSubscription['subscribe']` (`db.subscribeRequest`, `history().subscribe`, or your plugin's own `createSubscription().subscribe`) and re-renders only when one of them is notified. `getSnapshot` may be an inline closure — only its *result* has to be stable between notifications (return the stored reference, or an `EMPTY_LIST` constant instead of a fresh `[]`). The subscription is re-created only when `subscribe` or the contents of `keyList` change, so passing a new array with the same keys is free. See the plugin section for a stateful plugin example.
 
@@ -250,16 +264,20 @@ function CampaignRow({ campaignID }: { campaignID: number }) {
 Every request runs through the pipeline in this order:
 
 ```
-onRequest → fetch (+ onRetry loop) → onResponse → commit → onCommit → onSettled → resolve
-         ↘ failure ─────────────────────────────────────→ onError → onSettled → reject
+onRequestStart (sync) → abort check → prepare → onRequest → fetch (+ onRetry loop)
+  → onResponse → commit → onCommit → onSettled → resolve
+failure → onError → onSettled → reject
 ```
 
-`onRequest`/`onResponse`/`onRetry` throwing rejects the request with `kind: 'plugin'` (the message names the plugin and hook); `onRequest` returning `false` aborts it with `kind: 'abort'`. `onCommit`/`onReset` are synchronous observers. Their failures, and `onError`/`onSettled` failures, are isolated: they are logged with `console.error` and never change the request's outcome. The abort signal is checked before request preparation, after every request/response hook, and after normalization, so an abort that lands after the network call still completes is honored — the response is never stored. A `signal` that is already aborted when `db.request` is called rejects immediately, before any `onRequest` hook runs. Waiting for fetch and async request/response hooks is abortable even if the implementation ignores the signal; late results are discarded and late rejections are observed. This cannot undo server writes or a plugin's own side effects. Per-request data for plugins travels in `options.meta` and is read as `ctx.meta`.
+`onRequestStart` is a synchronous bookkeeping phase, called in plugin order before preparation and the initial abort check. It also runs for already-aborted requests. It must return `undefined`; returning a Promise is a plugin error, and its rejection is observed. If a start hook fails, remaining start hooks still run before `onError` and `onSettled`, so every plugin can release its bookkeeping. A reset stops further hooks from the old generation.
+
+`onRequestStart`/`onRequest`/`onResponse`/`onRetry` throwing rejects the request with `kind: 'plugin'` (the message names the plugin and hook); `onRequest` returning `false` aborts it with `kind: 'abort'`. `onCommit`/`onReset` are synchronous observers. Their failures, and `onError`/`onSettled` failures, are isolated: they are logged with `console.error` and never change the request's outcome. The abort signal is checked before request preparation, after every request/response hook, and after normalization, so an abort that lands after the network call still completes is honored — the response is never stored. A `signal` that is already aborted when `db.request` is called rejects immediately, before any `onRequest` hook runs. Waiting for fetch and async request/response hooks is abortable even if the implementation ignores the signal; late results are discarded and late rejections are observed. This cannot undo server writes or a plugin's own side effects. Per-request data for plugins travels in `options.meta` and is read as `ctx.meta`.
 
 ```ts
 interface CdeebeePlugin<Storage> {
   name: string;
   setup?: (db: CdeebeeInstance<Storage>) => void;
+  onRequestStart?: (ctx: CdeebeeRequestContext<Storage>) => undefined;
   onRequest?: (ctx: CdeebeeRequestContext<Storage>) => void | false | Promise<void | false>;
   onResponse?: (ctx: CdeebeeRequestContext<Storage>) => void | Promise<void>;
   onRetry?: (ctx: CdeebeeRequestContext<Storage>) => number | false;
@@ -275,13 +293,17 @@ Built-ins, all importable from `@recats/cdeebee/core` (or `@recats/cdeebee`):
 
 | Plugin | Options | Behavior |
 |---|---|---|
-| `history(options?)` | `{ maxHistorySize?, ignoreAbort? }` | Records done/error entries and `lastResultIDList` per api; exposes `getState()`, `getLast(api)`, `subscribe(listener, apiList?)`, `clear(api?)`; honors the `historyClear` request option. Required by `useRequestHistory`, `useRequestErrorList`, `useLastResultIDList`, `useLastResponse`. Every entry retains the full parsed `response` object, so history is capped at `maxHistorySize` entries per api — `20` by default; pass `maxHistorySize: 0` for unbounded. Aborted requests are not recorded in `errorList` unless `ignoreAbort: false`. |
+| `history(options?)` | `{ maxHistorySize?, ignoreAbort?, key?: (ctx) => string }` | Records done/error entries and `lastResultIDList` per key (the `api` by default); exposes `getState()`, `getLast(key)`, `subscribe(listener, keyList?)`, `clear(key?)`; honors the `historyClear` request option. Required by `useRequestHistory`, `useRequestErrorList`, `useLastResultIDList`, `useLastResponse`. Entries are ordered by send, not by arrival, and each carries its send `seq`. Every entry retains the full parsed `response` object, so history is capped at `maxHistorySize` entries per key — `20` by default; pass `maxHistorySize: 0` for unbounded. Aborted requests are not recorded in `errorList` unless `ignoreAbort: false`. |
 | `cancelation(options?)` | `{ apiList?, mode?: 'previous' \| 'latest', key?: (ctx) => string }` | Cancels concurrent calls within one key (defaults to `ctx.api`): `'previous'` (default) aborts the in-flight call and lets the new one proceed; `'latest'` skips the new call while one is in flight. Restricted to `apiList` when given. Use separate keys for independent consumers of the same API. It does not share a response promise between callers. |
 | `queryQueue(options?)` | `{ apiList?, key?: (ctx) => string }` | Sends matching requests concurrently and processes successful responses in send order within each key. Uses one shared queue by default; `apiList` restricts participation. Failed or aborted entries preserve predecessor ordering. Aborting a waiting response rejects promptly. |
 | `retry(options)` | `{ count, backoffMs?, when? }` | Retries a failed request up to `count` times (`when` defaults to network errors only); `backoffMs` is a finite non-negative delay or `(attempt) => ms`. Request preparation failures and aborts are never retried. Retrying a mutation requires an application/server idempotency policy: a network failure does not prove the server rejected the write. |
 | `devtools(options?)` | `{ name? }` | Connects to the Redux DevTools browser extension if present and streams every commit and settled request as an action. Use one `devtools()` instance per store. |
 
-`history` records the normalized change set as proposed, not what freshness checks kept, so `lastResultIDList` can name ids no longer in storage (a list cleared while a request was in flight); `useEntityList` omits them. Responses without list envelopes keep the previous ids, while `getLast()` / `useLastResponse()` always reflect the latest successful response.
+`history` records the normalized change set as proposed, not what freshness checks kept, so `lastResultIDList` can name ids no longer in storage (a list cleared while a request was in flight); `useEntityList` omits them. Responses without list envelopes keep the previous ids, while `getLast()` / `useLastResponse()` always reflect the latest-sent successful response.
+
+`history` orders by send: when two requests under one key overlap and the earlier-sent one answers last, it is filed before the newer entry and does not replace `getLast()` or `lastResultIDList`, so a slow response to an old search never overwrites the result of a newer one. `clear(key)` removes the recorded history and ignores all pending responses for that key that started before the clear, even if nothing has been recorded yet. `clear()` does this for every tracked key. Requests started afterward are recorded normally. Clearing history does not abort requests or prevent their storage commits. `historyClear` ignores every response sent before its own request. Use `key` when one endpoint feeds independent views, for example `history({ key: ctx => typeof ctx.meta.historyKey === 'string' ? ctx.meta.historyKey : ctx.api })` with `meta: { historyKey: 'sidebarSearch' }`; the history hooks and `clear` then take that key.
+
+The history `key` callback runs once in its synchronous `onRequestStart` hook, before request preparation and any `onRequest` hooks. Derive it from `api`, `options` or the initial `meta`; the captured key is used throughout the request. A throwing callback rejects the request with `kind: 'plugin'`. After `clear`, ordering metadata for a key is released when its last pending request has been processed by history, including requests delayed in earlier plugins. Keys with retained history keep their metadata.
 
 Create separate stateful plugin instances for each store. Plugin order is the order of `pluginList` for every hook. List `queryQueue` first — an async `onSettled` in an earlier plugin delays the queue release, and with it every request waiting behind the current one.
 

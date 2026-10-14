@@ -47,12 +47,15 @@ Replace the rejected-action payload `{ status, statusText, data }` with `Cdeebee
 | Kind | Meaning |
 |---|---|
 | `http` | Non-success HTTP status; includes the parsed error body when available |
+| `response` | Success HTTP status whose body `settings.fetch.validateResponse` rejected; includes the parsed body |
 | `network` | Fetch failed |
 | `abort` | Request canceled or skipped by a plugin; use `isAbortError(error)` to recognize it |
 | `parse` | Response body could not be parsed |
 | `request` | URL, dynamic settings, or request-body preparation failed before fetch |
 | `plugin` | `onRequest`, `onResponse`, or `onRetry` failed, including an invalid retry delay |
 | `normalize` | Normalization failed or produced a change set with undeclared lists |
+
+If your API reports failures inside a success response (for example a `responseStatus` field), declare `settings.fetch.validateResponse` instead of checking the body in every plugin, normalizer and caller. Rejected bodies are not normalized and reach `onError` as `kind: 'response'`.
 
 Read `rawResponse`, `extension`, and other non-list data from the returned response or `useLastResponse(api)` with the history plugin. Remove `requestManager.requestByApiUrl` access and synthetic storage lists such as `RAW_GroupedStats`.
 
@@ -138,5 +141,9 @@ Empty arrays and explicit `undefined` are now values, not missing data. If your 
 The behavior of `null` is unchanged: it already overwrote stored values and requires no migration.
 
 Keep filtered result IDs, query statistics, and server ordering in query state. Patch canonical entities without query-only fields, and join those entities with the response when rendering. Do not use `replaceList` for a filtered search. Full entity responses still use `upsert`; dictionaries can use `replaceList`. Once placeholder handling is independent of storage, a shared response queue is unnecessary for thin/full merging. Keep request ordering where reads must wait for pending server writes.
+
+### History ordering from v4 betas
+
+`history` now orders entries by send instead of arrival: an earlier-sent response that answers last no longer replaces `getLast()`, `useLastResponse()` or `lastResultIDList`. Application plugins that tracked the latest-sent response to work around this can be replaced by `history`. `history({ key })` files entries under a custom key instead of the api, so one endpoint can feed independent views; the history hooks, `getLast`, `subscribe` and `clear` take that key. Entries carry their send `seq`. The history key is now captured once in the public synchronous `onRequestStart` phase, before preparation and `onRequest` hooks; move any key inputs previously supplied by a plugin into request `meta` or `options`. `clear(key)` now ignores all requests already started under that key; `clear()` includes keys with pending requests and no recorded history. Requests started after the clear are recorded normally. Clearing history does not cancel requests or suppress storage commits. Cleared keys release their ordering metadata after their pending requests settle.
 
 When migrating logout/session cleanup to `db.reset()`, implement `onReset` in application plugins that retain state or pending queues. Release waiters, clear request bookkeeping, and notify plugin subscribers there. The pipeline aborts old requests and suppresses their remaining lifecycle hooks.

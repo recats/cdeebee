@@ -115,10 +115,29 @@ export async function executeFetch(ctx: FetchContext, settings: CdeebeeFetchSett
     throw new CdeebeeRequestError({ kind: 'http', api: ctx.api, requestID: ctx.requestID, status: raw.status, response });
   }
 
+  let response: unknown;
   try {
-    return { response: await parseBody(raw, responseType), status: raw.status };
+    response = await parseBody(raw, responseType);
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') throw toRequestError(error, ctx);
     throw new CdeebeeRequestError({ kind: 'parse', api: ctx.api, requestID: ctx.requestID, status: raw.status, cause: error });
   }
+
+  if (settings.validateResponse) {
+    let valid = false;
+    let cause: unknown;
+    try {
+      const result: unknown = settings.validateResponse(response, { api: ctx.api, requestID: ctx.requestID, status: raw.status, responseType });
+      valid = result === true;
+      if (result && typeof (result as { then?: unknown }).then === 'function') {
+        void Promise.resolve(result).catch(() => {});
+        throw new TypeError('validateResponse must return a boolean synchronously');
+      }
+    } catch (error) {
+      cause = error;
+    }
+    if (valid !== true) throw new CdeebeeRequestError({ kind: 'response', api: ctx.api, requestID: ctx.requestID, status: raw.status, response, cause });
+  }
+
+  return { response, status: raw.status };
 }

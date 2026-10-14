@@ -73,7 +73,14 @@ export interface CdeebeeSnapshot<S> {
   pluginStateList: Record<string, unknown>;
 }
 
-export type CdeebeeErrorKind = 'http' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize' | 'request';
+export type CdeebeeErrorKind = 'http' | 'response' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize' | 'request';
+
+export interface CdeebeeResponseValidationContext {
+  api: string;
+  requestID: string;
+  status: number;
+  responseType: 'json' | 'text' | 'blob';
+}
 
 export interface CdeebeeFetchSettings {
   baseUrl?: string;
@@ -82,6 +89,7 @@ export interface CdeebeeFetchSettings {
   fileKey?: string;
   bodyKey?: string;
   fetch?: typeof fetch;
+  validateResponse?: (response: unknown, ctx: CdeebeeResponseValidationContext) => boolean;
 }
 
 export interface CdeebeeNormalizeContext<S> {
@@ -138,6 +146,7 @@ export interface CdeebeeRequestContext<S> {
 export interface CdeebeePlugin<S> {
   name: string;
   setup?: (db: CdeebeeInstance<S>) => void;
+  onRequestStart?: (ctx: CdeebeeRequestContext<S>) => undefined;
   onRequest?: (ctx: CdeebeeRequestContext<S>) => void | false | Promise<void | false>;
   onResponse?: (ctx: CdeebeeRequestContext<S>) => void | Promise<void>;
   onRetry?: (ctx: CdeebeeRequestContext<S>) => number | false;
