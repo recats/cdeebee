@@ -28,7 +28,8 @@ export function devtools<S>(options: CdeebeeDevtoolsOptions = {}): CdeebeePlugin
     onCommit: (_changeSet, meta) => {
       if (session === undefined) return;
       const { connection, db } = session;
-      connection.send({ type: meta.label ?? meta.source, meta }, db.getSnapshot());
+      if (meta.source === 'reset') connection.init(db.getSnapshot());
+      else connection.send({ type: meta.label ?? meta.source, meta }, db.getSnapshot());
     },
     onSettled: ctx => {
       if (session === undefined) return;

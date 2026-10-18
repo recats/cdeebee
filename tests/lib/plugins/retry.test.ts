@@ -9,6 +9,10 @@ const make = (fetch: typeof globalThis.fetch, options: Parameters<typeof retry<S
 });
 
 describe('retry plugin', () => {
+  it.each([NaN, Infinity, -1, 0.5])('rejects invalid retry count %s instead of retrying indefinitely', count => {
+    expect(() => retry({ count })).toThrow(RangeError);
+  });
+
   it('retries network errors up to count', async () => {
     const fetch = mockFetch([new TypeError('down'), new TypeError('down'), jsonResponse({ ok: 1 })]);
     await expect(make(fetch, { count: 2 }).request({ api: '/x' })).resolves.toEqual({ ok: 1 });

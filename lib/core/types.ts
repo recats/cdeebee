@@ -26,7 +26,7 @@ export type CdeebeeApiStrategyList<S> = Record<string, CdeebeeStrategyList<S>>;
 
 export interface CdeebeeListChange<E = CdeebeeEntity> {
   upsertList?: E[];
-  patchList?: E[];
+  patchList?: Partial<E>[];
   setList?: E[];
   removeIDList?: EntityID[];
   replaceList?: Record<EntityID, E>;
@@ -39,7 +39,7 @@ export interface CdeebeeChangedList<S> {
 }
 
 export interface CdeebeeCommitMeta {
-  source: 'request' | 'set';
+  source: 'request' | 'set' | 'reset';
   api?: string;
   requestID?: string;
   label?: string;
@@ -73,7 +73,14 @@ export interface CdeebeeSnapshot<S> {
   pluginStateList: Record<string, unknown>;
 }
 
-export type CdeebeeErrorKind = 'http' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize';
+export type CdeebeeErrorKind = 'http' | 'response' | 'network' | 'abort' | 'parse' | 'plugin' | 'normalize' | 'request';
+
+export interface CdeebeeResponseValidationContext {
+  api: string;
+  requestID: string;
+  status: number;
+  responseType: 'json' | 'text' | 'blob';
+}
 
 export interface CdeebeeFetchSettings {
   baseUrl?: string;
@@ -82,6 +89,7 @@ export interface CdeebeeFetchSettings {
   fileKey?: string;
   bodyKey?: string;
   fetch?: typeof fetch;
+  validateResponse?: (response: unknown, ctx: CdeebeeResponseValidationContext) => boolean;
 }
 
 export interface CdeebeeNormalizeContext<S> {
@@ -138,12 +146,15 @@ export interface CdeebeeRequestContext<S> {
 export interface CdeebeePlugin<S> {
   name: string;
   setup?: (db: CdeebeeInstance<S>) => void;
+  onRequestStart?: (ctx: CdeebeeRequestContext<S>) => undefined;
   onRequest?: (ctx: CdeebeeRequestContext<S>) => void | false | Promise<void | false>;
   onResponse?: (ctx: CdeebeeRequestContext<S>) => void | Promise<void>;
   onRetry?: (ctx: CdeebeeRequestContext<S>) => number | false;
   onError?: (ctx: CdeebeeRequestContext<S>) => void | Promise<void>;
   onSettled?: (ctx: CdeebeeRequestContext<S>) => void | Promise<void>;
   onCommit?: (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta, changedList: CdeebeeChangedList<S>[]) => void;
+  /** Release resources and clear plugin state. Requests from before reset receive no further hooks. */
+  onReset?: () => void;
   getState?: () => unknown;
 }
 
@@ -174,7 +185,7 @@ export interface CdeebeeInstance<S> {
   getSnapshot: () => CdeebeeSnapshot<S>;
   getPlugin: <P extends CdeebeePlugin<S>>(name: string) => P | undefined;
   getEntityMeta: <K extends ListName<S>>(listName: K, entityID: EntityID) => CdeebeeEntityMeta | undefined;
-  commit: (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta) => CdeebeeChangedList<S>[];
+  commit: (changeSet: CdeebeeChangeSet<S>, meta: CdeebeeCommitMeta & { source: 'request' | 'set' }) => CdeebeeChangedList<S>[];
   setEntity: <K extends ListName<S>>(
     listName: K,
     entityID: EntityID,
@@ -183,6 +194,8 @@ export interface CdeebeeInstance<S> {
   removeEntityList: <K extends ListName<S>>(listName: K, entityIDList: EntityID[]) => void;
   clearList: <K extends ListName<S>>(listName: K) => void;
   replaceList: <K extends ListName<S>>(listName: K, entityRecord: Record<EntityID, EntityOf<S[K]>>) => void;
+  /** Empty storage and built-in plugin state, abort pending requests, keep subscriptions and settings. */
+  reset: () => void;
   subscribe: (listener: CdeebeeListener, dependencyList?: CdeebeeDependency<S>[]) => () => void;
   subscribeRequest: (listener: CdeebeeListener, apiList?: string[]) => () => void;
   getIndex: <K extends ListName<S>>(listName: K, fieldName: EntityFieldName<S, K>, value: unknown) => ReadonlySet<EntityID>;

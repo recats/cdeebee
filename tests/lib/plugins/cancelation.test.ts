@@ -27,6 +27,22 @@ const make = (fetch: typeof globalThis.fetch, options?: Parameters<typeof cancel
 });
 
 describe('cancelation plugin', () => {
+  it('custom keys isolate concurrent consumers of the same API', async () => {
+    const { fetch, deferredList } = controllableFetch();
+    const db = make(fetch, { key: ctx => String(ctx.meta.editorID) });
+    const first = db.requestSettled({ api: '/x', meta: { editorID: 1 } });
+    const other = db.requestSettled({ api: '/x', meta: { editorID: 2 } });
+    await tick();
+    const replacement = db.requestSettled({ api: '/x', meta: { editorID: 1 } });
+    await expect(first).resolves.toMatchObject({ ok: false, error: { kind: 'abort' } });
+    await tick();
+    deferredList[1].resolve(jsonResponse({ editorID: 2 }));
+    deferredList[2].resolve(jsonResponse({ editorID: 1 }));
+    await expect(other).resolves.toEqual({ ok: true, response: { editorID: 2 } });
+    await expect(replacement).resolves.toEqual({ ok: true, response: { editorID: 1 } });
+    expect(db.getState().activeRequestList).toEqual([]);
+  });
+
   it("mode 'previous' aborts the earlier in-flight request for the same api", async () => {
     const { fetch, deferredList } = controllableFetch();
     const db = make(fetch);
@@ -80,4 +96,61 @@ describe('cancelation plugin', () => {
     deferredList[1].resolve(jsonResponse({ ok: 3 }));
     await expect(third).resolves.toEqual({ ok: 3 });
   });
+});
+
+it('settling a superseded request cannot release the current cancellation slot', async () => {
+  const { fetch, deferredList } = controllableFetch();
+  const db = make(fetch);
+  const first = db.requestSettled({ api: '/x' });
+  await tick();
+  const second = db.requestSettled({ api: '/x' });
+  await expect(first).resolves.toMatchObject({ ok: false, error: { kind: 'abort' } });
+  await tick();
+  const third = db.requestSettled({ api: '/x' });
+  await expect(second).resolves.toMatchObject({ ok: false, error: { kind: 'abort' } });
+  await tick();
+  deferredList.at(-1)!.resolve(jsonResponse({ winner: 3 }));
+  await expect(third).resolves.toEqual({ ok: true, response: { winner: 3 } });
+});
+
+it('a request started by an abort listener supersedes the request that triggered the abort', async () => {
+  const { fetch, deferredList } = controllableFetch();
+  const db = make(fetch);
+  let reentrant: ReturnType<typeof db.requestSettled> | undefined;
+  db.pluginList.unshift({
+    name: 'reentrantAbort',
+    onRequest: ctx => {
+      if (ctx.meta.first) ctx.controller.signal.addEventListener('abort', () => {
+        reentrant = db.requestSettled({ api: '/x' });
+      }, { once: true });
+    },
+  });
+  const first = db.requestSettled({ api: '/x', meta: { first: true } });
+  await tick();
+  const second = db.requestSettled({ api: '/x' });
+  await expect(first).resolves.toMatchObject({ ok: false, error: { kind: 'abort' } });
+  await expect(second).resolves.toMatchObject({ ok: false, error: { kind: 'abort' } });
+  await tick();
+  deferredList.at(-1)!.resolve(jsonResponse({ winner: 'reentrant' }));
+  await expect(reentrant).resolves.toEqual({ ok: true, response: { winner: 'reentrant' } });
+});
+
+it('latest admits a new request while an aborted predecessor is still settling', async () => {
+  const { fetch, deferredList } = controllableFetch();
+  const ready = deferred<void>();
+  const release = deferred<void>();
+  const db = make(fetch, { mode: 'latest' });
+  db.pluginList.unshift({ name: 'slowError', onError: async () => { ready.resolve(); await release.promise; } });
+  const controller = new AbortController();
+  const first = db.requestSettled({ api: '/x', signal: controller.signal });
+  await tick();
+  controller.abort();
+  await ready.promise;
+  const next = db.requestSettled({ api: '/x' });
+  await tick();
+  expect(fetch).toHaveBeenCalledTimes(2);
+  release.resolve();
+  await expect(first).resolves.toMatchObject({ ok: false, error: { kind: 'abort' } });
+  deferredList[1].resolve(jsonResponse({ ok: true }));
+  await expect(next).resolves.toEqual({ ok: true, response: { ok: true } });
 });

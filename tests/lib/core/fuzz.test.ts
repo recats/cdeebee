@@ -83,7 +83,7 @@ const naivePresence = (stepList: Step[]): string => {
   let idSet = new Set<number>();
   for (const { change } of [...stepList].sort((x, y) => x.seq - y.seq)) {
     if (change.replaceList) idSet = new Set(Object.keys(change.replaceList).map(Number));
-    for (const list of [change.upsertList, change.patchList, change.setList]) list?.forEach(item => idSet.add(item.itemID));
+    for (const list of [change.upsertList, change.patchList, change.setList]) list?.forEach(item => idSet.add(item.itemID!));
     change.removeIDList?.forEach(itemID => idSet.delete(itemID as number));
   }
   return [...idSet].sort().join(',');

@@ -29,14 +29,14 @@ export class CdeebeeRequestError extends Error {
   }
 }
 
-export function isAbortError(error: unknown): boolean {
+export function isAbortError(error: unknown): error is CdeebeeRequestError & { kind: 'abort' } {
   return error instanceof CdeebeeRequestError && error.kind === 'abort';
 }
 
 export function toRequestError(
   error: unknown,
   ctx: { api: string; requestID: string },
-  kind: 'network' | 'plugin' | 'normalize' = 'network',
+  kind: 'network' | 'plugin' | 'normalize' | 'request' = 'network',
   source?: string,
 ): CdeebeeRequestError {
   if (error instanceof CdeebeeRequestError) return error;

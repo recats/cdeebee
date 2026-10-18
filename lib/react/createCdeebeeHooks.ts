@@ -1,5 +1,5 @@
 import { useCallback, useRef, useSyncExternalStore } from 'react';
-import { shallowEqual } from '../utils/shallowEqual';
+import { keepIfShallowEqual, shallowEqual } from '../utils/shallowEqual';
 import { usePluginState } from './usePluginState';
 import type { CdeebeeHistoryEntry, CdeebeeHistoryPlugin } from '../plugins/history';
 import type { CdeebeeInstance, CdeebeeList, CdeebeeState, CdeebeeStorageShape, EntityID, EntityOf, EntityFieldName, ListName } from '../core/types';
@@ -26,10 +26,6 @@ interface StoreSelectorCache<S, R> {
   equalityFn: (a: R, b: R) => boolean;
   result: R;
 }
-
-const keepIfEqual = <R>(prev: R | undefined, next: R): R => (
-  prev !== undefined && Array.isArray(next) && shallowEqual(prev, next) ? prev : next
-);
 
 export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: CdeebeeInstance<S>) {
   const getList = <K extends ListName<S>>(listName: K) => db.getState().storage[listName] as unknown as CdeebeeList<EntityOf<S[K]>>;
@@ -74,7 +70,7 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
         const entity = list[entityIDList[i]];
         if (entity !== undefined) next.push(entity);
       }
-      const result = keepIfEqual(cache?.result, next);
+      const result = keepIfShallowEqual(cache?.result, next);
       cacheRef.current = { list, key, result };
       return result;
     }, [listName, key]);
@@ -90,7 +86,7 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
       const list = db.getState().storage[listName];
       const cache = cacheRef.current;
       if (cache && cache.list === list && shallowEqual(cache.key, depList)) return cache.result;
-      const result = keepIfEqual(cache?.result, selectorRef.current(list));
+      const result = keepIfShallowEqual(cache?.result, selectorRef.current(list));
       cacheRef.current = { list, key: depList, result };
       return result;
     };
@@ -118,7 +114,7 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
           if (entity !== undefined) next.push(entity);
         });
       }
-      const result = keepIfEqual(cache?.result, next);
+      const result = keepIfShallowEqual(cache?.result, next);
       cacheRef.current = { list, fieldName, valueList, result };
       return result;
     };
@@ -170,25 +166,25 @@ export function createCdeebeeHooks<S extends CdeebeeStorageShape<S>>(db: Cdeebee
     return plugin;
   };
 
-  const useHistorySlice = <R>(api: string, select: (plugin: CdeebeeHistoryPlugin<S>) => R): R => {
+  const useHistorySlice = <R>(key: string, select: (plugin: CdeebeeHistoryPlugin<S>) => R): R => {
     const plugin = getHistoryPlugin();
-    return usePluginState(plugin.subscribe, () => select(plugin), [api]);
+    return usePluginState(plugin.subscribe, () => select(plugin), [key]);
   };
 
-  const useRequestHistory = (api: string): CdeebeeHistoryEntry[] => (
-    useHistorySlice(api, plugin => plugin.getState().doneList[api] ?? EMPTY_LIST)
+  const useRequestHistory = (key: string): CdeebeeHistoryEntry[] => (
+    useHistorySlice(key, plugin => plugin.getState().doneList[key] ?? EMPTY_LIST)
   );
 
-  const useRequestErrorList = (api: string): CdeebeeHistoryEntry[] => (
-    useHistorySlice(api, plugin => plugin.getState().errorList[api] ?? EMPTY_LIST)
+  const useRequestErrorList = (key: string): CdeebeeHistoryEntry[] => (
+    useHistorySlice(key, plugin => plugin.getState().errorList[key] ?? EMPTY_LIST)
   );
 
-  const useLastResultIDList = <K extends ListName<S>>(api: string, listName: K): EntityID[] => (
-    useHistorySlice(api, plugin => plugin.getState().lastResultIDList[api]?.[listName] ?? EMPTY_LIST)
+  const useLastResultIDList = <K extends ListName<S>>(key: string, listName: K): EntityID[] => (
+    useHistorySlice(key, plugin => plugin.getState().lastResultIDList[key]?.[listName] ?? EMPTY_LIST)
   );
 
-  const useLastResponse = <R = unknown>(api: string): R | undefined => (
-    useHistorySlice(api, plugin => plugin.getLast(api)?.response as R | undefined)
+  const useLastResponse = <R = unknown>(key: string): R | undefined => (
+    useHistorySlice(key, plugin => plugin.getLast(key)?.response as R | undefined)
   );
 
   return {

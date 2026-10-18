@@ -1,5 +1,5 @@
 import { createCdeebee } from '../../../lib/core/createCdeebee';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { buildUrl, resolveHeaderList, resolveData, buildRequestInit, executeFetch, type FetchContext } from '../../../lib/core/fetchClient';
 import { CdeebeeRequestError } from '../../../lib/core/requestError';
 import { jsonResponse, createMockResponse, mockFetch } from '../test-helpers';
@@ -28,6 +28,11 @@ describe('buildUrl', () => {
 });
 
 describe('resolveHeaderList / resolveData', () => {
+  it('request headers override settings regardless of casing', () => {
+    const headers = new Headers(resolveHeaderList({ headerList: { Authorization: 'old', Accept: 'application/json' } }, { authorization: 'new' }));
+    expect(headers.get('authorization')).toBe('new');
+    expect(headers.get('accept')).toBe('application/json');
+  });
   it('merges static settings with request values, request wins', () => {
     expect(resolveHeaderList({ headerList: { A: '1', B: '1' } }, { B: '2' })).toEqual({ A: '1', B: '2' });
     expect(resolveData({ mergeWithData: { token: 't', a: 0 } }, { a: 1 })).toEqual({ token: 't', a: 1 });
@@ -45,6 +50,12 @@ describe('resolveHeaderList / resolveData', () => {
 });
 
 describe('buildRequestInit', () => {
+  it('sends one content type and one internal request ID regardless of casing', () => {
+    const init = buildRequestInit(baseCtx({ headerList: { 'content-type': 'application/custom+json', 'UI-Request-ID': 'spoof' } }), {});
+    const headers = new Headers(init.headers);
+    expect(headers.get('content-type')).toBe('application/custom+json');
+    expect(headers.get('ui-request-id')).toBe('r1');
+  });
   it('POST sends JSON body with content-type and ui-request-id', () => {
     const init = buildRequestInit(baseCtx(), {});
     expect(init.method).toBe('POST');
@@ -110,6 +121,49 @@ describe('executeFetch', () => {
     const error = await executeFetch(baseCtx(), { fetch }).catch(e => e);
     expect(error.kind).toBe('http');
     expect(error.response).toBeUndefined();
+  });
+  it('validateResponse rejecting an ok body: kind response with status and parsed body', async () => {
+    const validateResponse = vi.fn((response: unknown) => (response as { status: string }).status === 'Success');
+    const fetch = mockFetch([jsonResponse({ status: 'Denied' })]);
+    const error = await executeFetch(baseCtx(), { fetch, validateResponse }).catch(e => e);
+    expect(error).toBeInstanceOf(CdeebeeRequestError);
+    expect(error.kind).toBe('response');
+    expect(error.status).toBe(200);
+    expect(error.response).toEqual({ status: 'Denied' });
+    expect(validateResponse).toHaveBeenCalledWith({ status: 'Denied' }, { api: '/x', requestID: 'r1', status: 200, responseType: 'json' });
+  });
+  it('validateResponse accepting the body returns it', async () => {
+    const result = await executeFetch(baseCtx(), { fetch: mockFetch([jsonResponse({ status: 'Success' })]), validateResponse: () => true });
+    expect(result).toEqual({ response: { status: 'Success' }, status: 200 });
+  });
+  it.each([1, 'true', {}])('validateResponse rejects a truthy non-boolean result: %j', result => {
+    return expect(executeFetch(baseCtx(), {
+      fetch: mockFetch([jsonResponse({})]),
+      validateResponse: () => result as unknown as boolean,
+    })).rejects.toMatchObject({ kind: 'response' });
+  });
+  it.each([
+    ['false', async (): Promise<boolean> => false],
+    ['true', async (): Promise<boolean> => true],
+    ['rejection', async (): Promise<boolean> => { throw new Error('async failure'); }],
+  ] as const)('validateResponse rejects async validators (%s)', async (_name, validator) => {
+    await expect(executeFetch(baseCtx(), {
+      fetch: mockFetch([jsonResponse({})]),
+      validateResponse: validator as unknown as () => boolean,
+    })).rejects.toMatchObject({ kind: 'response', cause: expect.any(TypeError) });
+  });
+  it('validateResponse is not called for non-ok responses', async () => {
+    const validateResponse = vi.fn(() => true);
+    const error = await executeFetch(baseCtx(), { fetch: mockFetch([jsonResponse({}, { ok: false, status: 500 })]), validateResponse }).catch(e => e);
+    expect(error.kind).toBe('http');
+    expect(validateResponse).not.toHaveBeenCalled();
+  });
+  it('validateResponse throwing is a response error carrying the cause', async () => {
+    const cause = new Error('boom');
+    const error = await executeFetch(baseCtx(), { fetch: mockFetch([jsonResponse({ a: 1 })]), validateResponse: () => { throw cause; } }).catch(e => e);
+    expect(error.kind).toBe('response');
+    expect(error.response).toEqual({ a: 1 });
+    expect(error.cause).toBe(cause);
   });
   it('parse error on ok response', async () => {
     const fetch = mockFetch([createMockResponse({ text: async () => 'bad json' })]);
